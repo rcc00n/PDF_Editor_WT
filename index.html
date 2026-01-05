@@ -15,12 +15,21 @@
   <body>
     <div class="app-shell">
       <aside class="rail">
-        <div class="brand">
-          <div class="brand-mark">RF</div>
-          <div>
-            <div class="brand-name">RelayForms</div>
-            <div class="brand-meta">Offline-first PDF Forms Platform</div>
+        <div class="rail-top">
+          <div class="brand">
+            <div class="brand-mark">RF</div>
+            <div class="brand-text">
+              <div class="brand-name">RelayForms</div>
+              <div class="brand-meta">Offline-first PDF Forms Platform</div>
+            </div>
           </div>
+          <button
+            class="rail-toggle"
+            type="button"
+            aria-expanded="true"
+            aria-label="Collapse sidebar"
+            title="Collapse sidebar"
+          ></button>
         </div>
 
         <div class="rail-status">
@@ -33,19 +42,24 @@
 
         <nav class="nav">
           <button class="nav-link is-active" data-screen="dashboard" type="button">
-            Dashboard
+            <span class="nav-icon" aria-hidden="true">DB</span>
+            <span class="nav-text">Dashboard</span>
           </button>
           <button class="nav-link" data-screen="builder" type="button">
-            Form Builder
+            <span class="nav-icon" aria-hidden="true">FB</span>
+            <span class="nav-text">Form Builder</span>
           </button>
           <button class="nav-link" data-screen="field" type="button">
-            Field App
+            <span class="nav-icon" aria-hidden="true">FA</span>
+            <span class="nav-text">Field App</span>
           </button>
           <button class="nav-link" data-screen="sync" type="button">
-            Sync Queue
+            <span class="nav-icon" aria-hidden="true">SQ</span>
+            <span class="nav-text">Sync Queue</span>
           </button>
           <button class="nav-link" data-screen="review" type="button">
-            Admin Review & Export
+            <span class="nav-icon" aria-hidden="true">AR</span>
+            <span class="nav-text">Admin Review & Export</span>
           </button>
         </nav>
 

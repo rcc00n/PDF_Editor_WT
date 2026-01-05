@@ -18,7 +18,9 @@
   --radius-sm: 8px;
 }
 
-* {
+*,
+*::before,
+*::after {
   box-sizing: border-box;
 }
 
@@ -46,8 +48,18 @@ body::before {
   position: relative;
   z-index: 1;
   display: grid;
-  grid-template-columns: 280px 1fr;
+  --rail-width: 280px;
+  grid-template-columns: var(--rail-width) 1fr;
   min-height: 100vh;
+  transition: grid-template-columns 0.25s ease;
+}
+
+.app-shell.is-collapsed {
+  --rail-width: 92px;
+}
+
+.app-shell > * {
+  min-width: 0;
 }
 
 .rail {
@@ -57,12 +69,28 @@ body::before {
   display: flex;
   flex-direction: column;
   gap: 24px;
+  transition: padding 0.25s ease;
+}
+
+.rail-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
 }
 
 .brand {
   display: flex;
   align-items: center;
   gap: 12px;
+}
+
+.brand-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-width: 180px;
+  transition: opacity 0.2s ease, max-width 0.2s ease;
 }
 
 .brand-mark {
@@ -90,6 +118,51 @@ body::before {
   margin-top: 2px;
 }
 
+.rail-toggle {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: #fff;
+  color: var(--text);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.rail-toggle::before {
+  content: "<";
+  font-family: "Sora", "IBM Plex Sans", sans-serif;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.rail-toggle:hover {
+  border-color: rgba(15, 118, 110, 0.3);
+  color: var(--accent-dark);
+}
+
+.app-shell.is-collapsed .rail-toggle::before {
+  content: ">";
+}
+
+.app-shell.is-collapsed .brand-text {
+  opacity: 0;
+  max-width: 0;
+  overflow: hidden;
+}
+
+.app-shell.is-collapsed .rail {
+  padding: 28px 12px;
+}
+
+.app-shell.is-collapsed .rail-status,
+.app-shell.is-collapsed .rail-card {
+  display: none;
+}
+
 .rail-status {
   display: flex;
   flex-direction: column;
@@ -111,6 +184,9 @@ body::before {
 }
 
 .nav-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   border: 1px solid transparent;
   background: transparent;
   font-family: inherit;
@@ -123,6 +199,25 @@ body::before {
   transition: all 0.2s ease;
 }
 
+.nav-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  background: rgba(15, 118, 110, 0.14);
+  color: var(--accent-dark);
+  display: none;
+  place-items: center;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  flex: 0 0 32px;
+}
+
+.nav-text {
+  white-space: nowrap;
+  transition: opacity 0.2s ease, width 0.2s ease;
+}
+
 .nav-link:hover {
   background: rgba(15, 118, 110, 0.08);
 }
@@ -131,6 +226,23 @@ body::before {
   background: var(--accent-soft);
   border-color: rgba(15, 118, 110, 0.3);
   color: var(--accent-dark);
+}
+
+.app-shell.is-collapsed .nav-link {
+  justify-content: center;
+  padding: 10px;
+  gap: 0;
+}
+
+.app-shell.is-collapsed .nav-icon {
+  display: grid;
+}
+
+.app-shell.is-collapsed .nav-text {
+  opacity: 0;
+  width: 0;
+  overflow: hidden;
+  pointer-events: none;
 }
 
 .rail-card {
@@ -161,35 +273,11 @@ body::before {
 
 .screen.is-active {
   display: block;
-  animation: screenEnter 0.4s ease;
-}
-
-@keyframes screenEnter {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
 }
 
 .reveal {
-  opacity: 0;
-  transform: translateY(8px);
-}
-
-.screen.is-active .reveal {
-  animation: revealUp 0.5s ease forwards;
-  animation-delay: var(--delay, 0s);
-}
-
-@keyframes revealUp {
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  opacity: 1;
+  transform: none;
 }
 
 h1 {
@@ -250,7 +338,6 @@ h2 {
   font-weight: 600;
   font-family: inherit;
   cursor: pointer;
-  transition: all 0.2s ease;
 }
 
 .btn-primary {
@@ -353,12 +440,13 @@ h2 {
 
 .dashboard-grid {
   display: grid;
-  grid-template-columns: 2.2fr 1fr;
+  grid-template-columns: minmax(0, 2.2fr) minmax(0, 1fr);
   grid-template-areas:
     "forms sync"
     "forms tickets"
     "activity activity";
   gap: 18px;
+  align-items: start;
 }
 
 .forms-overview {
@@ -463,9 +551,10 @@ h2 {
 .builder-meta {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   gap: 16px;
   margin-bottom: 20px;
+  flex-wrap: wrap;
 }
 
 .file-pill {
@@ -478,11 +567,17 @@ h2 {
   border: 1px solid var(--border);
   font-weight: 600;
   font-size: 13px;
+  flex: 1 1 260px;
+  max-width: 100%;
+  white-space: normal;
 }
 
 .meta-group {
   display: flex;
   gap: 18px;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  row-gap: 10px;
 }
 
 .meta-label {
@@ -499,8 +594,9 @@ h2 {
 
 .builder-grid {
   display: grid;
-  grid-template-columns: 180px 1fr 260px;
+  grid-template-columns: 180px minmax(0, 1fr) 260px;
   gap: 16px;
+  align-items: start;
 }
 
 .palette-list {
@@ -519,7 +615,6 @@ h2 {
   background: rgba(15, 23, 42, 0.02);
   cursor: pointer;
   font-weight: 600;
-  transition: all 0.2s ease;
 }
 
 .palette-item:hover {
@@ -671,7 +766,6 @@ h2 {
   inset: 0;
   background: rgba(15, 23, 42, 0.12);
   border-radius: 999px;
-  transition: all 0.2s ease;
 }
 
 .toggle-slider::before {
@@ -684,7 +778,6 @@ h2 {
   top: 3px;
   left: 3px;
   box-shadow: 0 2px 6px rgba(15, 23, 42, 0.2);
-  transition: all 0.2s ease;
 }
 
 .toggle input:checked + .toggle-slider {
@@ -702,7 +795,7 @@ h2 {
 
 .field-layout {
   display: grid;
-  grid-template-columns: 1.3fr 0.8fr;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 0.8fr);
   gap: 20px;
   align-items: start;
 }
@@ -802,8 +895,9 @@ h2 {
 
 .queue-grid {
   display: grid;
-  grid-template-columns: 280px 1fr;
+  grid-template-columns: minmax(240px, 280px) minmax(0, 1fr);
   gap: 20px;
+  align-items: start;
 }
 
 .queue-group {
@@ -849,8 +943,17 @@ h2 {
 
 .review-grid {
   display: grid;
-  grid-template-columns: 1.2fr 0.8fr;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.8fr);
   gap: 20px;
+  align-items: start;
+}
+
+.dashboard-grid > *,
+.builder-grid > *,
+.field-layout > *,
+.queue-grid > *,
+.review-grid > * {
+  min-width: 0;
 }
 
 .review-side {
@@ -923,11 +1026,11 @@ h2 {
 
 @media (max-width: 1100px) {
   .app-shell {
-    grid-template-columns: 220px 1fr;
+    --rail-width: 220px;
   }
 
   .builder-grid {
-    grid-template-columns: 160px 1fr;
+    grid-template-columns: 160px minmax(0, 1fr);
   }
 
   .properties {
@@ -957,6 +1060,10 @@ h2 {
     justify-content: space-between;
     flex-wrap: wrap;
     gap: 12px;
+  }
+
+  .rail-top {
+    width: 100%;
   }
 
   .nav {
