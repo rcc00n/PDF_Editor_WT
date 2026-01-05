@@ -1,0 +1,755 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>RelayForms - Offline-first PDF Forms</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=Sora:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="rail">
+        <div class="brand">
+          <div class="brand-mark">RF</div>
+          <div>
+            <div class="brand-name">RelayForms</div>
+            <div class="brand-meta">Offline-first PDF Forms Platform</div>
+          </div>
+        </div>
+
+        <div class="rail-status">
+          <span class="chip chip-outline">Offline-ready</span>
+          <div class="sync-mini">
+            <div class="sync-count">Queue: 7 pending</div>
+            <div class="sync-last">Last successful sync 09:12</div>
+          </div>
+        </div>
+
+        <nav class="nav">
+          <button class="nav-link is-active" data-screen="dashboard" type="button">
+            Dashboard
+          </button>
+          <button class="nav-link" data-screen="builder" type="button">
+            Form Builder
+          </button>
+          <button class="nav-link" data-screen="field" type="button">
+            Field App
+          </button>
+          <button class="nav-link" data-screen="sync" type="button">
+            Sync Queue
+          </button>
+          <button class="nav-link" data-screen="review" type="button">
+            Admin Review & Export
+          </button>
+        </nav>
+
+        <div class="rail-card">
+          <div class="card-title">Sync Status Overview</div>
+          <div class="sync-stats">
+            <div>
+              <div class="metric-value">7</div>
+              <div class="metric-label">Pending</div>
+            </div>
+            <div>
+              <div class="metric-value">1</div>
+              <div class="metric-label">In progress</div>
+            </div>
+            <div>
+              <div class="metric-value">2</div>
+              <div class="metric-label">Failed</div>
+            </div>
+            <div>
+              <div class="metric-value">42</div>
+              <div class="metric-label">Synced today</div>
+            </div>
+          </div>
+          <button class="btn btn-ghost" data-screen="sync" type="button">Open Sync Queue</button>
+        </div>
+      </aside>
+
+      <main class="main">
+        <section class="screen is-active" id="dashboard" data-title="Dashboard">
+          <header class="screen-header">
+            <div>
+              <h1>Dashboard</h1>
+              <p class="subtle">Immediate visibility into forms, field activity, and sync health.</p>
+            </div>
+            <div class="header-actions">
+              <button class="btn btn-primary" data-screen="builder" type="button">
+                Create New Form
+              </button>
+              <button class="btn btn-ghost" data-screen="field" type="button">
+                Open Field App
+              </button>
+            </div>
+          </header>
+
+          <div class="dashboard-grid">
+            <section class="panel forms-overview reveal" style="--delay: 0.1s">
+              <div class="panel-header">
+                <div>
+                  <h2>Forms Overview</h2>
+                  <p class="subtle">Versioned templates with per-form sync state.</p>
+                </div>
+                <button class="btn btn-secondary" data-screen="builder" type="button">
+                  New Version
+                </button>
+              </div>
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th>Form Name</th>
+                    <th>Version</th>
+                    <th>Status</th>
+                    <th>Sync</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>
+                      <div class="primary">Pump Station Safety Inspection</div>
+                      <div class="subtle">PDF locked | Schema v2.3</div>
+                    </td>
+                    <td>v2.3</td>
+                    <td><span class="chip chip-success">Active</span></td>
+                    <td>
+                      <div class="primary">Last synced 09:12</div>
+                      <div class="subtle">0 queued</div>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <div class="primary">Fiber Splice Completion</div>
+                      <div class="subtle">PDF locked | Schema v1.8</div>
+                    </td>
+                    <td>v1.8</td>
+                    <td><span class="chip chip-success">Active</span></td>
+                    <td>
+                      <div class="primary">3 pending</div>
+                      <div class="subtle">Last synced 08:31</div>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <div class="primary">Hazard Assessment - Urban Site</div>
+                      <div class="subtle">PDF locked | Schema v3.1</div>
+                    </td>
+                    <td>v3.1</td>
+                    <td><span class="chip chip-warning">Draft</span></td>
+                    <td>
+                      <div class="primary">Offline only</div>
+                      <div class="subtle">Not published</div>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <div class="primary">Water Main Pressure Test</div>
+                      <div class="subtle">PDF locked | Schema v2.0</div>
+                    </td>
+                    <td>v2.0</td>
+                    <td><span class="chip chip-muted">Archived</span></td>
+                    <td>
+                      <div class="primary">Synced</div>
+                      <div class="subtle">No active tickets</div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </section>
+
+            <section class="panel daily-tickets reveal" style="--delay: 0.2s">
+              <div class="panel-header">
+                <h2>Daily Field Tickets</h2>
+                <span class="chip chip-outline">Today</span>
+              </div>
+              <div class="ticket-list">
+                <div class="ticket-item">
+                  <div>
+                    <div class="primary">FT-2841 - Pump Station #12</div>
+                    <div class="subtle">Assigned: Jordan Miles | 08:58</div>
+                  </div>
+                  <span class="chip chip-pending">Pending</span>
+                </div>
+                <div class="ticket-item">
+                  <div>
+                    <div class="primary">FT-2839 - Fiber Splice 07A</div>
+                    <div class="subtle">Assigned: Luis Ortega | 08:14</div>
+                  </div>
+                  <span class="chip chip-success">Synced</span>
+                </div>
+                <div class="ticket-item">
+                  <div>
+                    <div class="primary">FT-2836 - Hazard Assessment</div>
+                    <div class="subtle">Assigned: Quinn Hart | 07:42</div>
+                  </div>
+                  <span class="chip chip-danger">Error</span>
+                </div>
+              </div>
+            </section>
+
+            <section class="panel sync-overview reveal" style="--delay: 0.25s">
+              <div class="panel-header">
+                <h2>Sync Status Overview</h2>
+                <span class="chip chip-outline">Queue Health</span>
+              </div>
+              <div class="metric-grid">
+                <div class="metric">
+                  <div class="metric-value">7</div>
+                  <div class="metric-label">Pending</div>
+                </div>
+                <div class="metric">
+                  <div class="metric-value">1</div>
+                  <div class="metric-label">In progress</div>
+                </div>
+                <div class="metric">
+                  <div class="metric-value">2</div>
+                  <div class="metric-label">Failed</div>
+                </div>
+                <div class="metric">
+                  <div class="metric-value">09:12</div>
+                  <div class="metric-label">Last success</div>
+                </div>
+              </div>
+              <button class="btn btn-secondary" data-screen="sync" type="button">
+                View Sync Queue
+              </button>
+            </section>
+
+            <section class="panel activity reveal" style="--delay: 0.3s">
+              <div class="panel-header">
+                <h2>Last Activity</h2>
+                <span class="chip chip-outline">Past 24 hours</span>
+              </div>
+              <div class="activity-list">
+                <div class="activity-item">
+                  <div class="activity-time">09:14</div>
+                  <div>
+                    <div class="primary">FT-2841 queued from Field App</div>
+                    <div class="subtle">Pump Station #12 | Jordan Miles</div>
+                  </div>
+                </div>
+                <div class="activity-item">
+                  <div class="activity-time">08:42</div>
+                  <div>
+                    <div class="primary">Form Builder published v2.3</div>
+                    <div class="subtle">Pump Station Safety Inspection</div>
+                  </div>
+                </div>
+                <div class="activity-item">
+                  <div class="activity-time">Yesterday</div>
+                  <div>
+                    <div class="primary">Sync job resolved 2 conflicts</div>
+                    <div class="subtle">Server accepted newer field values</div>
+                  </div>
+                </div>
+              </div>
+            </section>
+          </div>
+        </section>
+
+        <section class="screen" id="builder" data-title="PDF Upload & Form Builder">
+          <header class="screen-header">
+            <div>
+              <h1>PDF Upload & Form Builder</h1>
+              <p class="subtle">Map structured fields onto the locked PDF layout.</p>
+            </div>
+            <div class="header-actions">
+              <button class="btn btn-ghost" data-screen="field" type="button">Preview Field App</button>
+              <button class="btn btn-secondary" type="button">Replace PDF</button>
+              <button class="btn btn-primary" type="button">Publish Version</button>
+            </div>
+          </header>
+
+          <div class="builder-meta reveal" style="--delay: 0.1s">
+            <div class="file-pill">
+              Pump Station Safety Inspection.pdf
+              <span class="chip chip-success">Processed</span>
+            </div>
+            <div class="meta-group">
+              <div>
+                <div class="meta-label">Form Version</div>
+                <div class="meta-value">v2.3 | 12 fields</div>
+              </div>
+              <div>
+                <div class="meta-label">PDF Layout</div>
+                <div class="meta-value">Locked | Server-rendered</div>
+              </div>
+              <div>
+                <div class="meta-label">Status</div>
+                <div class="meta-value">Draft | Not published</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="builder-grid">
+            <section class="panel palette reveal" style="--delay: 0.15s">
+              <div class="panel-header">
+                <h2>Tool Palette</h2>
+              </div>
+              <div class="palette-list">
+                <button class="palette-item" type="button">
+                  <span class="icon">T</span>
+                  Text
+                </button>
+                <button class="palette-item" type="button">
+                  <span class="icon">CB</span>
+                  Checkbox
+                </button>
+                <button class="palette-item" type="button">
+                  <span class="icon">DT</span>
+                  Date
+                </button>
+                <button class="palette-item" type="button">
+                  <span class="icon">SIG</span>
+                  Signature
+                </button>
+                <button class="palette-item" type="button">
+                  <span class="icon">IMG</span>
+                  Photo
+                </button>
+              </div>
+              <div class="palette-footer">
+                <div class="subtle">Drag fields onto the PDF canvas.</div>
+              </div>
+            </section>
+
+            <section class="panel canvas reveal" style="--delay: 0.2s">
+              <div class="panel-header">
+                <h2>PDF Canvas</h2>
+                <span class="chip chip-outline">Page 1 of 2</span>
+              </div>
+              <div class="pdf-canvas">
+                <div class="pdf-page">
+                  <div class="pdf-title">Pump Station Safety Inspection</div>
+                  <div class="pdf-subtitle">Asset ID | Location | Inspection Date</div>
+                  <div class="pdf-field" style="top: 92px; left: 48px; width: 180px;">
+                    <span class="field-label">Site ID</span>
+                  </div>
+                  <div class="pdf-field" style="top: 92px; left: 252px; width: 160px;">
+                    <span class="field-label">Inspection Date</span>
+                  </div>
+                  <div class="pdf-field" style="top: 148px; left: 48px; width: 260px;">
+                    <span class="field-label">Technician</span>
+                  </div>
+                  <div class="pdf-field active" style="top: 204px; left: 48px; width: 220px;">
+                    <span class="field-label">Pressure Reading (psi)</span>
+                  </div>
+                  <div class="pdf-field" style="top: 204px; left: 288px; width: 150px;">
+                    <span class="field-label">Valve OK</span>
+                  </div>
+                  <div class="pdf-field" style="top: 260px; left: 48px; width: 390px; height: 88px;">
+                    <span class="field-label">Notes</span>
+                  </div>
+                  <div class="pdf-field" style="top: 368px; left: 48px; width: 200px; height: 60px;">
+                    <span class="field-label">Signature</span>
+                  </div>
+                  <div class="pdf-guides">
+                    <div class="guide-line"></div>
+                    <div class="guide-line"></div>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <section class="panel properties reveal" style="--delay: 0.25s">
+              <div class="panel-header">
+                <h2>Field Properties</h2>
+                <span class="chip chip-outline">Active</span>
+              </div>
+              <div class="property-group">
+                <label class="field-label">Label</label>
+                <div class="input">Pressure Reading (psi)</div>
+              </div>
+              <div class="property-group">
+                <label class="field-label">Field Key</label>
+                <div class="input">pressure_reading</div>
+              </div>
+              <div class="property-group">
+                <label class="field-label">Type</label>
+                <div class="input">Numeric</div>
+              </div>
+              <div class="property-group">
+                <div class="toggle-row">
+                  <span class="field-label">Required</span>
+                  <label class="toggle">
+                    <input type="checkbox" checked />
+                    <span class="toggle-slider"></span>
+                  </label>
+                </div>
+              </div>
+              <div class="property-group">
+                <label class="field-label">Validation</label>
+                <div class="input">Range 0-300</div>
+                <div class="hint">Validation hint: Enter PSI between 0 and 300.</div>
+              </div>
+              <div class="property-group">
+                <label class="field-label">Help Text</label>
+                <div class="input">Capture reading after 2-minute stabilization.</div>
+              </div>
+              <div class="property-actions">
+                <button class="btn btn-secondary" type="button">Save Field</button>
+                <button class="btn btn-ghost" type="button">Discard</button>
+              </div>
+            </section>
+          </div>
+        </section>
+
+        <section class="screen" id="field" data-title="Field App - Offline Mode">
+          <header class="screen-header">
+            <div>
+              <h1>Field App - Offline Mode</h1>
+              <p class="subtle">Forms render predictably with local drafts and queued submits.</p>
+            </div>
+            <div class="header-actions">
+              <span class="chip chip-danger chip-large">Offline Mode</span>
+              <button class="btn btn-secondary" data-screen="sync" type="button">
+                View Queue
+              </button>
+            </div>
+          </header>
+
+          <div class="field-layout">
+            <div class="device reveal" style="--delay: 0.15s">
+              <div class="device-top">Field Device | Tablet</div>
+              <div class="device-screen">
+                <div class="device-header">
+                  <div>
+                    <div class="device-title">Pump Station Safety Inspection</div>
+                    <div class="device-subtle">FT-2841 | Pump Station #12</div>
+                  </div>
+                  <span class="chip chip-danger chip-large">Offline Mode</span>
+                </div>
+                <div class="form-section">
+                  <div class="form-row">
+                    <label>Site ID</label>
+                    <div class="input input-large">PS-12</div>
+                  </div>
+                  <div class="form-row">
+                    <label>Inspection Date</label>
+                    <div class="input input-large">12 Apr 2024</div>
+                  </div>
+                  <div class="form-row">
+                    <label>Technician</label>
+                    <div class="input input-large">Jordan Miles</div>
+                  </div>
+                  <div class="form-row">
+                    <label>Pressure Reading (psi)</label>
+                    <div class="input input-large">186</div>
+                    <div class="hint">Within allowed range.</div>
+                  </div>
+                  <div class="form-row">
+                    <label>Valve OK</label>
+                    <div class="input input-large">Checked</div>
+                  </div>
+                  <div class="form-row">
+                    <label>Notes</label>
+                    <div class="input input-large input-tall">Minor vibration at intake panel.</div>
+                  </div>
+                  <div class="form-row">
+                    <label>Photo Attachment</label>
+                    <div class="attachment">IMG_4021.jpg | Stored locally</div>
+                  </div>
+                  <div class="form-row">
+                    <label>Signature</label>
+                    <div class="signature">Jordan Miles</div>
+                  </div>
+                </div>
+                <div class="device-footer">
+                  <div class="draft-status">Draft saved locally 2 minutes ago</div>
+                  <div class="device-actions">
+                    <button class="btn btn-ghost" type="button">Save Draft</button>
+                    <button class="btn btn-primary" type="button">Submit (Queued for Sync)</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="field-insights reveal" style="--delay: 0.25s">
+              <section class="panel">
+                <div class="panel-header">
+                  <h2>Offline Queue Status</h2>
+                </div>
+                <div class="metric-grid">
+                  <div class="metric">
+                    <div class="metric-value">3</div>
+                    <div class="metric-label">Queued tickets</div>
+                  </div>
+                  <div class="metric">
+                    <div class="metric-value">1</div>
+                    <div class="metric-label">Requires retry</div>
+                  </div>
+                  <div class="metric">
+                    <div class="metric-value">09:12</div>
+                    <div class="metric-label">Last success</div>
+                  </div>
+                </div>
+                <div class="subtle">Submissions sync automatically once a connection is detected.</div>
+              </section>
+              <section class="panel">
+                <div class="panel-header">
+                  <h2>Daily Field Tickets</h2>
+                </div>
+                <div class="ticket-list">
+                  <div class="ticket-item">
+                    <div>
+                      <div class="primary">FT-2841 | Pump Station #12</div>
+                      <div class="subtle">Queued | 09:14</div>
+                    </div>
+                    <span class="chip chip-pending">Pending</span>
+                  </div>
+                  <div class="ticket-item">
+                    <div>
+                      <div class="primary">FT-2838 | Valve Audit</div>
+                      <div class="subtle">Queued | 08:03</div>
+                    </div>
+                    <span class="chip chip-danger">Error</span>
+                  </div>
+                  <div class="ticket-item">
+                    <div>
+                      <div class="primary">FT-2835 | Fiber Splice 06C</div>
+                      <div class="subtle">Synced | 07:22</div>
+                    </div>
+                    <span class="chip chip-success">Synced</span>
+                  </div>
+                </div>
+              </section>
+            </div>
+          </div>
+        </section>
+
+        <section class="screen" id="sync" data-title="Sync Queue / Daily Field Tickets">
+          <header class="screen-header">
+            <div>
+              <h1>Sync Queue / Daily Field Tickets</h1>
+              <p class="subtle">Queued mutations with explicit retry and status visibility.</p>
+            </div>
+            <div class="header-actions">
+              <button class="btn btn-secondary" type="button">Retry Failed</button>
+              <button class="btn btn-primary" data-screen="review" type="button">
+                Review Latest Sync
+              </button>
+            </div>
+          </header>
+
+          <div class="queue-grid">
+            <section class="panel reveal" style="--delay: 0.1s">
+              <div class="panel-header">
+                <h2>Queue Overview</h2>
+                <span class="chip chip-outline">Auto-sync enabled</span>
+              </div>
+              <div class="metric-grid">
+                <div class="metric">
+                  <div class="metric-value">7</div>
+                  <div class="metric-label">Pending</div>
+                </div>
+                <div class="metric">
+                  <div class="metric-value">1</div>
+                  <div class="metric-label">In progress</div>
+                </div>
+                <div class="metric">
+                  <div class="metric-value">2</div>
+                  <div class="metric-label">Failed</div>
+                </div>
+                <div class="metric">
+                  <div class="metric-value">09:12</div>
+                  <div class="metric-label">Last success</div>
+                </div>
+              </div>
+            </section>
+
+            <section class="panel reveal" style="--delay: 0.2s">
+              <div class="panel-header">
+                <h2>Daily Field Tickets</h2>
+                <span class="chip chip-outline">Grouped by date</span>
+              </div>
+              <div class="queue-group">
+                <div class="queue-date">Today | 12 Apr</div>
+                <div class="queue-row">
+                  <div>
+                    <div class="primary">FT-2841 | Pump Station #12</div>
+                    <div class="subtle">Jordan Miles | 09:14</div>
+                  </div>
+                  <div class="queue-meta">Safety Inspection | v2.3</div>
+                  <span class="chip chip-pending">Pending</span>
+                </div>
+                <div class="queue-row">
+                  <div>
+                    <div class="primary">FT-2840 | Line Flush 3B</div>
+                    <div class="subtle">Maya Chen | 08:46</div>
+                  </div>
+                  <div class="queue-meta">Water Main Flush | v1.4</div>
+                  <span class="chip chip-info">In progress</span>
+                </div>
+                <div class="queue-row">
+                  <div>
+                    <div class="primary">FT-2839 | Fiber Splice 07A</div>
+                    <div class="subtle">Luis Ortega | 08:14</div>
+                  </div>
+                  <div class="queue-meta">Fiber Splice Completion | v1.8</div>
+                  <span class="chip chip-success">Synced</span>
+                </div>
+                <div class="queue-row error">
+                  <div>
+                    <div class="primary">FT-2836 | Hazard Assessment</div>
+                    <div class="subtle">Quinn Hart | 07:42</div>
+                  </div>
+                  <div class="queue-meta">Hazard Assessment | v3.1</div>
+                  <div class="queue-actions">
+                    <span class="chip chip-danger">Error</span>
+                    <button class="btn btn-ghost" type="button">Retry Sync</button>
+                  </div>
+                </div>
+              </div>
+              <div class="queue-group">
+                <div class="queue-date">Yesterday | 11 Apr</div>
+                <div class="queue-row">
+                  <div>
+                    <div class="primary">FT-2829 | Valve Audit</div>
+                    <div class="subtle">Morgan Lee | 17:28</div>
+                  </div>
+                  <div class="queue-meta">Valve Audit | v2.1</div>
+                  <span class="chip chip-success">Synced</span>
+                </div>
+                <div class="queue-row">
+                  <div>
+                    <div class="primary">FT-2827 | Water Main Test</div>
+                    <div class="subtle">Andre Diaz | 16:12</div>
+                  </div>
+                  <div class="queue-meta">Pressure Test | v2.0</div>
+                  <span class="chip chip-success">Synced</span>
+                </div>
+                <div class="queue-row">
+                  <div>
+                    <div class="primary">FT-2824 | Fiber Splice 06C</div>
+                    <div class="subtle">Kim Patel | 15:02</div>
+                  </div>
+                  <div class="queue-meta">Fiber Splice Completion | v1.8</div>
+                  <span class="chip chip-success">Synced</span>
+                </div>
+              </div>
+            </section>
+          </div>
+        </section>
+
+        <section class="screen" id="review" data-title="Admin Review & Export">
+          <header class="screen-header">
+            <div>
+              <h1>Admin Review & Export</h1>
+              <p class="subtle">Completed PDF preview with metadata, attachments, and export actions.</p>
+            </div>
+            <div class="header-actions">
+              <span class="chip chip-outline">Approval pending</span>
+              <button class="btn btn-primary" type="button">Approve & Archive</button>
+            </div>
+          </header>
+
+          <div class="review-grid">
+            <section class="panel review-canvas reveal" style="--delay: 0.1s">
+              <div class="panel-header">
+                <h2>Completed PDF</h2>
+                <span class="chip chip-success">Generated on sync</span>
+              </div>
+              <div class="pdf-canvas">
+                <div class="pdf-page filled">
+                  <div class="pdf-title">Pump Station Safety Inspection</div>
+                  <div class="pdf-subtitle">FT-2841 | Pump Station #12</div>
+                  <div class="pdf-value" style="top: 92px; left: 48px; width: 180px;">
+                    PS-12
+                  </div>
+                  <div class="pdf-value" style="top: 92px; left: 252px; width: 160px;">
+                    12 Apr 2024
+                  </div>
+                  <div class="pdf-value" style="top: 148px; left: 48px; width: 260px;">
+                    Jordan Miles
+                  </div>
+                  <div class="pdf-value" style="top: 204px; left: 48px; width: 220px;">
+                    186 psi
+                  </div>
+                  <div class="pdf-value" style="top: 204px; left: 288px; width: 150px;">
+                    Yes
+                  </div>
+                  <div class="pdf-value" style="top: 260px; left: 48px; width: 390px; height: 88px;">
+                    Minor vibration noted at intake panel. Recommend follow-up in 30 days.
+                  </div>
+                  <div class="pdf-signature" style="top: 368px; left: 48px; width: 200px; height: 60px;">
+                    Jordan Miles
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <aside class="review-side reveal" style="--delay: 0.2s">
+              <section class="panel">
+                <div class="panel-header">
+                  <h2>Ticket Metadata</h2>
+                </div>
+                <div class="meta-list">
+                  <div>
+                    <div class="meta-label">Technician</div>
+                    <div class="meta-value">Jordan Miles</div>
+                  </div>
+                  <div>
+                    <div class="meta-label">Submitted</div>
+                    <div class="meta-value">09:14 | 12 Apr</div>
+                  </div>
+                  <div>
+                    <div class="meta-label">Device</div>
+                    <div class="meta-value">RuggedTab X2 | Offline mode</div>
+                  </div>
+                  <div>
+                    <div class="meta-label">Form Version</div>
+                    <div class="meta-value">Pump Station Safety Inspection v2.3</div>
+                  </div>
+                </div>
+              </section>
+
+              <section class="panel">
+                <div class="panel-header">
+                  <h2>Attachments</h2>
+                </div>
+                <div class="attachment-grid">
+                  <div class="attachment-thumb">
+                    <div class="thumb-label">INTAKE_4021.jpg</div>
+                  </div>
+                  <div class="attachment-thumb">
+                    <div class="thumb-label">VALVE_4022.jpg</div>
+                  </div>
+                </div>
+              </section>
+
+              <section class="panel">
+                <div class="panel-header">
+                  <h2>Export</h2>
+                </div>
+                <div class="export-actions">
+                  <button class="btn btn-secondary" type="button">Export PDF</button>
+                  <button class="btn btn-ghost" type="button">Export CSV</button>
+                </div>
+                <div class="subtle">Exports generated server-side for consistency.</div>
+              </section>
+
+              <section class="panel">
+                <div class="panel-header">
+                  <h2>Approval State</h2>
+                </div>
+                <div class="approval">
+                  <div class="chip chip-warning">Pending Review</div>
+                  <div class="subtle">Auto-archive after approval.</div>
+                </div>
+                <button class="btn btn-primary" type="button">Approve & Archive</button>
+              </section>
+            </aside>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
+</html>
