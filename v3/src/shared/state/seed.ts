@@ -139,7 +139,7 @@ export function seedIfEmpty() {
     queue,
     activities,
     lastSyncSuccess: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString()
-  }, true)
+  })
 }
 
 function mkField(type: Field['type'], label: string, key: string, x: number, y: number, w: number, h: number, validation?: Field['validation']) : Field {

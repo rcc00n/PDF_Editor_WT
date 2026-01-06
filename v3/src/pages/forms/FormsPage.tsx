@@ -33,7 +33,7 @@ export default function FormsPage() {
         }
       />
 
-      <div className="px-6 mt-6">
+      <div className="px-4 mt-4 sm:px-6 sm:mt-6">
         <Card>
           <CardBody>
             <div className="overflow-auto rf-scrollbar">
@@ -41,9 +41,9 @@ export default function FormsPage() {
                 <thead className="text-xs text-neutral-500 dark:text-neutral-400">
                   <tr className="text-left">
                     <th className="py-2">Form</th>
-                    <th className="py-2">Current version</th>
-                    <th className="py-2">Status</th>
-                    <th className="py-2">Fields</th>
+                    <th className="py-2 hidden sm:table-cell">Current version</th>
+                    <th className="py-2 hidden sm:table-cell">Status</th>
+                    <th className="py-2 hidden sm:table-cell">Fields</th>
                     <th className="py-2 text-right">Actions</th>
                   </tr>
                 </thead>
@@ -53,19 +53,30 @@ export default function FormsPage() {
                       <td className="py-3">
                         <div className="font-medium">{f.name}</div>
                         {f.subtitle && <div className="text-xs text-neutral-500 dark:text-neutral-400">{f.subtitle}</div>}
+                        <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-neutral-500 dark:text-neutral-400 sm:hidden">
+                          <span>{v.version}</span>
+                          <span>·</span>
+                          <span>{v.fieldCount} fields</span>
+                        </div>
+                        <div className="mt-2 sm:hidden">
+                          <Badge tone={v.status === 'active' ? 'success' : v.status === 'draft' ? 'warning' : 'neutral'}>
+                            {v.status}
+                          </Badge>
+                        </div>
                       </td>
-                      <td className="py-3">{v.version}</td>
-                      <td className="py-3">
+                      <td className="py-3 hidden sm:table-cell">{v.version}</td>
+                      <td className="py-3 hidden sm:table-cell">
                         <Badge tone={v.status === 'active' ? 'success' : v.status === 'draft' ? 'warning' : 'neutral'}>
                           {v.status}
                         </Badge>
                       </td>
-                      <td className="py-3">{v.fieldCount}</td>
+                      <td className="py-3 hidden sm:table-cell">{v.fieldCount}</td>
                       <td className="py-3 text-right">
-                        <div className="inline-flex items-center gap-2">
+                        <div className="flex w-full flex-col items-stretch gap-2 sm:inline-flex sm:w-auto sm:flex-row sm:items-center">
                           <Button
                             size="sm"
                             variant="secondary"
+                            className="w-full sm:w-auto"
                             onClick={() => {
                               const newV = createVersion(f.id)
                               nav(`/builder/${f.id}?v=${newV}`)
@@ -77,6 +88,7 @@ export default function FormsPage() {
                           <Button
                             size="sm"
                             variant="secondary"
+                            className="w-full sm:w-auto"
                             onClick={() => nav(`/builder/${f.id}`)}
                           >
                             Open <ArrowRight size={16} />
@@ -84,6 +96,7 @@ export default function FormsPage() {
                           <Button
                             size="sm"
                             variant="ghost"
+                            className="w-full sm:w-auto"
                             onClick={() => archiveForm(f.id)}
                             title="Archive"
                           >
@@ -111,7 +124,7 @@ export default function FormsPage() {
       <Modal open={open} onClose={() => setOpen(false)} title="Create new form">
         <div className="space-y-3">
           <div className="text-sm text-neutral-500 dark:text-neutral-400">
-            Название можно поменять потом. В Builder ты добавишь PDF и поля.
+            You can rename it later. In the Builder you will add the PDF and fields.
           </div>
           <Input placeholder="Form name" value={name} onChange={(e) => setName(e.target.value)} />
           <div className="flex justify-end gap-2">

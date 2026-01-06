@@ -30,7 +30,7 @@ export default function ReviewPage() {
         title="Admin Review & Export"
         subtitle="Completed preview with metadata, attachments, and export actions."
         right={
-          <div className="flex items-center gap-2">
+          <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center sm:flex-nowrap">
             <Button size="sm" variant={filter === 'all' ? 'primary' : 'secondary'} onClick={() => setFilter('all')}>
               <Filter size={16} /> All
             </Button>
@@ -47,7 +47,7 @@ export default function ReviewPage() {
         }
       />
 
-      <div className="px-6 mt-6">
+      <div className="px-4 mt-4 sm:px-6 sm:mt-6">
         <Card>
           <CardBody>
             <div className="overflow-auto rf-scrollbar">
@@ -55,9 +55,9 @@ export default function ReviewPage() {
                 <thead className="text-xs text-neutral-500 dark:text-neutral-400">
                   <tr className="text-left">
                     <th className="py-2">Ticket</th>
-                    <th className="py-2">Assigned</th>
-                    <th className="py-2">Status</th>
-                    <th className="py-2">Approval</th>
+                    <th className="py-2 hidden sm:table-cell">Assigned</th>
+                    <th className="py-2 hidden sm:table-cell">Status</th>
+                    <th className="py-2 hidden sm:table-cell">Approval</th>
                     <th className="py-2 text-right">Open</th>
                   </tr>
                 </thead>
@@ -66,15 +66,24 @@ export default function ReviewPage() {
                     <tr key={t.id} className="border-t border-neutral-200 dark:border-neutral-800">
                       <td className="py-3">
                         <div className="font-medium">{t.id} · {t.title}</div>
-                        <div className="text-xs text-neutral-500 dark:text-neutral-400">{dateTimeShort(t.assignedAt)}</div>
+                        <div className="text-xs text-neutral-500 dark:text-neutral-400 hidden sm:block">{dateTimeShort(t.assignedAt)}</div>
+                        <div className="text-xs text-neutral-500 dark:text-neutral-400 sm:hidden">{t.assignedTo} · {dateTimeShort(t.assignedAt)}</div>
+                        <div className="mt-2 flex flex-wrap gap-2 sm:hidden">
+                          <Badge tone={t.status === 'synced' ? 'success' : t.status === 'error' ? 'danger' : t.status === 'queued' ? 'warning' : 'neutral'}>
+                            {t.status}
+                          </Badge>
+                          <Badge tone={t.approvalState === 'approved' ? 'success' : 'warning'}>
+                            {t.approvalState}
+                          </Badge>
+                        </div>
                       </td>
-                      <td className="py-3">{t.assignedTo}</td>
-                      <td className="py-3">
+                      <td className="py-3 hidden sm:table-cell">{t.assignedTo}</td>
+                      <td className="py-3 hidden sm:table-cell">
                         <Badge tone={t.status === 'synced' ? 'success' : t.status === 'error' ? 'danger' : t.status === 'queued' ? 'warning' : 'neutral'}>
                           {t.status}
                         </Badge>
                       </td>
-                      <td className="py-3">
+                      <td className="py-3 hidden sm:table-cell">
                         <Badge tone={t.approvalState === 'approved' ? 'success' : 'warning'}>
                           {t.approvalState}
                         </Badge>

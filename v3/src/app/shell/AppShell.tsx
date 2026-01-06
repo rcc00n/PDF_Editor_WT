@@ -28,7 +28,7 @@ export default function AppShell() {
     const onKey = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault()
-        useAppStore.getState().pushToast({ title: 'Command', message: 'Открой палитру команд: ⌘/Ctrl + K', variant: 'default' })
+        useAppStore.getState().pushToast({ title: 'Command', message: 'Open the command palette: ⌘/Ctrl + K', variant: 'default' })
         window.dispatchEvent(new CustomEvent('rf:command:open'))
       }
       if (e.key === 'Escape') {
@@ -41,7 +41,7 @@ export default function AppShell() {
 
   return (
     <div className="h-full flex">
-      <aside className="w-[76px] md:w-[240px] shrink-0 border-r border-neutral-200 dark:border-neutral-800 bg-white/80 dark:bg-neutral-950/70 backdrop-blur">
+      <aside className="hidden md:flex md:w-[240px] shrink-0 border-r border-neutral-200 dark:border-neutral-800 bg-white/80 dark:bg-neutral-950/70 backdrop-blur">
         <div className="h-16 flex items-center gap-2 px-3 md:px-4 border-b border-neutral-200 dark:border-neutral-800">
           <div className="h-10 w-10 rounded-2xl border border-neutral-200 dark:border-neutral-800 flex items-center justify-center font-semibold">
             RF
@@ -77,7 +77,7 @@ export default function AppShell() {
             <button
               className="rf-focus w-full flex items-center justify-between gap-3 rounded-2xl px-3 py-2.5 text-sm font-medium hover:bg-neutral-100 dark:hover:bg-neutral-900"
               onClick={() => navigate('/forms')}
-              title="Открыть Form Builder"
+              title="Open Form Builder"
             >
               <span className="flex items-center gap-3">
                 <PencilRuler size={18} /> Builder
@@ -119,7 +119,7 @@ export default function AppShell() {
                   'hover:bg-neutral-50 dark:hover:bg-neutral-900'
                 )}
                 onClick={() => setForcedOffline(!forcedOffline)}
-                title={forcedOffline ? 'Выключить offline симуляцию' : 'Включить offline симуляцию'}
+                title={forcedOffline ? 'Disable offline simulation' : 'Enable offline simulation'}
               >
                 <span className="inline-flex items-center gap-2">
                   {online ? <Wifi size={16} /> : <WifiOff size={16} />}
@@ -138,10 +138,35 @@ export default function AppShell() {
           </div>
         </header>
 
-        <main className="flex-1 min-h-0 overflow-auto rf-scrollbar">
+        <main className="flex-1 min-h-0 overflow-auto rf-scrollbar pb-24 md:pb-0">
           <Outlet />
         </main>
       </div>
+
+      <nav className="fixed bottom-0 left-0 right-0 z-40 md:hidden border-t border-neutral-200 dark:border-neutral-800 bg-white/95 dark:bg-neutral-950/95 backdrop-blur">
+        <div className="grid grid-cols-5 gap-1 px-2 py-2">
+          {nav.map((item) => {
+            const Icon = item.icon
+            return (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                className={({ isActive }) =>
+                  cn(
+                    'rf-focus flex flex-col items-center justify-center gap-1 rounded-2xl px-2 py-2 text-[10px] font-medium leading-tight transition',
+                    isActive
+                      ? 'bg-neutral-100 text-neutral-900 dark:bg-neutral-900 dark:text-white'
+                      : 'text-neutral-500 dark:text-neutral-400'
+                  )
+                }
+              >
+                <Icon size={18} />
+                <span className="text-center">{item.label}</span>
+              </NavLink>
+            )
+          })}
+        </div>
+      </nav>
     </div>
   )
 }

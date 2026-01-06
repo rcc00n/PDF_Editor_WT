@@ -60,7 +60,7 @@ export default function App() {
       {!online && (
         <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50">
           <div className="px-3 py-2 rounded-full text-xs font-medium border border-neutral-200 bg-white/90 backdrop-blur dark:border-neutral-800 dark:bg-neutral-900/80">
-            Offline: изменения сохраняются локально и уйдут в очередь синка
+            Offline: changes are saved locally and will go to the sync queue
           </div>
         </div>
       )}

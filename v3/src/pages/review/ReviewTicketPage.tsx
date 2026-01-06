@@ -63,7 +63,7 @@ export default function ReviewTicketPage() {
         }
       />
 
-      <div className="px-6 mt-6 grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-4 items-start">
+      <div className="px-4 mt-4 sm:px-6 sm:mt-6 grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-4 items-start">
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
@@ -137,7 +137,7 @@ export default function ReviewTicketPage() {
               {ticket.attachments.length === 0 ? (
                 <div className="text-sm text-neutral-500 dark:text-neutral-400">No attachments</div>
               ) : (
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   {ticket.attachments.map((a) => (
                     <a key={a.id} href={a.dataUrl} download={a.name} className="rf-focus rounded-2xl border border-neutral-200 dark:border-neutral-800 overflow-hidden hover:bg-neutral-50 dark:hover:bg-neutral-900">
                       <img src={a.dataUrl} alt={a.name} className="w-full h-[110px] object-cover" />

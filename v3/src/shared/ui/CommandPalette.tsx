@@ -97,7 +97,7 @@ export default function CommandPalette() {
         })}
         {filtered.length === 0 && (
           <div className="px-3 py-10 text-center text-sm text-neutral-500 dark:text-neutral-400">
-            Ничего не найдено
+            No results found
           </div>
         )}
       </div>
