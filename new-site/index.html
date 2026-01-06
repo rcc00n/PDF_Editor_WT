@@ -1,0 +1,676 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>RelayForms OS</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="ambient" aria-hidden="true">
+      <span class="orb orb-1"></span>
+      <span class="orb orb-2"></span>
+      <span class="orb orb-3"></span>
+    </div>
+
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="logo">RF</div>
+          <div>
+            <div class="brand-name">RelayForms</div>
+            <div class="brand-tag">Field OS</div>
+          </div>
+        </div>
+
+        <nav class="nav" aria-label="Primary">
+          <a class="nav-link is-active" data-view-link="dashboard" href="#dashboard">
+            <span class="nav-icon">D</span>
+            Dashboard
+          </a>
+          <a class="nav-link" data-view-link="forms" href="#forms">
+            <span class="nav-icon">F</span>
+            Forms
+          </a>
+          <a class="nav-link" data-view-link="builder" href="#builder">
+            <span class="nav-icon">B</span>
+            Builder
+          </a>
+          <a class="nav-link" data-view-link="field" href="#field">
+            <span class="nav-icon">A</span>
+            Field App
+          </a>
+          <a class="nav-link" data-view-link="queue" href="#queue">
+            <span class="nav-icon">Q</span>
+            Sync Queue
+          </a>
+          <a class="nav-link" data-view-link="review" href="#review">
+            <span class="nav-icon">R</span>
+            Review
+          </a>
+        </nav>
+
+        <div class="sidebar-card">
+          <div class="eyebrow">Quick start</div>
+          <div class="sidebar-title">Create a fresh form</div>
+          <p class="muted">Drag fields on a PDF, publish, and send to the field.</p>
+          <button class="btn btn-primary">New form</button>
+        </div>
+
+        <div class="sidebar-footer">
+          <div class="foot-label">Network</div>
+          <div class="status-chip good">
+            <span class="status-dot"></span>
+            Online
+          </div>
+        </div>
+      </aside>
+
+      <div class="main">
+        <header class="topbar">
+          <div class="topbar-left">
+            <div class="sync-pill">
+              <span class="status-dot online"></span>
+              Sync healthy
+            </div>
+            <button class="chip">Queued 5</button>
+            <div class="latency">Last sync 3m ago</div>
+          </div>
+
+          <div class="topbar-center">
+            <label class="search" aria-label="Search">
+              <input type="search" placeholder="Search forms, tickets, people" />
+            </label>
+          </div>
+
+          <div class="topbar-right">
+            <button class="btn btn-ghost" id="openPalette">Command</button>
+            <button class="btn btn-outline">Publish</button>
+            <div class="avatar" aria-label="Profile">AG</div>
+          </div>
+        </header>
+
+        <main class="content">
+          <section class="view is-active" id="dashboard" data-view="dashboard">
+            <div class="page-head reveal" style="--delay: 80ms;">
+              <div>
+                <div class="eyebrow">Overview</div>
+                <h1>Mission control</h1>
+                <p class="muted">A calm command center for every field ticket, sync, and review.</p>
+              </div>
+              <div class="actions">
+                <button class="btn btn-outline">View reports</button>
+                <button class="btn btn-primary">New ticket</button>
+              </div>
+            </div>
+
+            <div class="stat-grid">
+              <div class="stat-card reveal" style="--delay: 140ms;">
+                <div class="stat-title">Synced today</div>
+                <div class="stat-value">128</div>
+                <div class="stat-meta good">+24% from yesterday</div>
+              </div>
+              <div class="stat-card reveal" style="--delay: 180ms;">
+                <div class="stat-title">Queued</div>
+                <div class="stat-value">5</div>
+                <div class="stat-meta warn">2 waiting on photos</div>
+              </div>
+              <div class="stat-card reveal" style="--delay: 220ms;">
+                <div class="stat-title">Failed</div>
+                <div class="stat-value">1</div>
+                <div class="stat-meta bad">Auth refresh needed</div>
+              </div>
+              <div class="stat-card reveal" style="--delay: 260ms;">
+                <div class="stat-title">Active crews</div>
+                <div class="stat-value">18</div>
+                <div class="stat-meta">Across 6 regions</div>
+              </div>
+            </div>
+
+            <div class="grid-2">
+              <div class="panel reveal" style="--delay: 320ms;">
+                <div class="panel-head">
+                  <div>
+                    <div class="panel-title">Active forms</div>
+                    <div class="muted">Latest published versions and sync status.</div>
+                  </div>
+                  <button class="btn btn-ghost">View all</button>
+                </div>
+                <div class="table">
+                  <div class="table-row form header">
+                    <span>Form</span>
+                    <span>Version</span>
+                    <span>Status</span>
+                    <span>Owner</span>
+                    <span>Updated</span>
+                  </div>
+                  <div class="table-row form">
+                    <span>Safety inspection</span>
+                    <span>v4.2</span>
+                    <span class="tag good">Published</span>
+                    <span>R. Clark</span>
+                    <span>2h ago</span>
+                  </div>
+                  <div class="table-row form">
+                    <span>Equipment checklist</span>
+                    <span>v2.9</span>
+                    <span class="tag warn">Draft</span>
+                    <span>M. Diaz</span>
+                    <span>6h ago</span>
+                  </div>
+                  <div class="table-row form">
+                    <span>Incident report</span>
+                    <span>v3.1</span>
+                    <span class="tag good">Published</span>
+                    <span>J. Patel</span>
+                    <span>1d ago</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="panel reveal" style="--delay: 360ms;">
+                <div class="panel-head">
+                  <div>
+                    <div class="panel-title">Daily field tickets</div>
+                    <div class="muted">Last 12 hours of captured work.</div>
+                  </div>
+                  <button class="btn btn-ghost">Open log</button>
+                </div>
+                <div class="timeline">
+                  <div class="timeline-item">
+                    <div class="timeline-dot good"></div>
+                    <div>
+                      <div class="timeline-title">FT-2841 submitted</div>
+                      <div class="muted">Central plant, auto sync</div>
+                    </div>
+                    <div class="timeline-time">09:12</div>
+                  </div>
+                  <div class="timeline-item">
+                    <div class="timeline-dot warn"></div>
+                    <div>
+                      <div class="timeline-title">FT-2840 queued</div>
+                      <div class="muted">Photo attachment pending</div>
+                    </div>
+                    <div class="timeline-time">08:47</div>
+                  </div>
+                  <div class="timeline-item">
+                    <div class="timeline-dot"></div>
+                    <div>
+                      <div class="timeline-title">FT-2836 reviewed</div>
+                      <div class="muted">Exported as PDF + CSV</div>
+                    </div>
+                    <div class="timeline-time">07:50</div>
+                  </div>
+                  <div class="timeline-item">
+                    <div class="timeline-dot bad"></div>
+                    <div>
+                      <div class="timeline-title">FT-2834 failed</div>
+                      <div class="muted">Token expired, retry needed</div>
+                    </div>
+                    <div class="timeline-time">06:32</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="grid-2">
+              <div class="panel reveal" style="--delay: 420ms;">
+                <div class="panel-head">
+                  <div>
+                    <div class="panel-title">Sync health</div>
+                    <div class="muted">Offline ready with clear recovery paths.</div>
+                  </div>
+                </div>
+                <div class="health-grid">
+                  <div class="health-card">
+                    <div class="health-label">Offline drafts</div>
+                    <div class="health-value">12</div>
+                    <div class="muted">Saved locally</div>
+                  </div>
+                  <div class="health-card">
+                    <div class="health-label">Retry queue</div>
+                    <div class="health-value">3</div>
+                    <div class="muted">2 auto, 1 manual</div>
+                  </div>
+                  <div class="health-card">
+                    <div class="health-label">Success rate</div>
+                    <div class="health-value">98%</div>
+                    <div class="muted">Past 24h</div>
+                  </div>
+                </div>
+                <div class="progress">
+                  <div class="progress-bar" style="width: 82%;"></div>
+                </div>
+              </div>
+
+              <div class="panel reveal" style="--delay: 460ms;">
+                <div class="panel-head">
+                  <div>
+                    <div class="panel-title">Last activity</div>
+                    <div class="muted">What just changed in the system.</div>
+                  </div>
+                </div>
+                <div class="activity">
+                  <div class="activity-item">
+                    <div class="activity-title">Checklist v2.9 published</div>
+                    <div class="muted">by M. Diaz</div>
+                    <div class="activity-time">15m ago</div>
+                  </div>
+                  <div class="activity-item">
+                    <div class="activity-title">Queue retry succeeded</div>
+                    <div class="muted">FT-2834 synced</div>
+                    <div class="activity-time">38m ago</div>
+                  </div>
+                  <div class="activity-item">
+                    <div class="activity-title">New field user</div>
+                    <div class="muted">L. Burton invited</div>
+                    <div class="activity-time">2h ago</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="view" id="forms" data-view="forms">
+            <div class="page-head reveal" style="--delay: 80ms;">
+              <div>
+                <div class="eyebrow">Forms</div>
+                <h1>Forms library</h1>
+                <p class="muted">A single source of truth for every version in the field.</p>
+              </div>
+              <div class="actions">
+                <button class="btn btn-ghost">Import PDF</button>
+                <button class="btn btn-primary">New form</button>
+              </div>
+            </div>
+
+            <div class="chip-row reveal" style="--delay: 140ms;">
+              <button class="chip active">Active</button>
+              <button class="chip">Drafts</button>
+              <button class="chip">Needs review</button>
+              <button class="chip">Archived</button>
+            </div>
+
+            <div class="panel reveal" style="--delay: 200ms;">
+              <div class="table">
+                <div class="table-row form header">
+                  <span>Form</span>
+                  <span>Version</span>
+                  <span>Status</span>
+                  <span>Owner</span>
+                  <span>Usage</span>
+                </div>
+                <div class="table-row form">
+                  <span>Safety inspection</span>
+                  <span>v4.2</span>
+                  <span class="tag good">Published</span>
+                  <span>R. Clark</span>
+                  <span>82 tickets</span>
+                </div>
+                <div class="table-row form">
+                  <span>Equipment checklist</span>
+                  <span>v2.9</span>
+                  <span class="tag warn">Draft</span>
+                  <span>M. Diaz</span>
+                  <span>31 tickets</span>
+                </div>
+                <div class="table-row form">
+                  <span>Quality audit</span>
+                  <span>v1.7</span>
+                  <span class="tag good">Published</span>
+                  <span>A. Chen</span>
+                  <span>58 tickets</span>
+                </div>
+                <div class="table-row form">
+                  <span>Incident report</span>
+                  <span>v3.1</span>
+                  <span class="tag warn">Needs review</span>
+                  <span>J. Patel</span>
+                  <span>12 tickets</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="callout reveal" style="--delay: 260ms;">
+              <div>
+                <div class="callout-title">Smart empty states</div>
+                <p class="muted">When there are no drafts, the team sees clear next steps instead of blank screens.</p>
+              </div>
+              <button class="btn btn-outline">Create a template</button>
+            </div>
+          </section>
+
+          <section class="view" id="builder" data-view="builder">
+            <div class="page-head reveal" style="--delay: 80ms;">
+              <div>
+                <div class="eyebrow">Form builder</div>
+                <h1>Design like a canvas</h1>
+                <p class="muted">Snap-to-grid fields, layer control, and instant preview.</p>
+              </div>
+              <div class="actions">
+                <button class="btn btn-ghost">Preview field app</button>
+                <button class="btn btn-primary">Publish version</button>
+              </div>
+            </div>
+
+            <div class="builder-grid">
+              <div class="panel tool-panel reveal" style="--delay: 140ms;">
+                <div class="panel-title">Tool palette</div>
+                <div class="tool-list">
+                  <div class="tool-item active">
+                    <span class="tool-icon">T</span>
+                    Text
+                  </div>
+                  <div class="tool-item">
+                    <span class="tool-icon">C</span>
+                    Checkbox
+                  </div>
+                  <div class="tool-item">
+                    <span class="tool-icon">D</span>
+                    Date
+                  </div>
+                  <div class="tool-item">
+                    <span class="tool-icon">S</span>
+                    Signature
+                  </div>
+                  <div class="tool-item">
+                    <span class="tool-icon">P</span>
+                    Photo
+                  </div>
+                </div>
+                <div class="tool-footer">
+                  <div class="muted">Hold Shift to multi-select</div>
+                </div>
+              </div>
+
+              <div class="panel canvas-panel reveal" style="--delay: 180ms;">
+                <div class="canvas-toolbar">
+                  <button class="chip">Page 2 of 4</button>
+                  <div class="zoom-controls">
+                    <button class="btn btn-ghost">-</button>
+                    <span class="muted">100%</span>
+                    <button class="btn btn-ghost">+</button>
+                  </div>
+                </div>
+                <div class="pdf-canvas">
+                  <div class="pdf-page">
+                    <div class="pdf-header">
+                      <div class="pdf-title">Safety inspection</div>
+                      <div class="muted">Form ID SI-204</div>
+                    </div>
+                    <div class="field-ghost" style="top: 38%; left: 12%; width: 36%;">Equipment ID</div>
+                    <div class="field-ghost" style="top: 52%; left: 12%; width: 48%;">Condition notes</div>
+                    <div class="field-ghost" style="top: 68%; left: 12%; width: 24%;">Signature</div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="panel props-panel reveal" style="--delay: 220ms;">
+                <div class="panel-title">Field properties</div>
+                <div class="props-list">
+                  <div class="props-item">
+                    <label>Label</label>
+                    <input type="text" value="Equipment ID" />
+                  </div>
+                  <div class="props-item">
+                    <label>Key</label>
+                    <input type="text" value="equipment_id" />
+                  </div>
+                  <div class="props-item">
+                    <label>Type</label>
+                    <div class="select">Text</div>
+                  </div>
+                  <div class="props-item">
+                    <label>Required</label>
+                    <div class="toggle on">
+                      <span></span>
+                    </div>
+                  </div>
+                  <div class="props-item">
+                    <label>Validation</label>
+                    <div class="select">Alphanumeric</div>
+                  </div>
+                </div>
+                <div class="props-footer">
+                  <button class="btn btn-outline">Duplicate field</button>
+                  <button class="btn btn-ghost">Delete</button>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="view" id="field" data-view="field">
+            <div class="page-head reveal" style="--delay: 80ms;">
+              <div>
+                <div class="eyebrow">Field app</div>
+                <h1>Offline by default</h1>
+                <p class="muted">Field teams capture work without thinking about connectivity.</p>
+              </div>
+              <div class="actions">
+                <button class="btn btn-outline">View tickets</button>
+                <button class="btn btn-primary">Start new ticket</button>
+              </div>
+            </div>
+
+            <div class="field-grid">
+              <div class="panel device-panel reveal" style="--delay: 140ms;">
+                <div class="device">
+                  <div class="device-top">
+                    <span class="device-status">Offline mode</span>
+                    <span class="device-time">09:42</span>
+                  </div>
+                  <div class="device-screen">
+                    <div class="device-card">
+                      <div class="device-title">Safety inspection</div>
+                      <div class="muted">Ticket FT-2841</div>
+                      <div class="device-progress">
+                        <div class="device-progress-bar"></div>
+                      </div>
+                      <div class="device-actions">
+                        <button class="btn btn-primary">Continue</button>
+                        <button class="btn btn-ghost">Save draft</button>
+                      </div>
+                    </div>
+                    <div class="device-list">
+                      <div class="device-list-item">
+                        <span>Photo upload</span>
+                        <span class="tag warn">Queued</span>
+                      </div>
+                      <div class="device-list-item">
+                        <span>Signature</span>
+                        <span class="tag good">Captured</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="panel reveal" style="--delay: 180ms;">
+                <div class="panel-title">Field status</div>
+                <div class="field-stats">
+                  <div class="field-stat">
+                    <div class="stat-title">Drafts</div>
+                    <div class="stat-value">12</div>
+                  </div>
+                  <div class="field-stat">
+                    <div class="stat-title">Queued</div>
+                    <div class="stat-value">5</div>
+                  </div>
+                  <div class="field-stat">
+                    <div class="stat-title">Synced</div>
+                    <div class="stat-value">128</div>
+                  </div>
+                </div>
+                <div class="field-card">
+                  <div>
+                    <div class="eyebrow">Smart guidance</div>
+                    <div class="field-title">Clear states</div>
+                    <p class="muted">Every ticket shows Saved locally, Queued, or Synced with one action.</p>
+                  </div>
+                  <button class="btn btn-outline">Open guidance</button>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="view" id="queue" data-view="queue">
+            <div class="page-head reveal" style="--delay: 80ms;">
+              <div>
+                <div class="eyebrow">Sync queue</div>
+                <h1>Zero panic queue</h1>
+                <p class="muted">Every mutation is transparent with a clear next step.</p>
+              </div>
+              <div class="actions">
+                <button class="btn btn-outline">Retry failed</button>
+                <button class="btn btn-primary">Resolve all</button>
+              </div>
+            </div>
+
+            <div class="queue-list">
+              <div class="queue-card reveal" style="--delay: 140ms;">
+                <div>
+                  <div class="queue-title">FT-2840 photo attachment</div>
+                  <div class="muted">Waiting on upload, 12 MB</div>
+                </div>
+                <div class="queue-meta">
+                  <span class="tag warn">Queued</span>
+                  <button class="btn btn-ghost">Inspect</button>
+                </div>
+              </div>
+              <div class="queue-card reveal" style="--delay: 180ms;">
+                <div>
+                  <div class="queue-title">FT-2834 form submit</div>
+                  <div class="muted">Token expired, re-auth required</div>
+                </div>
+                <div class="queue-meta">
+                  <span class="tag bad">Failed</span>
+                  <button class="btn btn-outline">Retry</button>
+                </div>
+              </div>
+              <div class="queue-card reveal" style="--delay: 220ms;">
+                <div>
+                  <div class="queue-title">FT-2836 metadata sync</div>
+                  <div class="muted">2 fields pending mapping</div>
+                </div>
+                <div class="queue-meta">
+                  <span class="tag">In progress</span>
+                  <button class="btn btn-ghost">View</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="panel reveal" style="--delay: 260ms;">
+              <div class="panel-title">Queue health</div>
+              <div class="health-grid">
+                <div class="health-card">
+                  <div class="health-label">Avg. retry time</div>
+                  <div class="health-value">2.4m</div>
+                  <div class="muted">Past week</div>
+                </div>
+                <div class="health-card">
+                  <div class="health-label">Resolved today</div>
+                  <div class="health-value">18</div>
+                  <div class="muted">No manual action</div>
+                </div>
+                <div class="health-card">
+                  <div class="health-label">Attention needed</div>
+                  <div class="health-value">1</div>
+                  <div class="muted">Auth refresh</div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="view" id="review" data-view="review">
+            <div class="page-head reveal" style="--delay: 80ms;">
+              <div>
+                <div class="eyebrow">Admin review</div>
+                <h1>Approve with context</h1>
+                <p class="muted">Preview PDFs, attachments, and metadata in one place.</p>
+              </div>
+              <div class="actions">
+                <button class="btn btn-outline">Export CSV</button>
+                <button class="btn btn-primary">Approve ticket</button>
+              </div>
+            </div>
+
+            <div class="review-grid">
+              <div class="panel pdf-preview reveal" style="--delay: 140ms;">
+                <div class="panel-title">FT-2841 preview</div>
+                <div class="pdf-preview-page">
+                  <div class="pdf-header">
+                    <div class="pdf-title">Safety inspection</div>
+                    <div class="muted">Signed by M. Santos</div>
+                  </div>
+                  <div class="preview-block"></div>
+                  <div class="preview-block"></div>
+                  <div class="preview-block"></div>
+                </div>
+              </div>
+
+              <div class="panel reveal" style="--delay: 180ms;">
+                <div class="panel-title">Metadata</div>
+                <div class="meta-list">
+                  <div class="meta-item">
+                    <span>Location</span>
+                    <span>Central plant</span>
+                  </div>
+                  <div class="meta-item">
+                    <span>Submitted</span>
+                    <span>Today 09:12</span>
+                  </div>
+                  <div class="meta-item">
+                    <span>Attachments</span>
+                    <span>3 photos</span>
+                  </div>
+                  <div class="meta-item">
+                    <span>Sync status</span>
+                    <span class="tag good">Complete</span>
+                  </div>
+                </div>
+                <div class="attachment-grid">
+                  <div class="attachment-card">Photo 1</div>
+                  <div class="attachment-card">Photo 2</div>
+                  <div class="attachment-card">Signature</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="callout reveal" style="--delay: 220ms;">
+              <div>
+                <div class="callout-title">Export in one click</div>
+                <p class="muted">Download PDF and CSV together, or archive after approval.</p>
+              </div>
+              <div class="actions">
+                <button class="btn btn-outline">Export PDF</button>
+                <button class="btn btn-ghost">Archive</button>
+              </div>
+            </div>
+          </section>
+        </main>
+      </div>
+    </div>
+
+    <div class="palette" id="commandPalette" aria-hidden="true" role="dialog" aria-label="Command palette">
+      <div class="palette-card">
+        <div class="palette-head">
+          <div>
+            <div class="eyebrow">Command palette</div>
+            <div class="palette-title">Jump anywhere</div>
+          </div>
+          <button class="btn btn-ghost" id="closePalette">Close</button>
+        </div>
+        <input class="palette-input" type="text" placeholder="Search commands" />
+        <div class="palette-list">
+          <button class="palette-item">Create new form</button>
+          <button class="palette-item">Open sync queue</button>
+          <button class="palette-item">Go to FT-2841</button>
+          <button class="palette-item">Publish current version</button>
+        </div>
+        <div class="palette-footer muted">Tip: Press Ctrl or Cmd + K anytime</div>
+      </div>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
+</html>
