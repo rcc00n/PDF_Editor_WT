@@ -1,0 +1,202 @@
+import { useMemo } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
+import { Card, CardBody, CardHeader, CardSub, CardTitle } from '@/shared/ui/Card'
+import SectionHeader from '@/shared/ui/SectionHeader'
+import Button from '@/shared/ui/Button'
+import Badge from '@/shared/ui/Badge'
+import { useAppStore } from '@/shared/state/useAppStore'
+import { dateTimeShort, timeHHMM } from '@/shared/lib/format'
+import { Plus, ArrowRight } from 'lucide-react'
+
+export default function DashboardPage() {
+  const nav = useNavigate()
+  const forms = useAppStore(s => s.forms)
+  const tickets = useAppStore(s => s.tickets)
+  const queue = useAppStore(s => s.queue)
+  const activities = useAppStore(s => s.activities)
+  const lastSync = useAppStore(s => s.lastSyncSuccess)
+
+  const stats = useMemo(() => {
+    const pending = queue.filter(q => q.status === 'pending').length
+    const inProgress = queue.filter(q => q.status === 'in_progress').length
+    const failed = queue.filter(q => q.status === 'failed').length
+    const now = new Date()
+    const sameDay = (iso: string) => {
+      const d = new Date(iso)
+      return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate()
+    }
+    const syncedToday = tickets.filter(t => t.status === 'synced' && sameDay(t.updatedAt)).length
+    return { pending, inProgress, failed, syncedToday }
+  }, [queue, tickets])
+
+  return (
+    <div className="pb-10">
+      <SectionHeader
+        title="Dashboard"
+        subtitle="Immediate visibility into forms, field activity, and sync health."
+        right={
+          <>
+            <Button
+              variant="secondary"
+              onClick={() => {
+                const id = useAppStore.getState().createForm('New Form')
+                nav(`/builder/${id}`)
+              }}
+            >
+              <Plus size={16} /> Create New Form
+            </Button>
+            <Button variant="secondary" onClick={() => nav('/field')}>
+              Open Field App <ArrowRight size={16} />
+            </Button>
+          </>
+        }
+      />
+
+      <div className="px-6 mt-6 grid grid-cols-1 md:grid-cols-4 gap-3">
+        <StatCard label="Pending" value={stats.pending} tone={stats.pending ? 'warning' : 'neutral'} />
+        <StatCard label="In progress" value={stats.inProgress} tone="neutral" />
+        <StatCard label="Failed" value={stats.failed} tone={stats.failed ? 'danger' : 'neutral'} />
+        <StatCard label="Synced today" value={stats.syncedToday} tone={stats.syncedToday ? 'success' : 'neutral'} />
+      </div>
+
+      <div className="px-6 mt-3">
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <CardTitle>Sync Status Overview</CardTitle>
+                <CardSub>Queue health and last successful sync.</CardSub>
+              </div>
+              <Button variant="secondary" onClick={() => nav('/queue')}>Open Sync Queue</Button>
+            </div>
+          </CardHeader>
+          <CardBody>
+            <div className="flex flex-wrap gap-2 items-center">
+              <Badge tone={stats.pending ? 'warning' : 'neutral'}>{stats.pending} Pending</Badge>
+              <Badge tone="neutral">{stats.inProgress} In progress</Badge>
+              <Badge tone={stats.failed ? 'danger' : 'neutral'}>{stats.failed} Failed</Badge>
+              <span className="text-sm text-neutral-500 dark:text-neutral-400">
+                {lastSync ? `Last success ${timeHHMM(lastSync)}` : 'No successful sync yet'}
+              </span>
+            </div>
+          </CardBody>
+        </Card>
+      </div>
+
+      <div className="px-6 mt-6 grid grid-cols-1 xl:grid-cols-2 gap-4">
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>Forms Overview</CardTitle>
+                <CardSub>Versioned templates with per-form state.</CardSub>
+              </div>
+              <Button variant="secondary" onClick={() => nav('/forms')}>Manage</Button>
+            </div>
+          </CardHeader>
+          <CardBody>
+            <div className="overflow-auto rf-scrollbar">
+              <table className="w-full text-sm">
+                <thead className="text-xs text-neutral-500 dark:text-neutral-400">
+                  <tr className="text-left">
+                    <th className="py-2">Form</th>
+                    <th className="py-2">Version</th>
+                    <th className="py-2">Status</th>
+                    <th className="py-2">Fields</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {forms.map((f) => {
+                    const v = f.versions[0]
+                    return (
+                      <tr key={f.id} className="border-t border-neutral-200 dark:border-neutral-800">
+                        <td className="py-2">
+                          <div className="font-medium">{f.name}</div>
+                          <div className="text-xs text-neutral-500 dark:text-neutral-400">{f.subtitle}</div>
+                        </td>
+                        <td className="py-2">{v.version}</td>
+                        <td className="py-2">
+                          <Badge tone={v.status === 'active' ? 'success' : v.status === 'draft' ? 'warning' : 'neutral'}>
+                            {v.status}
+                          </Badge>
+                        </td>
+                        <td className="py-2">{v.fieldCount}</td>
+                        <td className="py-2 text-right">
+                          <Link className="rf-focus inline-flex items-center gap-2 rounded-xl px-2 py-1 hover:bg-neutral-100 dark:hover:bg-neutral-900" to={`/builder/${f.id}`}>
+                            Open <ArrowRight size={14} />
+                          </Link>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </CardBody>
+        </Card>
+
+        <div className="flex flex-col gap-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Daily Field Tickets</CardTitle>
+              <CardSub>Today</CardSub>
+            </CardHeader>
+            <CardBody>
+              <div className="flex flex-col gap-2">
+                {tickets.slice(0, 6).map((t) => (
+                  <Link key={t.id} to={`/field/ticket/${t.id}`} className="rf-focus rounded-2xl border border-neutral-200 dark:border-neutral-800 p-3 hover:bg-neutral-50 dark:hover:bg-neutral-900">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="font-medium truncate">{t.id} — {t.title}</div>
+                        <div className="text-xs text-neutral-500 dark:text-neutral-400 truncate">
+                          Assigned: {t.assignedTo} · {dateTimeShort(t.assignedAt)}
+                        </div>
+                      </div>
+                      <Badge tone={t.status === 'synced' ? 'success' : t.status === 'error' ? 'danger' : t.status === 'queued' ? 'warning' : 'neutral'}>
+                        {t.status}
+                      </Badge>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </CardBody>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Last Activity</CardTitle>
+              <CardSub>Past 24 hours</CardSub>
+            </CardHeader>
+            <CardBody>
+              <div className="flex flex-col gap-2">
+                {activities.slice(0, 10).map((a) => (
+                  <div key={a.id} className="rounded-2xl border border-neutral-200 dark:border-neutral-800 p-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="font-medium">{a.title}</div>
+                      <div className="text-xs text-neutral-500 dark:text-neutral-400">{timeHHMM(a.at)}</div>
+                    </div>
+                    {a.subtitle && <div className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">{a.subtitle}</div>}
+                  </div>
+                ))}
+              </div>
+            </CardBody>
+          </Card>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function StatCard({ label, value, tone }: { label: string; value: number; tone: 'neutral' | 'success' | 'warning' | 'danger' }) {
+  return (
+    <Card>
+      <CardBody className="py-5">
+        <div className="text-xs text-neutral-500 dark:text-neutral-400">{label}</div>
+        <div className="mt-1 flex items-end justify-between">
+          <div className="text-3xl font-semibold">{value}</div>
+          <Badge tone={tone}>{tone}</Badge>
+        </div>
+      </CardBody>
+    </Card>
+  )
+}
