@@ -1,0 +1,17 @@
+import type { InputHTMLAttributes } from 'react'
+import { cn } from './cn'
+
+export default function Input(props: InputHTMLAttributes<HTMLInputElement>) {
+  const { className, ...rest } = props
+  return (
+    <input
+      {...rest}
+      className={cn(
+        'rf-focus h-10 w-full rounded-2xl border border-neutral-200 bg-white px-3 text-sm',
+        'placeholder:text-neutral-400',
+        'dark:border-neutral-800 dark:bg-neutral-950',
+        className
+      )}
+    />
+  )
+}
