@@ -41,7 +41,7 @@ export default function AppShell() {
 
   return (
     <div className="h-full flex">
-      <aside className="hidden md:flex md:w-[240px] shrink-0 border-r border-neutral-200 dark:border-neutral-800 bg-white/80 dark:bg-neutral-950/70 backdrop-blur">
+      <aside className="hidden md:flex md:flex-col md:w-[240px] shrink-0 border-r border-neutral-200 dark:border-neutral-800 bg-white/80 dark:bg-neutral-950/70 backdrop-blur">
         <div className="h-16 flex items-center gap-2 px-3 md:px-4 border-b border-neutral-200 dark:border-neutral-800">
           <div className="h-10 w-10 rounded-2xl border border-neutral-200 dark:border-neutral-800 flex items-center justify-center font-semibold">
             RF
