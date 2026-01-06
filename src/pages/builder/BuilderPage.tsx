@@ -106,7 +106,7 @@ export default function BuilderPage() {
         }
       />
 
-      <div className="px-6 mt-6 grid grid-cols-1 xl:grid-cols-[260px_1fr_320px] gap-4 items-start">
+      <div className="px-4 mt-4 sm:px-6 sm:mt-6 grid grid-cols-1 xl:grid-cols-[260px_1fr_320px] gap-4 items-start">
         {/* Tool Palette */}
         <Card>
           <CardBody>
@@ -137,7 +137,7 @@ export default function BuilderPage() {
             </div>
 
             <div className="mt-3 text-xs text-neutral-500 dark:text-neutral-400">
-              Tip: drag fields to reposition. Все изменения сохраняются в браузере (demo).
+              Tip: drag fields to reposition. All changes are saved in the browser (demo).
             </div>
           </CardBody>
         </Card>
@@ -297,7 +297,7 @@ function FieldEditor({ field, onChange }: { field: Field; onChange: (f: Field) =
       <div>
         <div className="text-xs text-neutral-500 dark:text-neutral-400 mb-1">Validation</div>
         {field.type === 'numeric' ? (
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <Input
               type="number"
               placeholder="min"
@@ -347,7 +347,7 @@ function FieldEditor({ field, onChange }: { field: Field; onChange: (f: Field) =
         <Textarea value={field.helpText ?? ''} onChange={(e) => onChange({ ...field, helpText: e.target.value })} />
       </div>
 
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
         <div>
           <div className="text-xs text-neutral-500 dark:text-neutral-400 mb-1">W</div>
           <Input type="number" value={Math.round(field.w * 100)} onChange={(e) => onChange({ ...field, w: clamp01(Number(e.target.value) / 100) })} />

@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
+import { createJSONStorage, persist } from 'zustand/middleware'
 import type { Activity, FormTemplate, FormVersion, Id, QueueItem, Ticket } from '@/entities/types'
 import { nowIso, uid, nextTicketId } from '@/shared/lib/ids'
 import { clamp } from '@/shared/lib/math'
@@ -12,6 +12,40 @@ export type Toast = {
   message?: string
   variant?: 'default' | 'success' | 'warning' | 'danger'
   createdAt: string
+}
+
+const memoryStorage = new Map<string, string>()
+
+const safeStorage = {
+  getItem: (name: string) => {
+    try {
+      return localStorage.getItem(name) ?? memoryStorage.get(name) ?? null
+    } catch {
+      return memoryStorage.get(name) ?? null
+    }
+  },
+  setItem: (name: string, value: string) => {
+    try {
+      localStorage.setItem(name, value)
+    } catch {
+      memoryStorage.set(name, value)
+    }
+  },
+  removeItem: (name: string) => {
+    try {
+      localStorage.removeItem(name)
+    } catch {
+      memoryStorage.delete(name)
+    }
+  }
+}
+
+function getStoredTheme(): Theme {
+  try {
+    return (localStorage.getItem('rf_theme') as Theme) || 'dark'
+  } catch {
+    return 'dark'
+  }
 }
 
 type State = {
@@ -73,9 +107,13 @@ export const useAppStore = create<State>()(
     (set, get) => ({
       booted: false,
 
-      theme: (localStorage.getItem('rf_theme') as Theme) || 'dark',
+      theme: getStoredTheme(),
       setTheme: (theme) => {
-        localStorage.setItem('rf_theme', theme)
+        try {
+          localStorage.setItem('rf_theme', theme)
+        } catch {
+          memoryStorage.set('rf_theme', theme)
+        }
         document.documentElement.classList.toggle('dark', theme === 'dark')
         set({ theme })
       },
@@ -92,8 +130,8 @@ export const useAppStore = create<State>()(
         const systemOnline = get().systemOnline
         set({ forcedOffline: v, online: v ? false : systemOnline })
         get().pushToast({
-          title: v ? 'Offline режим включён' : 'Offline режим выключён',
-          message: v ? 'Изменения будут попадать в очередь синка.' : 'Синк восстановится автоматически.',
+          title: v ? 'Offline mode enabled' : 'Offline mode disabled',
+          message: v ? 'Changes will be queued for sync.' : 'Sync will resume automatically.',
           variant: v ? 'warning' : 'success'
         })
       },
@@ -146,7 +184,7 @@ export const useAppStore = create<State>()(
             ...s.forms
           ]
         }))
-        get().addActivity('Создан шаблон формы', name)
+        get().addActivity('Form template created', name)
         return id
       },
 
@@ -169,7 +207,7 @@ export const useAppStore = create<State>()(
           })
           return { forms }
         })
-        get().addActivity('Создана новая версия', `Form ${formId} → ${vId}`)
+        get().addActivity('New version created', `Form ${formId} → ${vId}`)
         return vId
       },
 
@@ -204,8 +242,8 @@ export const useAppStore = create<State>()(
         }))
         const form = get().forms.find((f) => f.id === formId)
         const v = form?.versions.find((x) => x.id === versionId)
-        get().addActivity('Опубликована версия', `${form?.name ?? formId} ${v?.version ?? ''}`)
-        get().pushToast({ title: 'Версия опубликована', message: 'Готово для Field App', variant: 'success' })
+        get().addActivity('Version published', `${form?.name ?? formId} ${v?.version ?? ''}`)
+        get().pushToast({ title: 'Version published', message: 'Ready for Field App', variant: 'success' })
       },
 
       archiveForm: (formId) => {
@@ -216,7 +254,7 @@ export const useAppStore = create<State>()(
               : f
           )
         }))
-        get().addActivity('Форма архивирована', formId)
+        get().addActivity('Form archived', formId)
       },
 
       upsertField: (formId, versionId, field) => {
@@ -270,7 +308,7 @@ export const useAppStore = create<State>()(
           updatedAt: nowIso()
         }
         set((s) => ({ tickets: [t, ...s.tickets] }))
-        get().addActivity('Создан тикет', `${id} · ${title}`)
+        get().addActivity('Ticket created', `${id} · ${title}`)
         return id
       },
 
@@ -284,7 +322,7 @@ export const useAppStore = create<State>()(
 
       saveDraft: (ticketId) => {
         get().updateTicket(ticketId, { status: 'queued' })
-        get().pushToast({ title: 'Черновик сохранён', message: 'Локально на устройстве', variant: 'success' })
+        get().pushToast({ title: 'Draft saved', message: 'Saved locally on this device', variant: 'success' })
       },
 
       submitTicket: (ticketId) => {
@@ -300,10 +338,10 @@ export const useAppStore = create<State>()(
         }
         set((s) => ({ queue: [qi, ...s.queue] }))
         get().updateTicket(ticketId, { status: online ? 'in_progress' : 'queued' })
-        get().addActivity('Тикет отправлен', `${ticketId} → очередь синка`)
+        get().addActivity('Ticket submitted', `${ticketId} → sync queue`)
         get().pushToast({
-          title: online ? 'Отправка началась' : 'Отправлено в очередь',
-          message: online ? 'Синк выполняется…' : 'Уйдёт автоматически при появлении сети.',
+          title: online ? 'Sending started' : 'Queued for sync',
+          message: online ? 'Sync in progress…' : 'Will sync automatically when back online.',
           variant: online ? 'default' : 'warning'
         })
       },
@@ -319,7 +357,7 @@ export const useAppStore = create<State>()(
         set((s) => ({
           queue: s.queue.map((q) => (q.status === 'failed' ? { ...q, status: 'pending' } : q))
         }))
-        get().pushToast({ title: 'Retry запущен', message: 'Failed элементы вернулись в Pending', variant: 'success' })
+        get().pushToast({ title: 'Retry started', message: 'Failed items returned to Pending', variant: 'success' })
       },
 
       markQueueItem: (queueItemId, status, err) => {
@@ -334,7 +372,7 @@ export const useAppStore = create<State>()(
 
       markSynced: (ticketId) => {
         get().updateTicket(ticketId, { status: 'synced', lastError: undefined })
-        get().addActivity('Синк завершён', ticketId)
+        get().addActivity('Sync completed', ticketId)
       },
 
       recordSyncSuccess: () => set({ lastSyncSuccess: nowIso() }),
@@ -346,6 +384,7 @@ export const useAppStore = create<State>()(
     }),
     {
       name: 'rf_store_v1',
+      storage: createJSONStorage(() => safeStorage),
       partialize: (s) => ({
         theme: s.theme,
         systemOnline: s.systemOnline,

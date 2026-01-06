@@ -52,14 +52,14 @@ export default function DashboardPage() {
         }
       />
 
-      <div className="px-6 mt-6 grid grid-cols-1 md:grid-cols-4 gap-3">
+      <div className="px-4 mt-4 sm:px-6 sm:mt-6 grid grid-cols-1 md:grid-cols-4 gap-3">
         <StatCard label="Pending" value={stats.pending} tone={stats.pending ? 'warning' : 'neutral'} />
         <StatCard label="In progress" value={stats.inProgress} tone="neutral" />
         <StatCard label="Failed" value={stats.failed} tone={stats.failed ? 'danger' : 'neutral'} />
         <StatCard label="Synced today" value={stats.syncedToday} tone={stats.syncedToday ? 'success' : 'neutral'} />
       </div>
 
-      <div className="px-6 mt-3">
+      <div className="px-4 mt-3 sm:px-6 sm:mt-4">
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between gap-3">
@@ -83,7 +83,7 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      <div className="px-6 mt-6 grid grid-cols-1 xl:grid-cols-2 gap-4">
+      <div className="px-4 mt-4 sm:px-6 sm:mt-6 grid grid-cols-1 xl:grid-cols-2 gap-4">
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
@@ -100,9 +100,10 @@ export default function DashboardPage() {
                 <thead className="text-xs text-neutral-500 dark:text-neutral-400">
                   <tr className="text-left">
                     <th className="py-2">Form</th>
-                    <th className="py-2">Version</th>
-                    <th className="py-2">Status</th>
-                    <th className="py-2">Fields</th>
+                    <th className="py-2 hidden sm:table-cell">Version</th>
+                    <th className="py-2 hidden sm:table-cell">Status</th>
+                    <th className="py-2 hidden sm:table-cell">Fields</th>
+                    <th className="py-2 text-right hidden sm:table-cell">Open</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -113,15 +114,30 @@ export default function DashboardPage() {
                         <td className="py-2">
                           <div className="font-medium">{f.name}</div>
                           <div className="text-xs text-neutral-500 dark:text-neutral-400">{f.subtitle}</div>
+                          <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-neutral-500 dark:text-neutral-400 sm:hidden">
+                            <span>{v.version}</span>
+                            <span>·</span>
+                            <span>{v.fieldCount} fields</span>
+                          </div>
+                          <div className="mt-2 sm:hidden">
+                            <Badge tone={v.status === 'active' ? 'success' : v.status === 'draft' ? 'warning' : 'neutral'}>
+                              {v.status}
+                            </Badge>
+                          </div>
+                          <div className="mt-2 sm:hidden">
+                            <Link className="rf-focus inline-flex items-center gap-2 rounded-xl px-2 py-1 hover:bg-neutral-100 dark:hover:bg-neutral-900" to={`/builder/${f.id}`}>
+                              Open <ArrowRight size={14} />
+                            </Link>
+                          </div>
                         </td>
-                        <td className="py-2">{v.version}</td>
-                        <td className="py-2">
+                        <td className="py-2 hidden sm:table-cell">{v.version}</td>
+                        <td className="py-2 hidden sm:table-cell">
                           <Badge tone={v.status === 'active' ? 'success' : v.status === 'draft' ? 'warning' : 'neutral'}>
                             {v.status}
                           </Badge>
                         </td>
-                        <td className="py-2">{v.fieldCount}</td>
-                        <td className="py-2 text-right">
+                        <td className="py-2 hidden sm:table-cell">{v.fieldCount}</td>
+                        <td className="py-2 text-right hidden sm:table-cell">
                           <Link className="rf-focus inline-flex items-center gap-2 rounded-xl px-2 py-1 hover:bg-neutral-100 dark:hover:bg-neutral-900" to={`/builder/${f.id}`}>
                             Open <ArrowRight size={14} />
                           </Link>

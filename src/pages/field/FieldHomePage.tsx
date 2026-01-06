@@ -50,7 +50,7 @@ export default function FieldHomePage() {
         }
       />
 
-      <div className="px-6 mt-6 grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-4">
+      <div className="px-4 mt-4 sm:px-6 sm:mt-6 grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-4">
         <Card>
           <CardHeader>
             <CardTitle>Daily Field Tickets</CardTitle>
