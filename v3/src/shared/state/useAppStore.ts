@@ -111,12 +111,16 @@ export const useAppStore = create<State>()(
 
       toasts: [],
       pushToast: (t) =>
-        set((s) => ({
-          toasts: [
-            ...s.toasts,
-            { id: uid('toast'), createdAt: nowIso(), variant: 'default', ...t }
-          ].slice(-4)
-        })),
+        set((s) => {
+          const toast: Toast = {
+            id: uid('toast'),
+            createdAt: nowIso(),
+            title: t.title,
+            message: t.message,
+            variant: t.variant ?? 'default'
+          }
+          return { toasts: [...s.toasts, toast].slice(-4) }
+        }),
       dismissToast: (id) => set((s) => ({ toasts: s.toasts.filter((x) => x.id !== id) })),
 
       boot: () => {
