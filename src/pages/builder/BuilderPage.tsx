@@ -25,6 +25,9 @@ const tools: Array<{ type: FieldType; label: string }> = [
   { type: 'employee', label: 'Employees' }
 ]
 
+const GRID_PX = 8
+const MIN_FIELD_SIZE = 0.03
+
 export default function BuilderPage() {
   const { formId = '' } = useParams()
   const location = useLocation()
@@ -59,6 +62,7 @@ export default function BuilderPage() {
   const selected = useMemo(() => version?.fields.find(f => f.id === selectedId) ?? null, [version, selectedId])
 
   const { ref: stageRef, size } = useElementSize<HTMLDivElement>()
+  const grid = getGridStep(size)
 
   if (role !== 'admin') {
     return (
@@ -297,7 +301,7 @@ export default function BuilderPage() {
                       const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect()
                       const x = (e.clientX - rect.left) / rect.width
                       const y = (e.clientY - rect.top) / rect.height
-                      const f = newField(activeTool, x, y, page)
+                      const f = newField(activeTool, x, y, page, grid)
                       handleUpsertField(f)
                       setSelectedId(f.id)
                     }}
@@ -309,7 +313,7 @@ export default function BuilderPage() {
                       const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect()
                       const x = (e.clientX - rect.left) / rect.width
                       const y = (e.clientY - rect.top) / rect.height
-                      const f = newField(tool, x, y, page)
+                      const f = newField(tool, x, y, page, grid)
                       handleUpsertField(f)
                       setSelectedId(f.id)
                     }}
@@ -348,7 +352,7 @@ export default function BuilderPage() {
                       const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect()
                       const x = (e.clientX - rect.left) / rect.width
                       const y = (e.clientY - rect.top) / rect.height
-                      const f = newField(activeTool, x, y, page)
+                      const f = newField(activeTool, x, y, page, grid)
                       handleUpsertField(f)
                       setSelectedId(f.id)
                     }}
@@ -360,7 +364,7 @@ export default function BuilderPage() {
                       const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect()
                       const x = (e.clientX - rect.left) / rect.width
                       const y = (e.clientY - rect.top) / rect.height
-                      const f = newField(tool, x, y, page)
+                      const f = newField(tool, x, y, page, grid)
                       handleUpsertField(f)
                       setSelectedId(f.id)
                     }}
@@ -430,6 +434,9 @@ export default function BuilderPage() {
 }
 
 function FieldEditor({ field, onChange }: { field: Field; onChange: (f: Field) => void | Promise<void> }) {
+  const maxW = Math.max(1 - field.x, MIN_FIELD_SIZE)
+  const maxH = Math.max(1 - field.y, MIN_FIELD_SIZE)
+
   return (
     <div className="mt-4 space-y-3">
       <div>
@@ -523,11 +530,19 @@ function FieldEditor({ field, onChange }: { field: Field; onChange: (f: Field) =
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
           <div>
             <div className="text-xs text-neutral-500 dark:text-neutral-400 mb-1">W</div>
-            <Input type="number" value={Math.round(field.w * 100)} onChange={(e) => onChange({ ...field, w: clamp01(Number(e.target.value) / 100) })} />
+            <Input
+              type="number"
+              value={Math.round(field.w * 100)}
+              onChange={(e) => onChange({ ...field, w: clamp(Number(e.target.value) / 100, MIN_FIELD_SIZE, maxW) })}
+            />
           </div>
           <div>
             <div className="text-xs text-neutral-500 dark:text-neutral-400 mb-1">H</div>
-            <Input type="number" value={Math.round(field.h * 100)} onChange={(e) => onChange({ ...field, h: clamp01(Number(e.target.value) / 100) })} />
+            <Input
+              type="number"
+              value={Math.round(field.h * 100)}
+              onChange={(e) => onChange({ ...field, h: clamp(Number(e.target.value) / 100, MIN_FIELD_SIZE, maxH) })}
+            />
           </div>
         </div>
       )}
@@ -552,6 +567,7 @@ function FieldBox({
 }) {
   const [drag, setDrag] = useState<null | { ox: number; oy: number; pid: number }>(null)
   const [resize, setResize] = useState<null | { startX: number; startY: number; w: number; h: number; pid: number }>(null)
+  const grid = getGridStep(stage)
 
   const style = {
     left: `${field.x * 100}%`,
@@ -587,8 +603,8 @@ function FieldBox({
           const dy = (e.clientY - resize.startY) / parent.height
           const maxW = 1 - field.x
           const maxH = 1 - field.y
-          const nextW = Math.max(0.03, Math.min(maxW, resize.w + dx))
-          const nextH = Math.max(0.03, Math.min(maxH, resize.h + dy))
+          const nextW = clamp(snapToGrid(resize.w + dx, grid.x), MIN_FIELD_SIZE, maxW)
+          const nextH = clamp(snapToGrid(resize.h + dy, grid.y), MIN_FIELD_SIZE, maxH)
           onResize(nextW, nextH)
           return
         }
@@ -597,7 +613,12 @@ function FieldBox({
         const parent = (e.currentTarget.parentElement as HTMLDivElement).getBoundingClientRect()
         const nx = (e.clientX - parent.left - drag.ox) / parent.width
         const ny = (e.clientY - parent.top - drag.oy) / parent.height
-        onMove(clamp01(nx), clamp01(ny))
+        const maxX = 1 - field.w
+        const maxY = 1 - field.h
+        onMove(
+          clamp(snapToGrid(nx, grid.x), 0, maxX),
+          clamp(snapToGrid(ny, grid.y), 0, maxY)
+        )
       }}
       onPointerUp={(e) => {
         if (drag?.pid === e.pointerId || resize?.pid === e.pointerId) {
@@ -631,8 +652,7 @@ function FieldBox({
   )
 }
 
-function newField(type: FieldType, x: number, y: number, page: number): Field {
-  const base = { x: clamp01(x), y: clamp01(y), page }
+function newField(type: FieldType, x: number, y: number, page: number, grid?: { x: number; y: number }): Field {
   const sizes: Record<FieldType, { w: number; h: number }> = {
     text: { w: 0.34, h: 0.055 },
     numeric: { w: 0.26, h: 0.055 },
@@ -644,6 +664,10 @@ function newField(type: FieldType, x: number, y: number, page: number): Field {
   }
 
   const wh = sizes[type]
+  const maxX = 1 - wh.w
+  const maxY = 1 - wh.h
+  const nx = clamp(snapToGrid(x, grid?.x ?? 0), 0, maxX)
+  const ny = clamp(snapToGrid(y, grid?.y ?? 0), 0, maxY)
   return {
     id: uid('fld'),
     type,
@@ -651,7 +675,9 @@ function newField(type: FieldType, x: number, y: number, page: number): Field {
     key: `${type}_${Math.random().toString(16).slice(2, 6)}`,
     required: false,
     validation: type === 'numeric' ? { kind: 'range', min: 0, max: 300 } : { kind: 'none' },
-    ...base,
+    x: nx,
+    y: ny,
+    page,
     w: wh.w,
     h: wh.h
   }
@@ -669,6 +695,17 @@ function labelFor(type: FieldType) {
   }
 }
 
-function clamp01(n: number) {
-  return Math.max(0, Math.min(1, n))
+function getGridStep(stage: { width: number; height: number }) {
+  const x = stage.width ? GRID_PX / stage.width : 0
+  const y = stage.height ? GRID_PX / stage.height : 0
+  return { x: Math.min(x, 1), y: Math.min(y, 1) }
+}
+
+function snapToGrid(value: number, step: number) {
+  if (!step) return value
+  return Math.round(value / step) * step
+}
+
+function clamp(n: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, n))
 }
