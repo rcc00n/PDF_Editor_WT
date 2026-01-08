@@ -9,7 +9,7 @@ import { Plus, ListChecks } from 'lucide-react'
 import Modal from '@/shared/ui/Modal'
 import Input from '@/shared/ui/Input'
 import Select from '@/shared/ui/Select'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 export default function FieldHomePage() {
   const nav = useNavigate()
@@ -18,11 +18,16 @@ export default function FieldHomePage() {
   const lastSync = useAppStore(s => s.lastSyncSuccess)
   const forms = useAppStore(s => s.forms)
   const createTicket = useAppStore(s => s.createTicket)
+  const pushToast = useAppStore(s => s.pushToast)
 
   const [open, setOpen] = useState(false)
   const [title, setTitle] = useState('New Ticket')
   const [assignedTo, setAssignedTo] = useState('Technician')
   const [formId, setFormId] = useState(forms[0]?.id ?? '')
+
+  useEffect(() => {
+    if (!formId && forms.length > 0) setFormId(forms[0].id)
+  }, [forms, formId])
 
   const activeVersions = useMemo(() => {
     const f = forms.find(x => x.id === formId)
@@ -134,11 +139,18 @@ export default function FieldHomePage() {
           <div className="flex justify-end gap-2">
             <Button variant="secondary" onClick={() => setOpen(false)}>Cancel</Button>
             <Button onClick={() => {
-              const { v } = activeVersions
-              if (!v) return
-              const id = createTicket(formId, v.id, (title || 'Ticket').trim(), (assignedTo || 'Technician').trim())
-              setOpen(false)
-              nav(`/field/ticket/${id}`)
+              const run = async () => {
+                const { v } = activeVersions
+                if (!v) return
+                try {
+                  const id = await createTicket(formId, v.id, (title || 'Ticket').trim(), (assignedTo || 'Technician').trim())
+                  setOpen(false)
+                  nav(`/field/ticket/${id}`)
+                } catch (err: any) {
+                  pushToast({ title: 'Ticket failed', message: err?.message || 'Unable to create ticket', variant: 'danger' })
+                }
+              }
+              void run()
             }}>
               Create
             </Button>

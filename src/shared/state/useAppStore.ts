@@ -3,9 +3,17 @@ import { createJSONStorage, persist } from 'zustand/middleware'
 import type { Activity, FormTemplate, FormVersion, Id, QueueItem, Ticket } from '@/entities/types'
 import { nowIso, uid, nextTicketId } from '@/shared/lib/ids'
 import { clamp } from '@/shared/lib/math'
+import { API_ENABLED } from '@/shared/api/config'
+import { apiFetch, apiJson, clearStoredTokens, getStoredAccessToken, getStoredRefreshToken, storeTokens } from '@/shared/api/client'
 
 export type Theme = 'light' | 'dark' | 'planet'
 export type UserRole = 'admin' | 'worker'
+export type AuthStatus = 'unknown' | 'authenticated' | 'unauthenticated'
+
+export type UserProfile = {
+  email: string
+  role: UserRole
+}
 
 export type Toast = {
   id: Id
@@ -62,14 +70,29 @@ function applyTheme(theme: Theme) {
   root.classList.toggle('theme-planet', theme === 'planet')
 }
 
+function upsertById<T extends { id: string }>(items: T[], next: T) {
+  const idx = items.findIndex((i) => i.id === next.id)
+  if (idx === -1) return [next, ...items]
+  const copy = items.slice()
+  copy[idx] = next
+  return copy
+}
+
 type State = {
   booted: boolean
+  apiEnabled: boolean
+  authStatus: AuthStatus
+  user?: UserProfile
 
   theme: Theme
   setTheme: (theme: Theme) => void
   toggleTheme: () => void
   role: UserRole
   setRole: (role: UserRole) => void
+  initAuth: () => Promise<void>
+  login: (email: string, password: string) => Promise<void>
+  logout: () => void
+  refreshRemote: () => Promise<void>
 
   systemOnline: boolean
   forcedOffline: boolean
@@ -90,23 +113,26 @@ type State = {
   boot: () => void
 
   // Forms
-  createForm: (name: string) => Id
-  createVersion: (formId: Id) => Id
-  renameForm: (formId: Id, name: string) => void
+  createForm: (name: string) => Promise<Id>
+  createVersion: (formId: Id) => Promise<Id>
+  renameForm: (formId: Id, name: string) => Promise<void>
   setPdf: (formId: Id, versionId: Id, pdf: FormVersion['pdf']) => void
-  publishVersion: (formId: Id, versionId: Id) => void
-  archiveForm: (formId: Id) => void
+  uploadPdf: (formId: Id, versionId: Id, file: File) => Promise<void>
+  publishVersion: (formId: Id, versionId: Id) => Promise<void>
+  archiveForm: (formId: Id) => Promise<void>
 
   // Builder fields
-  upsertField: (formId: Id, versionId: Id, field: FormVersion['fields'][number]) => void
-  deleteField: (formId: Id, versionId: Id, fieldId: Id) => void
+  upsertField: (formId: Id, versionId: Id, field: FormVersion['fields'][number]) => Promise<void>
+  deleteField: (formId: Id, versionId: Id, fieldId: Id) => Promise<void>
 
   // Tickets
-  createTicket: (formId: Id, versionId: Id, title: string, assignedTo: string) => Id
+  createTicket: (formId: Id, versionId: Id, title: string, assignedTo: string) => Promise<Id>
   updateTicket: (ticketId: Id, patch: Partial<Ticket>) => void
-  saveDraft: (ticketId: Id) => void
-  submitTicket: (ticketId: Id) => void
-  approveTicket: (ticketId: Id) => void
+  saveDraft: (ticketId: Id) => Promise<void>
+  submitTicket: (ticketId: Id) => Promise<void>
+  approveTicket: (ticketId: Id) => Promise<void>
+  uploadAttachment: (ticketId: Id, file: File) => Promise<void>
+  uploadSignature: (ticketId: Id, dataUrl: string, signer: string) => Promise<void>
 
   // Queue
   retryFailed: () => void
@@ -122,6 +148,9 @@ export const useAppStore = create<State>()(
   persist(
     (set, get) => ({
       booted: false,
+      apiEnabled: API_ENABLED,
+      authStatus: API_ENABLED ? 'unknown' : 'authenticated',
+      user: undefined,
 
       theme: getStoredTheme(),
       setTheme: (theme) => {
@@ -139,7 +168,60 @@ export const useAppStore = create<State>()(
         get().setTheme(next)
       },
       role: 'admin',
-      setRole: (role) => set({ role }),
+      setRole: (role) => {
+        if (API_ENABLED) return
+        set({ role })
+      },
+      initAuth: async () => {
+        if (!API_ENABLED) return
+        const hasToken = getStoredAccessToken() || getStoredRefreshToken()
+        if (!hasToken) {
+          clearStoredTokens()
+          set({ authStatus: 'unauthenticated', user: undefined })
+          return
+        }
+        try {
+          const me = await apiJson('/auth/me/')
+          set({ authStatus: 'authenticated', user: me, role: me.role })
+          await get().refreshRemote()
+        } catch {
+          clearStoredTokens()
+          set({ authStatus: 'unauthenticated', user: undefined })
+        }
+      },
+      login: async (email, password) => {
+        if (!API_ENABLED) return
+        const data = await apiJson('/auth/token/', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username: email, password })
+        }, false)
+        storeTokens(data.access, data.refresh)
+        const me = await apiJson('/auth/me/')
+        set({ authStatus: 'authenticated', user: me, role: me.role })
+        await get().refreshRemote()
+      },
+      logout: () => {
+        clearStoredTokens()
+        set({
+          authStatus: API_ENABLED ? 'unauthenticated' : 'authenticated',
+          user: undefined,
+          role: 'worker',
+          forms: [],
+          tickets: [],
+          queue: [],
+          activities: [],
+          lastSyncSuccess: undefined
+        })
+      },
+      refreshRemote: async () => {
+        if (!API_ENABLED) return
+        const [forms, tickets] = await Promise.all([
+          apiJson('/forms/'),
+          apiJson('/tickets/')
+        ])
+        set({ forms, tickets, queue: [], activities: [], lastSyncSuccess: undefined })
+      },
 
       systemOnline: typeof navigator !== 'undefined' ? navigator.onLine : true,
       forcedOffline: false,
@@ -186,7 +268,17 @@ export const useAppStore = create<State>()(
         set({ booted: true })
       },
 
-      createForm: (name) => {
+      createForm: async (name) => {
+        if (API_ENABLED) {
+          const form = await apiJson('/forms/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name })
+          })
+          set((s) => ({ forms: upsertById(s.forms, form) }))
+          get().addActivity('Form template created', name)
+          return form.id
+        }
         const id = uid('form')
         const vId = uid('ver')
         const version: FormVersion = {
@@ -206,7 +298,14 @@ export const useAppStore = create<State>()(
         return id
       },
 
-      createVersion: (formId) => {
+      createVersion: async (formId) => {
+        if (API_ENABLED) {
+          const form = await apiJson(`/forms/${formId}/versions/`, { method: 'POST' })
+          set((s) => ({ forms: upsertById(s.forms, form) }))
+          const latest = form.versions?.[0]
+          if (latest) get().addActivity('New version created', `${formId} → ${latest.id}`)
+          return latest?.id ?? formId
+        }
         const vId = uid('ver')
         set((s) => {
           const forms = s.forms.map((f) => {
@@ -229,8 +328,18 @@ export const useAppStore = create<State>()(
         return vId
       },
 
-      renameForm: (formId, name) =>
-        set((s) => ({ forms: s.forms.map((f) => (f.id === formId ? { ...f, name } : f)) })),
+      renameForm: async (formId, name) => {
+        if (API_ENABLED) {
+          const form = await apiJson(`/forms/${formId}/`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name })
+          })
+          set((s) => ({ forms: upsertById(s.forms, form) }))
+          return
+        }
+        set((s) => ({ forms: s.forms.map((f) => (f.id === formId ? { ...f, name } : f)) }))
+      },
 
       setPdf: (formId, versionId, pdf) =>
         set((s) => ({
@@ -243,7 +352,25 @@ export const useAppStore = create<State>()(
           })
         })),
 
-      publishVersion: (formId, versionId) => {
+      uploadPdf: async (formId, versionId, file) => {
+        const formData = new FormData()
+        formData.append('file', file)
+        const res = await apiFetch(`/forms/${formId}/versions/${versionId}/pdf/`, { method: 'POST', body: formData })
+        if (!res.ok) {
+          const msg = (await res.text()) || 'PDF upload failed'
+          throw new Error(msg)
+        }
+        const form = await res.json()
+        set((s) => ({ forms: upsertById(s.forms, form) }))
+      },
+
+      publishVersion: async (formId, versionId) => {
+        if (API_ENABLED) {
+          const form = await apiJson(`/forms/${formId}/versions/${versionId}/publish/`, { method: 'POST' })
+          set((s) => ({ forms: upsertById(s.forms, form) }))
+          get().pushToast({ title: 'Version published', message: 'Ready for Field App', variant: 'success' })
+          return
+        }
         const preForm = get().forms.find((f) => f.id === formId)
         const preVersion = preForm?.versions.find((v) => v.id === versionId)
         const wasArchived = preVersion?.status === 'archived'
@@ -270,7 +397,13 @@ export const useAppStore = create<State>()(
         get().pushToast({ title: toastTitle, message: toastMessage, variant: 'success' })
       },
 
-      archiveForm: (formId) => {
+      archiveForm: async (formId) => {
+        if (API_ENABLED) {
+          const form = await apiJson(`/forms/${formId}/archive/`, { method: 'POST' })
+          set((s) => ({ forms: upsertById(s.forms, form) }))
+          get().addActivity('Form archived', formId)
+          return
+        }
         set((s) => ({
           forms: s.forms.map((f) =>
             f.id === formId
@@ -281,7 +414,16 @@ export const useAppStore = create<State>()(
         get().addActivity('Form archived', formId)
       },
 
-      upsertField: (formId, versionId, field) => {
+      upsertField: async (formId, versionId, field) => {
+        if (API_ENABLED) {
+          const form = await apiJson(`/forms/${formId}/versions/${versionId}/fields/`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ field })
+          })
+          set((s) => ({ forms: upsertById(s.forms, form) }))
+          return
+        }
         set((s) => ({
           forms: s.forms.map((f) => {
             if (f.id !== formId) return f
@@ -300,7 +442,12 @@ export const useAppStore = create<State>()(
         }))
       },
 
-      deleteField: (formId, versionId, fieldId) => {
+      deleteField: async (formId, versionId, fieldId) => {
+        if (API_ENABLED) {
+          const form = await apiJson(`/forms/${formId}/versions/${versionId}/fields/${fieldId}/`, { method: 'DELETE' })
+          set((s) => ({ forms: upsertById(s.forms, form) }))
+          return
+        }
         set((s) => ({
           forms: s.forms.map((f) => {
             if (f.id !== formId) return f
@@ -316,7 +463,17 @@ export const useAppStore = create<State>()(
         }))
       },
 
-      createTicket: (formId, versionId, title, assignedTo) => {
+      createTicket: async (formId, versionId, title, assignedTo) => {
+        if (API_ENABLED) {
+          const ticket = await apiJson('/tickets/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ formId, versionId, title, assignedTo })
+          })
+          set((s) => ({ tickets: upsertById(s.tickets, ticket) }))
+          get().addActivity('Ticket created', `${ticket.id} · ${ticket.title}`)
+          return ticket.id
+        }
         const id = nextTicketId(get().tickets)
         const t: Ticket = {
           id,
@@ -344,12 +501,23 @@ export const useAppStore = create<State>()(
         }))
       },
 
-      saveDraft: (ticketId) => {
+      saveDraft: async (ticketId) => {
         get().updateTicket(ticketId, { status: 'queued' })
+        if (API_ENABLED && get().online) {
+          const t = get().tickets.find((x) => x.id === ticketId)
+          if (t) {
+            const updated = await apiJson(`/tickets/${ticketId}/`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ values: t.values, signature: t.signature, status: 'queued' })
+            })
+            set((s) => ({ tickets: upsertById(s.tickets, updated) }))
+          }
+        }
         get().pushToast({ title: 'Draft saved', message: 'Saved locally on this device', variant: 'success' })
       },
 
-      submitTicket: (ticketId) => {
+      submitTicket: async (ticketId) => {
         const online = get().online
         const qId = uid('q')
         const qi: QueueItem = {
@@ -371,10 +539,37 @@ export const useAppStore = create<State>()(
       },
 
 
-      approveTicket: (ticketId) => {
+      approveTicket: async (ticketId) => {
+        if (API_ENABLED) {
+          const updated = await apiJson(`/tickets/${ticketId}/approve/`, { method: 'POST' })
+          set((s) => ({ tickets: upsertById(s.tickets, updated) }))
+          get().addActivity('Approved & Archived', ticketId)
+          get().pushToast({ title: 'Approved', message: `${ticketId} archived`, variant: 'success' })
+          return
+        }
         get().updateTicket(ticketId, { approvalState: 'approved' })
         get().addActivity('Approved & Archived', ticketId)
         get().pushToast({ title: 'Approved', message: `${ticketId} archived`, variant: 'success' })
+      },
+
+      uploadAttachment: async (ticketId, file) => {
+        if (!API_ENABLED) return
+        const formData = new FormData()
+        formData.append('file', file)
+        const res = await apiFetch(`/tickets/${ticketId}/attachments/`, { method: 'POST', body: formData })
+        if (!res.ok) throw new Error('Attachment upload failed')
+        const updated = await res.json()
+        set((s) => ({ tickets: upsertById(s.tickets, updated) }))
+      },
+
+      uploadSignature: async (ticketId, dataUrl, signer) => {
+        if (!API_ENABLED) return
+        const updated = await apiJson(`/tickets/${ticketId}/signature/`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ dataUrl, signer })
+        })
+        set((s) => ({ tickets: upsertById(s.tickets, updated) }))
       },
 
       retryFailed: () => {

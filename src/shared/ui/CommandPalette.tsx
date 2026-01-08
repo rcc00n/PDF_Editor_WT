@@ -4,14 +4,14 @@ import Modal from './Modal'
 import Input from './Input'
 import Kbd from './Kbd'
 import { useAppStore } from '@/shared/state/useAppStore'
-import { Search, Plus, LayoutGrid, FileText, Smartphone, RefreshCw, ClipboardCheck, Moon, Sun, Globe, WifiOff, Wifi, Shield, User } from 'lucide-react'
+import { Search, Plus, LayoutGrid, FileText, Smartphone, RefreshCw, ClipboardCheck, Moon, Sun, Globe, WifiOff, Wifi, Shield, User, LogOut } from 'lucide-react'
 
 type Action = {
   id: string
   title: string
   subtitle?: string
   icon?: any
-  run: () => void
+  run: () => void | Promise<void>
   keywords?: string
 }
 
@@ -24,6 +24,8 @@ export default function CommandPalette() {
   const theme = useAppStore(s => s.theme)
   const role = useAppStore(s => s.role)
   const setRole = useAppStore(s => s.setRole)
+  const apiEnabled = useAppStore(s => s.apiEnabled)
+  const logout = useAppStore(s => s.logout)
   const forcedOffline = useAppStore(s => s.forcedOffline)
   const setForcedOffline = useAppStore(s => s.setForcedOffline)
   const createForm = useAppStore(s => s.createForm)
@@ -54,34 +56,48 @@ export default function CommandPalette() {
       { id: 'field', title: 'Field App', subtitle: 'Offline tickets', icon: Smartphone, run: () => nav('/field') },
       { id: 'queue', title: 'Sync Queue', subtitle: 'Pending / failed mutations', icon: RefreshCw, run: () => nav('/queue') },
       { id: 'review', title: 'Admin Review', subtitle: 'Preview and export', icon: ClipboardCheck, run: () => nav('/review') },
-      {
+      { id: 'theme', title: `Switch to ${nextTheme}`, icon: ThemeIcon, run: () => toggleTheme(), keywords: 'theme dark light planet' },
+      { id: 'offline', title: forcedOffline ? 'Disable offline simulation' : 'Enable offline simulation', icon: forcedOffline ? Wifi : WifiOff, run: () => setForcedOffline(!forcedOffline), keywords: 'offline online network' }
+    ]
+
+    if (!apiEnabled) {
+      base.splice(5, 0, {
         id: 'role',
         title: isAdmin ? 'Switch to worker' : 'Switch to admin',
         subtitle: isAdmin ? 'Limit access to form creation' : 'Full template access',
         icon: isAdmin ? User : Shield,
         run: () => setRole(isAdmin ? 'worker' : 'admin'),
         keywords: 'role admin worker access'
-      },
-      { id: 'theme', title: `Switch to ${nextTheme}`, icon: ThemeIcon, run: () => toggleTheme(), keywords: 'theme dark light planet' },
-      { id: 'offline', title: forcedOffline ? 'Disable offline simulation' : 'Enable offline simulation', icon: forcedOffline ? Wifi : WifiOff, run: () => setForcedOffline(!forcedOffline), keywords: 'offline online network' }
-    ]
+      })
+    }
 
     if (isAdmin) {
-      base.splice(5, 0, {
+      base.splice(apiEnabled ? 5 : 6, 0, {
         id: 'new',
         title: 'Create new form',
         subtitle: 'Start a template from scratch',
         icon: Plus,
-        run: () => {
-          const id = createForm('New Form')
+        run: async () => {
+          const id = await createForm('New Form')
           nav(`/builder/${id}`)
         },
         keywords: 'create new form template builder'
       })
     }
 
+    if (apiEnabled) {
+      base.push({
+        id: 'logout',
+        title: 'Sign out',
+        subtitle: 'End current session',
+        icon: LogOut,
+        run: () => logout(),
+        keywords: 'logout sign out session'
+      })
+    }
+
     return base
-  }, [nav, createForm, nextTheme, ThemeIcon, toggleTheme, forcedOffline, setForcedOffline, isAdmin, setRole])
+  }, [nav, createForm, nextTheme, ThemeIcon, toggleTheme, forcedOffline, setForcedOffline, isAdmin, setRole, apiEnabled, logout])
 
   const filtered = actions.filter((a) => {
     const s = (a.title + ' ' + (a.subtitle ?? '') + ' ' + (a.keywords ?? '')).toLowerCase()
@@ -109,7 +125,11 @@ export default function CommandPalette() {
               key={a.id}
               className="rf-focus w-full text-left px-3 py-3 flex items-center gap-3 hover:bg-neutral-50 dark:hover:bg-neutral-900"
               onClick={() => {
-                a.run()
+                const result = a.run()
+                if (result && typeof (result as Promise<void>).finally === 'function') {
+                  ;(result as Promise<void>).finally(() => setOpen(false))
+                  return
+                }
                 setOpen(false)
               }}
             >

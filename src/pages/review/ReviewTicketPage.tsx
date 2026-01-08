@@ -54,7 +54,7 @@ export default function ReviewTicketPage() {
               <FileSpreadsheet size={16} /> Export CSV
             </Button>
             <Button
-              onClick={() => approveTicket(ticket.id)}
+              onClick={() => void approveTicket(ticket.id)}
               disabled={ticket.approvalState === 'approved'}
             >
               <CheckCircle2 size={16} /> Approve & Archive
@@ -95,8 +95,8 @@ export default function ReviewTicketPage() {
               <div className="mt-4 rounded-2xl border border-neutral-200 dark:border-neutral-800 p-3">
                 <div className="text-xs text-neutral-500 dark:text-neutral-400">Signature</div>
                 <div className="mt-1 font-medium">{ticket.signature?.signer ?? '—'}</div>
-                {ticket.signature?.dataUrl && (
-                  <img src={ticket.signature.dataUrl} alt="signature" className="mt-2 h-[80px] w-auto rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white" />
+                {signatureSrc(ticket.signature) && (
+                  <img src={signatureSrc(ticket.signature)} alt="signature" className="mt-2 h-[80px] w-auto rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white" />
                 )}
               </div>
             </div>
@@ -138,15 +138,19 @@ export default function ReviewTicketPage() {
                 <div className="text-sm text-neutral-500 dark:text-neutral-400">No attachments</div>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {ticket.attachments.map((a) => (
-                    <a key={a.id} href={a.dataUrl} download={a.name} className="rf-focus rounded-2xl border border-neutral-200 dark:border-neutral-800 overflow-hidden hover:bg-neutral-50 dark:hover:bg-neutral-900">
-                      <img src={a.dataUrl} alt={a.name} className="w-full h-[110px] object-cover" />
-                      <div className="p-2">
-                        <div className="text-xs font-medium truncate">{a.name}</div>
-                        <div className="text-[11px] text-neutral-500 dark:text-neutral-400 truncate">{a.mime}</div>
-                      </div>
-                    </a>
-                  ))}
+                  {ticket.attachments.map((a) => {
+                    const src = attachmentSrc(a)
+                    if (!src) return null
+                    return (
+                      <a key={a.id} href={src} download={a.name} className="rf-focus rounded-2xl border border-neutral-200 dark:border-neutral-800 overflow-hidden hover:bg-neutral-50 dark:hover:bg-neutral-900">
+                        <img src={src} alt={a.name} className="w-full h-[110px] object-cover" />
+                        <div className="p-2">
+                          <div className="text-xs font-medium truncate">{a.name}</div>
+                          <div className="text-[11px] text-neutral-500 dark:text-neutral-400 truncate">{a.mime}</div>
+                        </div>
+                      </a>
+                    )
+                  })}
                 </div>
               )}
             </CardBody>
@@ -165,7 +169,7 @@ export default function ReviewTicketPage() {
                 </Badge>
               </div>
               <div className="mt-3">
-                <Button onClick={() => approveTicket(ticket.id)} disabled={ticket.approvalState === 'approved'}>
+                <Button onClick={() => void approveTicket(ticket.id)} disabled={ticket.approvalState === 'approved'}>
                   <CheckCircle2 size={16} /> Approve & Archive
                 </Button>
               </div>
@@ -175,4 +179,13 @@ export default function ReviewTicketPage() {
       </div>
     </div>
   )
+}
+
+function attachmentSrc(attachment: { url?: string; dataUrl?: string }) {
+  return attachment.url || attachment.dataUrl || ''
+}
+
+function signatureSrc(signature?: { url?: string; dataUrl?: string }) {
+  if (!signature) return ''
+  return signature.dataUrl || signature.url || ''
 }
