@@ -1,8 +1,11 @@
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { useEffect } from 'react'
-import { LayoutGrid, FileText, PencilRuler, Smartphone, RefreshCw, ClipboardCheck, Moon, Sun, Globe, Wifi, WifiOff, Command, Shield, User, Users } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { LayoutGrid, FileText, PencilRuler, Smartphone, RefreshCw, ClipboardCheck, Moon, Sun, Globe, Wifi, WifiOff, Command, Shield, User, Users, ChevronLeft, ChevronRight, ChevronDown, LogOut } from 'lucide-react'
 import { useAppStore } from '@/shared/state/useAppStore'
 import { cn } from '@/shared/ui/cn'
+import Modal from '@/shared/ui/Modal'
+import Button from '@/shared/ui/Button'
+import Badge from '@/shared/ui/Badge'
 
 const nav = [
   { to: '/dashboard', label: 'Dashboard', icon: LayoutGrid },
@@ -19,6 +22,9 @@ export default function AppShell() {
   const setRole = useAppStore(s => s.setRole)
   const apiEnabled = useAppStore(s => s.apiEnabled)
   const user = useAppStore(s => s.user)
+  const sidebarCollapsed = useAppStore(s => s.sidebarCollapsed)
+  const setSidebarCollapsed = useAppStore(s => s.setSidebarCollapsed)
+  const logout = useAppStore(s => s.logout)
   const online = useAppStore(s => s.online)
   const forcedOffline = useAppStore(s => s.forcedOffline)
   const setForcedOffline = useAppStore(s => s.setForcedOffline)
@@ -33,6 +39,8 @@ export default function AppShell() {
   const isAdmin = role === 'admin'
   const RoleIcon = isAdmin ? Shield : User
   const navItems = isAdmin ? [...nav, { to: '/employees', label: 'Employees', icon: Users }] : nav
+  const [profileOpen, setProfileOpen] = useState(false)
+  const profileLabel = user?.email || (isAdmin ? 'Admin' : 'Worker')
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -51,15 +59,38 @@ export default function AppShell() {
 
   return (
     <div className="h-full flex">
-      <aside className="hidden md:flex md:flex-col md:w-[240px] shrink-0 border-r border-neutral-200 dark:border-neutral-800 bg-white/80 dark:bg-neutral-950/70 backdrop-blur">
-        <div className="h-16 flex items-center gap-2 px-3 md:px-4 border-b border-neutral-200 dark:border-neutral-800">
+      <aside
+        className={cn(
+          'hidden md:flex md:flex-col shrink-0 border-r border-neutral-200 dark:border-neutral-800 bg-white/80 dark:bg-neutral-950/70 backdrop-blur',
+          sidebarCollapsed ? 'md:w-[88px]' : 'md:w-[240px]'
+        )}
+      >
+        <div
+          className={cn(
+            'h-16 flex items-center border-b border-neutral-200 dark:border-neutral-800',
+            sidebarCollapsed ? 'px-2 justify-between gap-2' : 'px-3 md:px-4 gap-3'
+          )}
+        >
           <div className="h-10 w-10 rounded-2xl border border-neutral-200 dark:border-neutral-800 flex items-center justify-center font-semibold">
             RF
           </div>
-          <div className="hidden md:block leading-tight">
-            <div className="font-semibold">RelayForms</div>
-            <div className="text-xs text-neutral-500 dark:text-neutral-400">Offline-ready</div>
-          </div>
+          {!sidebarCollapsed && (
+            <div className="hidden md:block leading-tight">
+              <div className="font-semibold">RelayForms</div>
+              <div className="text-xs text-neutral-500 dark:text-neutral-400">Offline-ready</div>
+            </div>
+          )}
+          <button
+            className={cn(
+              'rf-focus rounded-xl p-2 hover:bg-neutral-100 dark:hover:bg-neutral-900',
+              !sidebarCollapsed && 'ml-auto'
+            )}
+            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+            title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          >
+            {sidebarCollapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
+          </button>
         </div>
 
         <nav className="p-2 md:p-3 flex flex-col gap-1">
@@ -69,31 +100,38 @@ export default function AppShell() {
               <NavLink
                 key={item.to}
                 to={item.to}
+                title={item.label}
+                aria-label={item.label}
                 className={({ isActive }) =>
                   cn(
                     'rf-focus flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-medium transition',
                     'hover:bg-neutral-100 dark:hover:bg-neutral-900',
-                    isActive && 'bg-neutral-100 dark:bg-neutral-900'
+                    isActive && 'bg-neutral-100 dark:bg-neutral-900',
+                    sidebarCollapsed && 'justify-center px-2'
                   )
                 }
               >
                 <Icon size={18} className="shrink-0" />
-                <span className="hidden md:block">{item.label}</span>
+                {!sidebarCollapsed && <span className="hidden md:block">{item.label}</span>}
               </NavLink>
             )
           })}
 
           {isAdmin && (
-            <div className="mt-2 hidden md:block border-t border-neutral-200 dark:border-neutral-800 pt-3">
+            <div className={cn('mt-2 hidden md:block border-t border-neutral-200 dark:border-neutral-800 pt-3', sidebarCollapsed && 'px-0')}>
               <button
-                className="rf-focus w-full flex items-center justify-between gap-3 rounded-2xl px-3 py-2.5 text-sm font-medium hover:bg-neutral-100 dark:hover:bg-neutral-900"
+                className={cn(
+                  'rf-focus w-full flex items-center justify-between gap-3 rounded-2xl px-3 py-2.5 text-sm font-medium hover:bg-neutral-100 dark:hover:bg-neutral-900',
+                  sidebarCollapsed && 'justify-center px-2'
+                )}
                 onClick={() => navigate('/forms')}
                 title="Open Form Builder"
               >
                 <span className="flex items-center gap-3">
-                  <PencilRuler size={18} /> Builder
+                  <PencilRuler size={18} />
+                  {!sidebarCollapsed && 'Builder'}
                 </span>
-                <span className="text-xs text-neutral-500 dark:text-neutral-400">→</span>
+                {!sidebarCollapsed && <span className="text-xs text-neutral-500 dark:text-neutral-400">→</span>}
               </button>
             </div>
           )}
@@ -139,28 +177,17 @@ export default function AppShell() {
                 </span>
               </button>
 
-              {apiEnabled ? (
-                <div
-                  className="rounded-2xl border border-neutral-200 dark:border-neutral-800 px-3 py-2 text-sm font-medium"
-                  title={user?.email || (isAdmin ? 'Admin' : 'Worker')}
-                >
-                  <span className="inline-flex items-center gap-2">
-                    <RoleIcon size={16} />
-                    <span className="hidden md:inline">{isAdmin ? 'Admin' : 'Worker'}</span>
-                  </span>
-                </div>
-              ) : (
-                <button
-                  className="rf-focus rounded-2xl border border-neutral-200 dark:border-neutral-800 px-3 py-2 text-sm font-medium hover:bg-neutral-50 dark:hover:bg-neutral-900"
-                  onClick={() => setRole(isAdmin ? 'worker' : 'admin')}
-                  title={isAdmin ? 'Switch to worker' : 'Switch to admin'}
-                >
-                  <span className="inline-flex items-center gap-2">
-                    <RoleIcon size={16} />
-                    <span className="hidden md:inline">{isAdmin ? 'Admin' : 'Worker'}</span>
-                  </span>
-                </button>
-              )}
+              <button
+                className="rf-focus rounded-2xl border border-neutral-200 dark:border-neutral-800 px-3 py-2 text-sm font-medium hover:bg-neutral-50 dark:hover:bg-neutral-900"
+                onClick={() => setProfileOpen(true)}
+                title={user?.email || (isAdmin ? 'Admin' : 'Worker')}
+              >
+                <span className="inline-flex items-center gap-2">
+                  <RoleIcon size={16} />
+                  <span className="hidden md:inline">{isAdmin ? 'Admin' : 'Worker'}</span>
+                  <ChevronDown size={14} className="text-neutral-400" />
+                </span>
+              </button>
 
               <button
                 className="rf-focus rounded-2xl border border-neutral-200 dark:border-neutral-800 px-3 py-2 text-sm hover:bg-neutral-50 dark:hover:bg-neutral-900"
@@ -177,6 +204,42 @@ export default function AppShell() {
           <Outlet />
         </main>
       </div>
+
+      <Modal open={profileOpen} onClose={() => setProfileOpen(false)} title="Profile">
+        <div className="space-y-4">
+          <div className="flex items-center gap-3">
+            <div className="h-12 w-12 rounded-2xl border border-neutral-200 dark:border-neutral-800 flex items-center justify-center font-semibold">
+              <RoleIcon size={20} />
+            </div>
+            <div className="min-w-0">
+              <div className="font-semibold truncate">{profileLabel}</div>
+              <div className="text-xs text-neutral-500 dark:text-neutral-400">
+                {apiEnabled ? 'Signed in account' : 'Local demo profile'}
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 text-xs text-neutral-500 dark:text-neutral-400">
+            <Badge tone={isAdmin ? 'success' : 'neutral'}>{isAdmin ? 'Admin' : 'Worker'}</Badge>
+            <span>{online ? 'Online' : 'Offline'}</span>
+          </div>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            {!apiEnabled && (
+              <Button variant="secondary" onClick={() => setRole(isAdmin ? 'worker' : 'admin')}>
+                Switch to {isAdmin ? 'Worker' : 'Admin'}
+              </Button>
+            )}
+            <Button
+              variant="danger"
+              onClick={() => {
+                setProfileOpen(false)
+                logout()
+              }}
+            >
+              <LogOut size={16} /> Log out
+            </Button>
+          </div>
+        </div>
+      </Modal>
 
       <nav className="fixed bottom-0 left-0 right-0 z-40 md:hidden border-t border-neutral-200 dark:border-neutral-800 bg-white/95 dark:bg-neutral-950/95 backdrop-blur">
         <div className={cn('grid gap-1 px-2 py-2', navItems.length > 5 ? 'grid-cols-6' : 'grid-cols-5')}>
