@@ -80,6 +80,18 @@ export default function BuilderPage() {
 
   const pdf = version.pdf
 
+  const handleUpsertField = (next: Field) => {
+    void upsertField(form.id, version.id, next).catch((err) => {
+      pushToast({ title: 'Field update failed', message: err?.message || 'Unable to save field', variant: 'danger' })
+    })
+  }
+
+  const handleDeleteField = (fieldId: string) => {
+    void deleteField(form.id, version.id, fieldId).catch((err) => {
+      pushToast({ title: 'Delete failed', message: err?.message || 'Unable to delete field', variant: 'danger' })
+    })
+  }
+
   return (
     <div className="pb-10">
       <SectionHeader
@@ -214,14 +226,14 @@ export default function BuilderPage() {
                   {/* Overlay */}
                   <div
                     className="absolute inset-0"
-                    onMouseDown={(e) => {
+                    onPointerDown={(e) => {
                       // only add when clicking empty overlay
                       if ((e.target as HTMLElement).dataset.field === '1') return
                       const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect()
                       const x = (e.clientX - rect.left) / rect.width
                       const y = (e.clientY - rect.top) / rect.height
                       const f = newField(activeTool, x, y, page)
-                      void upsertField(form.id, version.id, f)
+                      handleUpsertField(f)
                       setSelectedId(f.id)
                     }}
                   >
@@ -234,9 +246,7 @@ export default function BuilderPage() {
                           selected={f.id === selectedId}
                           stage={size}
                           onSelect={() => setSelectedId(f.id)}
-                          onMove={(nx, ny) => {
-                            void upsertField(form.id, version.id, { ...f, x: nx, y: ny })
-                          }}
+                          onMove={(nx, ny) => handleUpsertField({ ...f, x: nx, y: ny })}
                         />
                       ))}
                   </div>
@@ -261,7 +271,7 @@ export default function BuilderPage() {
                   className="rf-focus rounded-xl p-2 hover:bg-neutral-100 dark:hover:bg-neutral-900"
                   title="Delete field"
                   onClick={() => {
-                    void deleteField(form.id, version.id, selected.id)
+                    handleDeleteField(selected.id)
                     setSelectedId(null)
                   }}
                 >
@@ -275,10 +285,7 @@ export default function BuilderPage() {
                 Select a field on the canvas to edit.
               </div>
             ) : (
-              <FieldEditor
-                field={selected}
-                onChange={(next) => upsertField(form.id, version.id, next)}
-              />
+              <FieldEditor field={selected} onChange={handleUpsertField} />
             )}
           </CardBody>
         </Card>
@@ -403,13 +410,14 @@ function FieldBox({
   onSelect: () => void
   onMove: (x: number, y: number) => void
 }) {
-  const [drag, setDrag] = useState<null | { ox: number; oy: number }>(null)
+  const [drag, setDrag] = useState<null | { ox: number; oy: number; pid: number }>(null)
 
   const style = {
     left: `${field.x * 100}%`,
     top: `${field.y * 100}%`,
     width: `${field.w * 100}%`,
-    height: `${field.h * 100}%`
+    height: `${field.h * 100}%`,
+    touchAction: 'none'
   } as any
 
   return (
@@ -422,25 +430,28 @@ function FieldBox({
           : 'border-neutral-300 bg-white/60 dark:border-neutral-700 dark:bg-neutral-950/40'
       )}
       style={style}
-      onMouseDown={(e) => {
+      onPointerDown={(e) => {
         e.stopPropagation()
         onSelect()
+        ;(e.currentTarget as HTMLDivElement).setPointerCapture(e.pointerId)
         const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect()
-        setDrag({ ox: e.clientX - rect.left, oy: e.clientY - rect.top })
+        setDrag({ ox: e.clientX - rect.left, oy: e.clientY - rect.top, pid: e.pointerId })
       }}
-      onMouseMove={(e) => {
-        if (!drag) return
+      onPointerMove={(e) => {
+        if (!drag || drag.pid !== e.pointerId) return
         e.stopPropagation()
         const parent = (e.currentTarget.parentElement as HTMLDivElement).getBoundingClientRect()
         const nx = (e.clientX - parent.left - drag.ox) / parent.width
         const ny = (e.clientY - parent.top - drag.oy) / parent.height
         onMove(clamp01(nx), clamp01(ny))
       }}
-      onMouseUp={(e) => {
-        if (drag) e.stopPropagation()
-        setDrag(null)
+      onPointerUp={(e) => {
+        if (drag?.pid === e.pointerId) {
+          e.stopPropagation()
+          setDrag(null)
+        }
       }}
-      onMouseLeave={() => setDrag(null)}
+      onPointerCancel={() => setDrag(null)}
     >
       <span className="px-2 truncate">{field.label}</span>
     </div>
