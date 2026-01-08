@@ -99,7 +99,7 @@ export default function DashboardPage() {
               <Button variant="secondary" onClick={() => nav('/queue')}>Open Sync Queue</Button>
             </div>
           </CardHeader>
-          <CardBody>
+          <CardBody className="pt-1">
             <div className="flex flex-wrap gap-2 items-center">
               <Badge tone={stats.pending ? 'warning' : 'neutral'}>{stats.pending} Pending</Badge>
               <Badge tone="neutral">{stats.inProgress} In progress</Badge>
@@ -131,7 +131,7 @@ export default function DashboardPage() {
             </div>
           </CardHeader>
           {pendingOpen && (
-            <CardBody>
+            <CardBody className="pt-1">
               {pendingTickets.length === 0 ? (
                 <div className="text-sm text-neutral-500 dark:text-neutral-400">No pending tickets for today.</div>
               ) : (
@@ -173,7 +173,7 @@ export default function DashboardPage() {
             </div>
           </CardHeader>
           {syncedOpen && (
-            <CardBody>
+            <CardBody className="pt-1">
               {syncedTickets.length === 0 ? (
                 <div className="text-sm text-neutral-500 dark:text-neutral-400">No synced tickets yet today.</div>
               ) : (
