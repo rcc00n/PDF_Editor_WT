@@ -13,6 +13,8 @@ import { downloadDataUrl } from '@/shared/lib/download'
 import SignaturePad from '@/features/field/SignaturePad'
 import { ArrowLeft, Save, Send, ImagePlus, FileDown } from 'lucide-react'
 
+const DEFAULT_FONT_SIZE = 12
+
 export default function FieldTicketPage() {
   const { ticketId = '' } = useParams()
   const nav = useNavigate()
@@ -236,6 +238,7 @@ function FieldInput({
   const help = field.helpText
   const [search, setSearch] = useState('')
   const [expanded, setExpanded] = useState(false)
+  const fontSize = field.fontSize ?? DEFAULT_FONT_SIZE
 
   if (field.type === 'checkbox') {
     return (
@@ -292,11 +295,13 @@ function FieldInput({
               setSearch(e.target.value)
               setExpanded(false)
             }}
+            style={{ fontSize }}
           />
           <select
             className="rf-focus h-10 w-full rounded-2xl border border-neutral-200 bg-white px-3 text-sm dark:border-neutral-800 dark:bg-neutral-950"
             value={value ?? ''}
             onChange={(e) => onChange(e.target.value)}
+            style={{ fontSize }}
           >
             <option value="">Select employee</option>
             {visible.map((e) => (
@@ -334,11 +339,16 @@ function FieldInput({
 
       <div className="mt-2">
         {field.type === 'date' ? (
-          <Input type="date" value={value ?? ''} onChange={(e) => onChange(e.target.value)} />
+          <Input type="date" value={value ?? ''} onChange={(e) => onChange(e.target.value)} style={{ fontSize }} />
         ) : field.type === 'numeric' ? (
-          <Input type="number" value={value ?? ''} onChange={(e) => onChange(e.target.value === '' ? '' : Number(e.target.value))} />
+          <Input
+            type="number"
+            value={value ?? ''}
+            onChange={(e) => onChange(e.target.value === '' ? '' : Number(e.target.value))}
+            style={{ fontSize }}
+          />
         ) : (
-          <Input value={value ?? ''} onChange={(e) => onChange(e.target.value)} />
+          <Input value={value ?? ''} onChange={(e) => onChange(e.target.value)} style={{ fontSize }} />
         )}
       </div>
 
@@ -354,7 +364,7 @@ function FieldInput({
       <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 p-3">
         <div className="font-medium">{field.label}{field.required ? ' *' : ''}</div>
         <div className="mt-2">
-          <Textarea value={value ?? ''} onChange={(e) => onChange(e.target.value)} />
+          <Textarea value={value ?? ''} onChange={(e) => onChange(e.target.value)} style={{ fontSize }} />
         </div>
         {hint && <div className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">{hint}</div>}
       </div>
