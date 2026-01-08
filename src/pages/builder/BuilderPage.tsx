@@ -438,111 +438,123 @@ function FieldEditor({ field, onChange }: { field: Field; onChange: (f: Field) =
   const maxH = Math.max(1 - field.y, MIN_FIELD_SIZE)
 
   return (
-    <div className="mt-4 space-y-3">
-      <div>
-        <div className="text-xs text-neutral-500 dark:text-neutral-400 mb-1">Label</div>
-        <Input value={field.label} onChange={(e) => onChange({ ...field, label: e.target.value })} />
-      </div>
+    <div className="mt-4 space-y-4">
+      <div className="space-y-3">
+        <div className="text-[11px] font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Basics</div>
+        <div>
+          <div className="text-xs text-neutral-500 dark:text-neutral-400 mb-1">Label</div>
+          <Input value={field.label} onChange={(e) => onChange({ ...field, label: e.target.value })} />
+        </div>
 
-      <div>
-        <div className="text-xs text-neutral-500 dark:text-neutral-400 mb-1">Field Key</div>
-        <Input value={field.key} onChange={(e) => onChange({ ...field, key: e.target.value.replace(/\s+/g, '_') })} />
-        <div className="text-[11px] text-neutral-500 dark:text-neutral-400 mt-1">Used in storage/export.</div>
-      </div>
+        <div>
+          <div className="text-xs text-neutral-500 dark:text-neutral-400 mb-1">Field Key</div>
+          <Input value={field.key} onChange={(e) => onChange({ ...field, key: e.target.value.replace(/\s+/g, '_') })} />
+          <div className="text-[11px] text-neutral-500 dark:text-neutral-400 mt-1">Used in storage/export.</div>
+        </div>
 
-      <div>
-        <div className="text-xs text-neutral-500 dark:text-neutral-400 mb-1">Type</div>
-        <Select value={field.type} onChange={(e) => onChange({ ...field, type: e.target.value as any })}>
-          <option value="text">Text</option>
-          <option value="numeric">Numeric</option>
-          <option value="checkbox">Checkbox</option>
-          <option value="date">Date</option>
-          <option value="signature">Signature</option>
-          <option value="photo">Photo</option>
-          <option value="employee">Employee list</option>
-        </Select>
-      </div>
-
-      <div className="flex items-center justify-between">
-        <div className="text-xs text-neutral-500 dark:text-neutral-400">Required</div>
-        <input
-          type="checkbox"
-          className="h-4 w-4"
-          checked={field.required}
-          onChange={(e) => onChange({ ...field, required: e.target.checked })}
-        />
-      </div>
-
-      <div>
-        <div className="text-xs text-neutral-500 dark:text-neutral-400 mb-1">Validation</div>
-        {field.type === 'numeric' ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            <Input
-              type="number"
-              placeholder="min"
-              value={field.validation.kind === 'range' ? field.validation.min : 0}
-              onChange={(e) =>
-                onChange({
-                  ...field,
-                  validation: { kind: 'range', min: Number(e.target.value || 0), max: field.validation.kind === 'range' ? field.validation.max : 300 }
-                })
-              }
-            />
-            <Input
-              type="number"
-              placeholder="max"
-              value={field.validation.kind === 'range' ? field.validation.max : 300}
-              onChange={(e) =>
-                onChange({
-                  ...field,
-                  validation: { kind: 'range', min: field.validation.kind === 'range' ? field.validation.min : 0, max: Number(e.target.value || 0) }
-                })
-              }
-            />
-          </div>
-        ) : (
-          <Select
-            value={field.validation.kind}
-            onChange={(e) =>
-              onChange({
-                ...field,
-                validation: e.target.value === 'none' ? { kind: 'none' } : { kind: 'regex', pattern: '' }
-              })
-            }
-          >
-            <option value="none">None</option>
-            <option value="regex">Regex</option>
+        <div>
+          <div className="text-xs text-neutral-500 dark:text-neutral-400 mb-1">Type</div>
+          <Select value={field.type} onChange={(e) => onChange({ ...field, type: e.target.value as any })}>
+            <option value="text">Text</option>
+            <option value="numeric">Numeric</option>
+            <option value="checkbox">Checkbox</option>
+            <option value="date">Date</option>
+            <option value="signature">Signature</option>
+            <option value="photo">Photo</option>
+            <option value="employee">Employee list</option>
           </Select>
-        )}
+        </div>
+
+        <div className="flex items-center justify-between">
+          <div className="text-xs text-neutral-500 dark:text-neutral-400">Required</div>
+          <input
+            type="checkbox"
+            className="h-4 w-4"
+            checked={field.required}
+            onChange={(e) => onChange({ ...field, required: e.target.checked })}
+          />
+        </div>
       </div>
 
-      <div>
-        <div className="text-xs text-neutral-500 dark:text-neutral-400 mb-1">Hint</div>
-        <Input value={field.hint ?? ''} onChange={(e) => onChange({ ...field, hint: e.target.value })} />
+      <div className="space-y-3 border-t border-neutral-200/80 pt-4 dark:border-neutral-800/80">
+        <div className="text-[11px] font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Validation</div>
+        <div>
+          <div className="text-xs text-neutral-500 dark:text-neutral-400 mb-1">Validation</div>
+          {field.type === 'numeric' ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <Input
+                type="number"
+                placeholder="min"
+                value={field.validation.kind === 'range' ? field.validation.min : 0}
+                onChange={(e) =>
+                  onChange({
+                    ...field,
+                    validation: { kind: 'range', min: Number(e.target.value || 0), max: field.validation.kind === 'range' ? field.validation.max : 300 }
+                  })
+                }
+              />
+              <Input
+                type="number"
+                placeholder="max"
+                value={field.validation.kind === 'range' ? field.validation.max : 300}
+                onChange={(e) =>
+                  onChange({
+                    ...field,
+                    validation: { kind: 'range', min: field.validation.kind === 'range' ? field.validation.min : 0, max: Number(e.target.value || 0) }
+                  })
+                }
+              />
+            </div>
+          ) : (
+            <Select
+              value={field.validation.kind}
+              onChange={(e) =>
+                onChange({
+                  ...field,
+                  validation: e.target.value === 'none' ? { kind: 'none' } : { kind: 'regex', pattern: '' }
+                })
+              }
+            >
+              <option value="none">None</option>
+              <option value="regex">Regex</option>
+            </Select>
+          )}
+        </div>
       </div>
 
-      <div>
-        <div className="text-xs text-neutral-500 dark:text-neutral-400 mb-1">Help Text</div>
-        <Textarea value={field.helpText ?? ''} onChange={(e) => onChange({ ...field, helpText: e.target.value })} />
+      <div className="space-y-3 border-t border-neutral-200/80 pt-4 dark:border-neutral-800/80">
+        <div className="text-[11px] font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Guidance</div>
+        <div>
+          <div className="text-xs text-neutral-500 dark:text-neutral-400 mb-1">Hint</div>
+          <Input value={field.hint ?? ''} onChange={(e) => onChange({ ...field, hint: e.target.value })} />
+        </div>
+
+        <div>
+          <div className="text-xs text-neutral-500 dark:text-neutral-400 mb-1">Help Text</div>
+          <Textarea value={field.helpText ?? ''} onChange={(e) => onChange({ ...field, helpText: e.target.value })} />
+        </div>
       </div>
 
       {field.type !== 'checkbox' && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-          <div>
-            <div className="text-xs text-neutral-500 dark:text-neutral-400 mb-1">W</div>
-            <Input
-              type="number"
-              value={Math.round(field.w * 100)}
-              onChange={(e) => onChange({ ...field, w: clamp(Number(e.target.value) / 100, MIN_FIELD_SIZE, maxW) })}
-            />
-          </div>
-          <div>
-            <div className="text-xs text-neutral-500 dark:text-neutral-400 mb-1">H</div>
-            <Input
-              type="number"
-              value={Math.round(field.h * 100)}
-              onChange={(e) => onChange({ ...field, h: clamp(Number(e.target.value) / 100, MIN_FIELD_SIZE, maxH) })}
-            />
+        <div className="space-y-3 border-t border-neutral-200/80 pt-4 dark:border-neutral-800/80">
+          <div className="text-[11px] font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Size</div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <div>
+              <div className="text-xs text-neutral-500 dark:text-neutral-400 mb-1">W</div>
+              <Input
+                type="number"
+                value={Math.round(field.w * 100)}
+                onChange={(e) => onChange({ ...field, w: clamp(Number(e.target.value) / 100, MIN_FIELD_SIZE, maxW) })}
+              />
+            </div>
+            <div>
+              <div className="text-xs text-neutral-500 dark:text-neutral-400 mb-1">H</div>
+              <Input
+                type="number"
+                value={Math.round(field.h * 100)}
+                onChange={(e) => onChange({ ...field, h: clamp(Number(e.target.value) / 100, MIN_FIELD_SIZE, maxH) })}
+              />
+            </div>
           </div>
         </div>
       )}
