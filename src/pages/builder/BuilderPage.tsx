@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import SectionHeader from '@/shared/ui/SectionHeader'
 import Button from '@/shared/ui/Button'
@@ -13,7 +13,7 @@ import { uid } from '@/shared/lib/ids'
 import { useElementSize } from '@/shared/hooks/useElementSize'
 import PdfPageCanvas from '@/features/pdf/PdfPageCanvas'
 import { cn } from '@/shared/ui/cn'
-import { Eye, Upload, CheckCircle2, Trash2 } from 'lucide-react'
+import { Eye, Upload, CheckCircle2, Trash2, Maximize2, Minimize2 } from 'lucide-react'
 
 const tools: Array<{ type: FieldType; label: string }> = [
   { type: 'text', label: 'Text' },
@@ -58,11 +58,35 @@ export default function BuilderPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [page, setPage] = useState(1)
   const [numPages, setNumPages] = useState(1)
+  const [propertiesOpen, setPropertiesOpen] = useState(() => {
+    if (typeof window === 'undefined') return true
+    return window.innerWidth >= 1400
+  })
+  const [canvasFocus, setCanvasFocus] = useState(false)
 
   const selected = useMemo(() => version?.fields.find(f => f.id === selectedId) ?? null, [version, selectedId])
 
   const { ref: stageRef, size } = useElementSize<HTMLDivElement>()
   const grid = getGridStep(size)
+  const showProperties = propertiesOpen && !canvasFocus
+
+  useEffect(() => {
+    if (!canvasFocus) return
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = prev
+    }
+  }, [canvasFocus])
+
+  useEffect(() => {
+    if (!canvasFocus) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setCanvasFocus(false)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [canvasFocus])
 
   if (role !== 'admin') {
     return (
@@ -101,8 +125,35 @@ export default function BuilderPage() {
     })
   }
 
+  const handleDuplicateField = (field: Field) => {
+    const offsetX = grid.x ? grid.x * 2 : 0.02
+    const offsetY = grid.y ? grid.y * 2 : 0.02
+    const maxX = 1 - field.w
+    const maxY = 1 - field.h
+    const nextX = field.x + offsetX <= maxX ? field.x + offsetX : field.x - offsetX
+    const nextY = field.y + offsetY <= maxY ? field.y + offsetY : field.y - offsetY
+    const nx = clamp(snapToGrid(nextX, grid.x), 0, maxX)
+    const ny = clamp(snapToGrid(nextY, grid.y), 0, maxY)
+    const copy: Field = {
+      ...field,
+      id: uid('fld'),
+      key: `${field.key}_${Math.random().toString(16).slice(2, 6)}`,
+      x: nx,
+      y: ny
+    }
+    handleUpsertField(copy)
+    setSelectedId(copy.id)
+  }
+
   return (
     <div className="pb-10">
+      {canvasFocus && (
+        <div
+          className="fixed inset-0 z-40 bg-neutral-950/60 backdrop-blur-sm"
+          onClick={() => setCanvasFocus(false)}
+          aria-hidden="true"
+        />
+      )}
       <SectionHeader
         title="Form Builder"
         subtitle={`${form.name} · ${version.version} · ${version.fieldCount} fields`}
@@ -160,115 +211,157 @@ export default function BuilderPage() {
         }
       />
 
-      <div className="px-4 mt-4 sm:px-6 sm:mt-6 grid grid-cols-1 xl:grid-cols-[260px_1fr_320px] gap-4 items-start">
+      <div
+        className={cn(
+          'px-4 mt-4 sm:px-6 sm:mt-6 grid gap-4 items-start',
+          canvasFocus ? 'grid-cols-1' : propertiesOpen ? 'grid-cols-1 xl:grid-cols-[260px_1fr_320px]' : 'grid-cols-1 xl:grid-cols-[260px_1fr]'
+        )}
+      >
         {/* Tool Palette */}
-        <Card>
-          <CardBody>
-            <div className="text-sm font-semibold">Tool Palette</div>
-            <div className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
-              Click a tool (or drag it) onto the canvas. Click it again for Hand mode.
-            </div>
-            <div className="mt-3 grid grid-cols-2 gap-2">
-              {tools.map((t) => (
-                <button
-                  key={t.type}
-                  className={cn(
-                    'rf-focus rounded-2xl border px-3 py-2 text-sm font-medium transition',
-                    activeTool === t.type
-                      ? 'border-neutral-900 bg-neutral-900 text-white dark:border-white dark:bg-white dark:text-neutral-900'
-                      : 'border-neutral-200 hover:bg-neutral-50 dark:border-neutral-800 dark:hover:bg-neutral-900'
-                  )}
-                  draggable
-                  onDragStart={(e) => {
-                    e.dataTransfer.setData('application/x-rf-tool', t.type)
-                    e.dataTransfer.effectAllowed = 'copy'
-                  }}
-                  onClick={() => setActiveTool((prev) => (prev === t.type ? null : t.type))}
-                >
-                  {t.label}
-                </button>
-              ))}
-            </div>
-
-            <div className="mt-4 flex items-center justify-between">
-              <div className="text-xs text-neutral-500 dark:text-neutral-400">Status</div>
-              <Badge tone={version.status === 'active' ? 'success' : version.status === 'draft' ? 'warning' : 'neutral'}>{version.status}</Badge>
-            </div>
-
-            {!pdf && (
-              <div className="mt-4">
-                <div className="text-xs text-neutral-500 dark:text-neutral-400">Canvas size (mm)</div>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  <button
-                    className="rf-focus rounded-xl border border-neutral-200 px-2 py-1 text-xs hover:bg-neutral-50 dark:border-neutral-800 dark:hover:bg-neutral-900"
-                    onClick={() => setCanvasSize(form.id, version.id, { width: 210, height: 297 })}
-                  >
-                    A4
-                  </button>
-                  <button
-                    className="rf-focus rounded-xl border border-neutral-200 px-2 py-1 text-xs hover:bg-neutral-50 dark:border-neutral-800 dark:hover:bg-neutral-900"
-                    onClick={() => setCanvasSize(form.id, version.id, { width: 216, height: 279 })}
-                  >
-                    Letter
-                  </button>
-                </div>
-                <div className="mt-2 grid grid-cols-2 gap-2">
-                  <div>
-                    <div className="text-[11px] text-neutral-500 dark:text-neutral-400 mb-1">W</div>
-                    <Input
-                      type="number"
-                      value={Math.round(canvas.width)}
-                      onChange={(e) =>
-                        setCanvasSize(form.id, version.id, {
-                          width: Math.max(50, Number(e.target.value || 0)),
-                          height: canvas.height
-                        })
-                      }
-                    />
-                  </div>
-                  <div>
-                    <div className="text-[11px] text-neutral-500 dark:text-neutral-400 mb-1">H</div>
-                    <Input
-                      type="number"
-                      value={Math.round(canvas.height)}
-                      onChange={(e) =>
-                        setCanvasSize(form.id, version.id, {
-                          width: canvas.width,
-                          height: Math.max(50, Number(e.target.value || 0))
-                        })
-                      }
-                    />
-                  </div>
-                </div>
+        {!canvasFocus && (
+          <Card>
+            <CardBody>
+              <div className="text-sm font-semibold">Tool Palette</div>
+              <div className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
+                Click a tool (or drag it) onto the canvas. Click it again for Hand mode.
               </div>
-            )}
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                {tools.map((t) => (
+                  <button
+                    key={t.type}
+                    className={cn(
+                      'rf-focus rounded-2xl border px-3 py-2 text-sm font-medium transition',
+                      activeTool === t.type
+                        ? 'border-neutral-900 bg-neutral-900 text-white dark:border-white dark:bg-white dark:text-neutral-900'
+                        : 'border-neutral-200 hover:bg-neutral-50 dark:border-neutral-800 dark:hover:bg-neutral-900'
+                    )}
+                    draggable
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData('application/x-rf-tool', t.type)
+                      e.dataTransfer.effectAllowed = 'copy'
+                    }}
+                    onClick={() => setActiveTool((prev) => (prev === t.type ? null : t.type))}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
 
-            <div className="mt-3 text-xs text-neutral-500 dark:text-neutral-400">
-              Tip: drag fields to reposition. Hand mode prevents accidental adds.
-            </div>
-          </CardBody>
-        </Card>
+              <div className="mt-4 flex items-center justify-between">
+                <div className="text-xs text-neutral-500 dark:text-neutral-400">Status</div>
+                <Badge tone={version.status === 'active' ? 'success' : version.status === 'draft' ? 'warning' : 'neutral'}>{version.status}</Badge>
+              </div>
+
+              {!pdf && (
+                <div className="mt-4">
+                  <div className="text-xs text-neutral-500 dark:text-neutral-400">Canvas size (mm)</div>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <button
+                      className="rf-focus rounded-xl border border-neutral-200 px-2 py-1 text-xs hover:bg-neutral-50 dark:border-neutral-800 dark:hover:bg-neutral-900"
+                      onClick={() => setCanvasSize(form.id, version.id, { width: 210, height: 297 })}
+                    >
+                      A4
+                    </button>
+                    <button
+                      className="rf-focus rounded-xl border border-neutral-200 px-2 py-1 text-xs hover:bg-neutral-50 dark:border-neutral-800 dark:hover:bg-neutral-900"
+                      onClick={() => setCanvasSize(form.id, version.id, { width: 216, height: 279 })}
+                    >
+                      Letter
+                    </button>
+                  </div>
+                  <div className="mt-2 grid grid-cols-2 gap-2">
+                    <div>
+                      <div className="text-[11px] text-neutral-500 dark:text-neutral-400 mb-1">W</div>
+                      <Input
+                        type="number"
+                        value={Math.round(canvas.width)}
+                        onChange={(e) =>
+                          setCanvasSize(form.id, version.id, {
+                            width: Math.max(50, Number(e.target.value || 0)),
+                            height: canvas.height
+                          })
+                        }
+                      />
+                    </div>
+                    <div>
+                      <div className="text-[11px] text-neutral-500 dark:text-neutral-400 mb-1">H</div>
+                      <Input
+                        type="number"
+                        value={Math.round(canvas.height)}
+                        onChange={(e) =>
+                          setCanvasSize(form.id, version.id, {
+                            width: canvas.width,
+                            height: Math.max(50, Number(e.target.value || 0))
+                          })
+                        }
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="mt-3 text-xs text-neutral-500 dark:text-neutral-400">
+                Tip: drag fields to reposition, triple-click to duplicate. Hand mode prevents accidental adds.
+              </div>
+            </CardBody>
+          </Card>
+        )}
 
         {/* Canvas */}
-        <Card>
-          <CardBody>
-            <div className="flex items-center justify-between gap-3">
+        <Card
+          className={cn(
+            canvasFocus && 'fixed inset-4 z-50 flex flex-col shadow-2xl border-neutral-200/80 dark:border-neutral-700/80'
+          )}
+        >
+          <CardBody className={cn(canvasFocus && 'flex-1 min-h-0 overflow-auto')}>
+            <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="text-sm font-semibold">PDF Canvas</div>
-              <div className="flex items-center gap-2">
-                <button
-                  className="rf-focus rounded-xl px-2 py-1 text-sm hover:bg-neutral-100 dark:hover:bg-neutral-900"
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                >
-                  ←
-                </button>
-                <div className="text-sm">
-                  Page {page} / {numPages}
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="flex items-center gap-2">
+                  <button
+                    className="rf-focus rounded-xl px-2 py-1 text-sm hover:bg-neutral-100 dark:hover:bg-neutral-900"
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  >
+                    ←
+                  </button>
+                  <div className="text-sm">
+                    Page {page} / {numPages}
+                  </div>
+                  <button
+                    className="rf-focus rounded-xl px-2 py-1 text-sm hover:bg-neutral-100 dark:hover:bg-neutral-900"
+                    onClick={() => setPage((p) => Math.min(numPages, p + 1))}
+                  >
+                    →
+                  </button>
                 </div>
+                <div className="hidden sm:block h-5 w-px bg-neutral-200 dark:bg-neutral-800" aria-hidden="true" />
                 <button
-                  className="rf-focus rounded-xl px-2 py-1 text-sm hover:bg-neutral-100 dark:hover:bg-neutral-900"
-                  onClick={() => setPage((p) => Math.min(numPages, p + 1))}
+                  className={cn(
+                    'rf-focus rounded-xl border px-2 py-1 text-xs font-medium transition',
+                    propertiesOpen
+                      ? 'border-neutral-900 bg-neutral-900 text-white dark:border-white dark:bg-white dark:text-neutral-900'
+                      : 'border-neutral-200 text-neutral-700 hover:bg-neutral-50 dark:border-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-900'
+                  )}
+                  onClick={() => setPropertiesOpen((prev) => !prev)}
+                  aria-pressed={propertiesOpen}
+                  title={propertiesOpen ? 'Hide properties panel' : 'Show properties panel'}
                 >
-                  →
+                  <span className="sm:hidden">Props</span>
+                  <span className="hidden sm:inline">Properties</span>
+                </button>
+                <button
+                  className={cn(
+                    'rf-focus rounded-xl border px-2 py-1 text-xs font-medium transition flex items-center gap-2',
+                    canvasFocus
+                      ? 'border-blue-500 bg-blue-500/10 text-blue-700 dark:border-blue-300 dark:text-blue-200'
+                      : 'border-neutral-200 text-neutral-700 hover:bg-neutral-50 dark:border-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-900'
+                  )}
+                  onClick={() => setCanvasFocus((prev) => !prev)}
+                  aria-pressed={canvasFocus}
+                  title={canvasFocus ? 'Exit full screen' : 'Full screen canvas'}
+                >
+                  {canvasFocus ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+                  <span className="hidden sm:inline">{canvasFocus ? 'Exit Full Screen' : 'Full Screen'}</span>
                 </button>
               </div>
             </div>
@@ -327,6 +420,7 @@ export default function BuilderPage() {
                         onSelect={() => setSelectedId(f.id)}
                         onMove={(nx, ny) => handleUpsertField({ ...f, x: nx, y: ny })}
                         onResize={(nw, nh) => handleUpsertField({ ...f, w: nw, h: nh })}
+                        onDuplicate={() => handleDuplicateField(f)}
                       />
                     ))}
                   </div>
@@ -334,6 +428,7 @@ export default function BuilderPage() {
               ) : (
                 <div className="relative">
                   <PdfPageCanvas
+                    key={canvasFocus ? 'focus' : 'normal'}
                     dataUrl={pdf.dataUrl ?? pdf.url}
                     page={page}
                     onMeta={(m) => setNumPages(m.numPages)}
@@ -378,6 +473,7 @@ export default function BuilderPage() {
                         onSelect={() => setSelectedId(f.id)}
                         onMove={(nx, ny) => handleUpsertField({ ...f, x: nx, y: ny })}
                         onResize={(nw, nh) => handleUpsertField({ ...f, w: nw, h: nh })}
+                        onDuplicate={() => handleDuplicateField(f)}
                       />
                     ))}
                   </div>
@@ -401,33 +497,44 @@ export default function BuilderPage() {
         </Card>
 
         {/* Properties */}
-        <Card>
-          <CardBody>
-            <div className="flex items-center justify-between">
-              <div className="text-sm font-semibold">Field Properties</div>
-              {selected && (
-                <button
-                  className="rf-focus rounded-xl p-2 hover:bg-neutral-100 dark:hover:bg-neutral-900"
-                  title="Delete field"
-                  onClick={() => {
-                    handleDeleteField(selected.id)
-                    setSelectedId(null)
-                  }}
-                >
-                  <Trash2 size={18} />
-                </button>
-              )}
-            </div>
-
-            {!selected ? (
-              <div className="mt-4 text-sm text-neutral-500 dark:text-neutral-400">
-                Select a field on the canvas to edit.
+        {showProperties && (
+          <Card>
+            <CardBody>
+              <div className="flex items-center justify-between gap-2">
+                <div className="text-sm font-semibold">Field Properties</div>
+                <div className="flex items-center gap-2">
+                  <button
+                    className="rf-focus rounded-xl border border-neutral-200 px-2 py-1 text-xs font-medium text-neutral-700 hover:bg-neutral-50 dark:border-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-900"
+                    onClick={() => setPropertiesOpen(false)}
+                    title="Hide properties panel"
+                  >
+                    Hide
+                  </button>
+                  {selected && (
+                    <button
+                      className="rf-focus rounded-xl p-2 hover:bg-neutral-100 dark:hover:bg-neutral-900"
+                      title="Delete field"
+                      onClick={() => {
+                        handleDeleteField(selected.id)
+                        setSelectedId(null)
+                      }}
+                    >
+                      <Trash2 size={18} />
+                    </button>
+                  )}
+                </div>
               </div>
-            ) : (
-              <FieldEditor field={selected} onChange={handleUpsertField} />
-            )}
-          </CardBody>
-        </Card>
+
+              {!selected ? (
+                <div className="mt-4 text-sm text-neutral-500 dark:text-neutral-400">
+                  Select a field on the canvas to edit.
+                </div>
+              ) : (
+                <FieldEditor field={selected} onChange={handleUpsertField} />
+              )}
+            </CardBody>
+          </Card>
+        )}
       </div>
     </div>
   )
@@ -568,7 +675,8 @@ function FieldBox({
   stage,
   onSelect,
   onMove,
-  onResize
+  onResize,
+  onDuplicate
 }: {
   field: Field
   selected: boolean
@@ -576,6 +684,7 @@ function FieldBox({
   onSelect: () => void
   onMove: (x: number, y: number) => void
   onResize: (w: number, h: number) => void
+  onDuplicate: () => void
 }) {
   const [drag, setDrag] = useState<null | { ox: number; oy: number; pid: number }>(null)
   const [resize, setResize] = useState<null | { startX: number; startY: number; w: number; h: number; pid: number }>(null)
@@ -596,8 +705,8 @@ function FieldBox({
       className={cn(
         'absolute rounded-xl border text-[11px] flex items-center justify-center select-none cursor-move',
         selected
-          ? 'border-blue-500 bg-blue-500/10'
-          : 'border-neutral-300 bg-white/60 dark:border-neutral-700 dark:bg-neutral-950/40'
+          ? 'border-blue-500 bg-blue-50 text-blue-900 shadow-sm dark:border-blue-300 dark:bg-blue-100 dark:text-blue-950'
+          : 'border-neutral-300 bg-white/80 text-neutral-900 dark:border-neutral-700 dark:bg-neutral-900/60 dark:text-neutral-100'
       )}
       style={style}
       onPointerDown={(e) => {
@@ -642,6 +751,11 @@ function FieldBox({
       onPointerCancel={() => {
         setDrag(null)
         setResize(null)
+      }}
+      onClick={(e) => {
+        if (e.detail !== 3) return
+        e.stopPropagation()
+        onDuplicate()
       }}
     >
       <span className="px-2 truncate">{field.label}</span>
