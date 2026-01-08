@@ -20,8 +20,9 @@ export default function DashboardPage() {
   const queue = useAppStore(s => s.queue)
   const lastSync = useAppStore(s => s.lastSyncSuccess)
   const canEdit = role === 'admin'
-  const [pendingOpen, setPendingOpen] = useState(true)
-  const [syncedOpen, setSyncedOpen] = useState(true)
+  const [pendingOpen, setPendingOpen] = useState(false)
+  const [syncedOpen, setSyncedOpen] = useState(false)
+  const [formsOpen, setFormsOpen] = useState(false)
 
   const stats = useMemo(() => {
     const pending = queue.filter(q => q.status === 'pending').length
@@ -50,6 +51,9 @@ export default function DashboardPage() {
 
   const pendingTickets = dailyTickets.filter(t => t.status === 'pending' || t.status === 'queued' || t.status === 'in_progress')
   const syncedTickets = dailyTickets.filter(t => t.status === 'synced')
+  const pendingVisible = pendingOpen ? pendingTickets : pendingTickets.slice(0, 2)
+  const syncedVisible = syncedOpen ? syncedTickets : syncedTickets.slice(0, 2)
+  const formsVisible = formsOpen ? forms : forms.slice(0, 15)
 
   return (
     <div className="pb-10">
@@ -130,29 +134,27 @@ export default function DashboardPage() {
               </button>
             </div>
           </CardHeader>
-          {pendingOpen && (
-            <CardBody className="pt-1">
-              {pendingTickets.length === 0 ? (
-                <div className="text-sm text-neutral-500 dark:text-neutral-400">No pending tickets for today.</div>
-              ) : (
-                <div className="flex flex-col gap-2">
-                  {pendingTickets.map((t) => (
-                    <Link key={t.id} to={`/field/ticket/${t.id}`} className="rf-focus rounded-2xl border border-neutral-200 dark:border-neutral-800 p-3 hover:bg-neutral-50 dark:hover:bg-neutral-900">
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="min-w-0">
-                          <div className="font-medium truncate">{t.id} — {t.title}</div>
-                          <div className="text-xs text-neutral-500 dark:text-neutral-400 truncate">
-                            Assigned: {t.assignedTo} · {dateTimeShort(t.assignedAt)}
-                          </div>
+          <CardBody className="pt-1">
+            {pendingTickets.length === 0 ? (
+              <div className="text-sm text-neutral-500 dark:text-neutral-400">No pending tickets for today.</div>
+            ) : (
+              <div className="flex flex-col gap-2">
+                {pendingVisible.map((t) => (
+                  <Link key={t.id} to={`/field/ticket/${t.id}`} className="rf-focus rounded-2xl border border-neutral-200 dark:border-neutral-800 p-3 hover:bg-neutral-50 dark:hover:bg-neutral-900">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="font-medium truncate">{t.id} — {t.title}</div>
+                        <div className="text-xs text-neutral-500 dark:text-neutral-400 truncate">
+                          Assigned: {t.assignedTo} · {dateTimeShort(t.assignedAt)}
                         </div>
-                        <Badge tone={ticketTone(t.status)}>{t.status}</Badge>
                       </div>
-                    </Link>
-                  ))}
-                </div>
-              )}
-            </CardBody>
-          )}
+                      <Badge tone={ticketTone(t.status)}>{t.status}</Badge>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </CardBody>
         </Card>
 
         <Card>
@@ -172,41 +174,49 @@ export default function DashboardPage() {
               </button>
             </div>
           </CardHeader>
-          {syncedOpen && (
-            <CardBody className="pt-1">
-              {syncedTickets.length === 0 ? (
-                <div className="text-sm text-neutral-500 dark:text-neutral-400">No synced tickets yet today.</div>
-              ) : (
-                <div className="flex flex-col gap-2">
-                  {syncedTickets.map((t) => (
-                    <Link key={t.id} to={`/field/ticket/${t.id}`} className="rf-focus rounded-2xl border border-neutral-200 dark:border-neutral-800 p-3 hover:bg-neutral-50 dark:hover:bg-neutral-900">
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="min-w-0">
-                          <div className="font-medium truncate">{t.id} — {t.title}</div>
-                          <div className="text-xs text-neutral-500 dark:text-neutral-400 truncate">
-                            Assigned: {t.assignedTo} · {dateTimeShort(t.assignedAt)}
-                          </div>
+          <CardBody className="pt-1">
+            {syncedTickets.length === 0 ? (
+              <div className="text-sm text-neutral-500 dark:text-neutral-400">No synced tickets yet today.</div>
+            ) : (
+              <div className="flex flex-col gap-2">
+                {syncedVisible.map((t) => (
+                  <Link key={t.id} to={`/field/ticket/${t.id}`} className="rf-focus rounded-2xl border border-neutral-200 dark:border-neutral-800 p-3 hover:bg-neutral-50 dark:hover:bg-neutral-900">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="font-medium truncate">{t.id} — {t.title}</div>
+                        <div className="text-xs text-neutral-500 dark:text-neutral-400 truncate">
+                          Assigned: {t.assignedTo} · {dateTimeShort(t.assignedAt)}
                         </div>
-                        <Badge tone="success">synced</Badge>
                       </div>
-                    </Link>
-                  ))}
-                </div>
-              )}
-            </CardBody>
-          )}
+                      <Badge tone="success">synced</Badge>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </CardBody>
         </Card>
       </div>
 
       <div className="px-4 mt-4 sm:px-6 sm:mt-6">
         <Card>
           <CardHeader>
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-3">
               <div>
                 <CardTitle>Forms Overview</CardTitle>
                 <CardSub>Versioned templates with per-form state.</CardSub>
               </div>
-              <Button variant="secondary" onClick={() => nav('/forms')}>Manage</Button>
+              <div className="flex items-center gap-2">
+                <button
+                  className="rf-focus rounded-xl p-2 hover:bg-neutral-100 dark:hover:bg-neutral-900"
+                  onClick={() => setFormsOpen((v) => !v)}
+                  aria-expanded={formsOpen}
+                  title={formsOpen ? 'Collapse list' : 'Expand list'}
+                >
+                  <ChevronDown size={18} className={cn('transition', formsOpen && 'rotate-180')} />
+                </button>
+                <Button variant="secondary" onClick={() => nav('/forms')}>Manage</Button>
+              </div>
             </div>
           </CardHeader>
           <CardBody>
@@ -222,7 +232,7 @@ export default function DashboardPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {forms.map((f) => {
+                  {formsVisible.map((f) => {
                     const v = f.versions.find(v => v.status === 'active') ?? f.versions[0]
                     return (
                       <tr key={f.id} className="border-t border-neutral-200 dark:border-neutral-800">
