@@ -90,7 +90,7 @@ class TicketUpdateSerializer(serializers.Serializer):
     status = serializers.CharField(required=False)
     approvalState = serializers.CharField(required=False)
     values = serializers.DictField(required=False)
-    signature = serializers.DictField(required=False)
+    signature = serializers.DictField(required=False, allow_null=True)
 
     def update(self, instance: Ticket, validated_data):
         if 'title' in validated_data:
