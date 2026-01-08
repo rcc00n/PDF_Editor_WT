@@ -4,7 +4,7 @@ import Modal from './Modal'
 import Input from './Input'
 import Kbd from './Kbd'
 import { useAppStore } from '@/shared/state/useAppStore'
-import { Search, Plus, LayoutGrid, FileText, Smartphone, RefreshCw, ClipboardCheck, Moon, Sun, WifiOff, Wifi } from 'lucide-react'
+import { Search, Plus, LayoutGrid, FileText, Smartphone, RefreshCw, ClipboardCheck, Moon, Sun, Globe, WifiOff, Wifi, Shield, User } from 'lucide-react'
 
 type Action = {
   id: string
@@ -22,9 +22,15 @@ export default function CommandPalette() {
 
   const toggleTheme = useAppStore(s => s.toggleTheme)
   const theme = useAppStore(s => s.theme)
+  const role = useAppStore(s => s.role)
+  const setRole = useAppStore(s => s.setRole)
   const forcedOffline = useAppStore(s => s.forcedOffline)
   const setForcedOffline = useAppStore(s => s.setForcedOffline)
   const createForm = useAppStore(s => s.createForm)
+
+  const nextTheme = theme === 'dark' ? 'light' : theme === 'light' ? 'planet' : 'dark'
+  const ThemeIcon = nextTheme === 'light' ? Sun : nextTheme === 'dark' ? Moon : Globe
+  const isAdmin = role === 'admin'
 
   useEffect(() => {
     const onOpen = () => setOpen(true)
@@ -41,19 +47,41 @@ export default function CommandPalette() {
     if (!open) setQ('')
   }, [open])
 
-  const actions: Action[] = useMemo(() => [
-    { id: 'dash', title: 'Dashboard', subtitle: 'Overview and activity', icon: LayoutGrid, run: () => nav('/dashboard') },
-    { id: 'forms', title: 'Forms', subtitle: 'Templates and versions', icon: FileText, run: () => nav('/forms') },
-    { id: 'field', title: 'Field App', subtitle: 'Offline tickets', icon: Smartphone, run: () => nav('/field') },
-    { id: 'queue', title: 'Sync Queue', subtitle: 'Pending / failed mutations', icon: RefreshCw, run: () => nav('/queue') },
-    { id: 'review', title: 'Admin Review', subtitle: 'Preview and export', icon: ClipboardCheck, run: () => nav('/review') },
-    { id: 'new', title: 'Create new form', subtitle: 'Start a template from scratch', icon: Plus, run: () => {
-      const id = createForm('New Form')
-      nav(`/builder/${id}`)
-    }, keywords: 'create new form template builder' },
-    { id: 'theme', title: theme === 'dark' ? 'Switch to light' : 'Switch to dark', icon: theme === 'dark' ? Sun : Moon, run: () => toggleTheme(), keywords: 'theme dark light' },
-    { id: 'offline', title: forcedOffline ? 'Disable offline simulation' : 'Enable offline simulation', icon: forcedOffline ? Wifi : WifiOff, run: () => setForcedOffline(!forcedOffline), keywords: 'offline online network' }
-  ], [nav, createForm, theme, toggleTheme, forcedOffline, setForcedOffline])
+  const actions: Action[] = useMemo(() => {
+    const base: Action[] = [
+      { id: 'dash', title: 'Dashboard', subtitle: 'Overview and activity', icon: LayoutGrid, run: () => nav('/dashboard') },
+      { id: 'forms', title: 'Forms', subtitle: 'Templates and versions', icon: FileText, run: () => nav('/forms') },
+      { id: 'field', title: 'Field App', subtitle: 'Offline tickets', icon: Smartphone, run: () => nav('/field') },
+      { id: 'queue', title: 'Sync Queue', subtitle: 'Pending / failed mutations', icon: RefreshCw, run: () => nav('/queue') },
+      { id: 'review', title: 'Admin Review', subtitle: 'Preview and export', icon: ClipboardCheck, run: () => nav('/review') },
+      {
+        id: 'role',
+        title: isAdmin ? 'Switch to worker' : 'Switch to admin',
+        subtitle: isAdmin ? 'Limit access to form creation' : 'Full template access',
+        icon: isAdmin ? User : Shield,
+        run: () => setRole(isAdmin ? 'worker' : 'admin'),
+        keywords: 'role admin worker access'
+      },
+      { id: 'theme', title: `Switch to ${nextTheme}`, icon: ThemeIcon, run: () => toggleTheme(), keywords: 'theme dark light planet' },
+      { id: 'offline', title: forcedOffline ? 'Disable offline simulation' : 'Enable offline simulation', icon: forcedOffline ? Wifi : WifiOff, run: () => setForcedOffline(!forcedOffline), keywords: 'offline online network' }
+    ]
+
+    if (isAdmin) {
+      base.splice(5, 0, {
+        id: 'new',
+        title: 'Create new form',
+        subtitle: 'Start a template from scratch',
+        icon: Plus,
+        run: () => {
+          const id = createForm('New Form')
+          nav(`/builder/${id}`)
+        },
+        keywords: 'create new form template builder'
+      })
+    }
+
+    return base
+  }, [nav, createForm, nextTheme, ThemeIcon, toggleTheme, forcedOffline, setForcedOffline, isAdmin, setRole])
 
   const filtered = actions.filter((a) => {
     const s = (a.title + ' ' + (a.subtitle ?? '') + ' ' + (a.keywords ?? '')).toLowerCase()

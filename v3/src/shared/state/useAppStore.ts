@@ -4,7 +4,8 @@ import type { Activity, FormTemplate, FormVersion, Id, QueueItem, Ticket } from 
 import { nowIso, uid, nextTicketId } from '@/shared/lib/ids'
 import { clamp } from '@/shared/lib/math'
 
-export type Theme = 'light' | 'dark'
+export type Theme = 'light' | 'dark' | 'planet'
+export type UserRole = 'admin' | 'worker'
 
 export type Toast = {
   id: Id
@@ -40,12 +41,25 @@ const safeStorage = {
   }
 }
 
+function normalizeTheme(value: string | null): Theme {
+  if (value === 'light' || value === 'dark' || value === 'planet') return value
+  return 'dark'
+}
+
 function getStoredTheme(): Theme {
   try {
-    return (localStorage.getItem('rf_theme') as Theme) || 'dark'
+    return normalizeTheme(localStorage.getItem('rf_theme'))
   } catch {
     return 'dark'
   }
+}
+
+function applyTheme(theme: Theme) {
+  if (typeof document === 'undefined') return
+  const root = document.documentElement
+  const isDark = theme === 'dark' || theme === 'planet'
+  root.classList.toggle('dark', isDark)
+  root.classList.toggle('theme-planet', theme === 'planet')
 }
 
 type State = {
@@ -54,6 +68,8 @@ type State = {
   theme: Theme
   setTheme: (theme: Theme) => void
   toggleTheme: () => void
+  role: UserRole
+  setRole: (role: UserRole) => void
 
   systemOnline: boolean
   forcedOffline: boolean
@@ -114,13 +130,16 @@ export const useAppStore = create<State>()(
         } catch {
           memoryStorage.set('rf_theme', theme)
         }
-        document.documentElement.classList.toggle('dark', theme === 'dark')
+        applyTheme(theme)
         set({ theme })
       },
       toggleTheme: () => {
-        const next = get().theme === 'dark' ? 'light' : 'dark'
+        const current = get().theme
+        const next: Theme = current === 'dark' ? 'light' : current === 'light' ? 'planet' : 'dark'
         get().setTheme(next)
       },
+      role: 'admin',
+      setRole: (role) => set({ role }),
 
       systemOnline: typeof navigator !== 'undefined' ? navigator.onLine : true,
       forcedOffline: false,
@@ -163,8 +182,7 @@ export const useAppStore = create<State>()(
 
       boot: () => {
         // sync theme on boot
-        const theme = get().theme
-        document.documentElement.classList.toggle('dark', theme === 'dark')
+        applyTheme(get().theme)
         set({ booted: true })
       },
 
@@ -226,6 +244,9 @@ export const useAppStore = create<State>()(
         })),
 
       publishVersion: (formId, versionId) => {
+        const preForm = get().forms.find((f) => f.id === formId)
+        const preVersion = preForm?.versions.find((v) => v.id === versionId)
+        const wasArchived = preVersion?.status === 'archived'
         set((s) => ({
           forms: s.forms.map((f) => {
             if (f.id !== formId) return f
@@ -242,8 +263,11 @@ export const useAppStore = create<State>()(
         }))
         const form = get().forms.find((f) => f.id === formId)
         const v = form?.versions.find((x) => x.id === versionId)
-        get().addActivity('Version published', `${form?.name ?? formId} ${v?.version ?? ''}`)
-        get().pushToast({ title: 'Version published', message: 'Ready for Field App', variant: 'success' })
+        const activityTitle = wasArchived ? 'Version rolled back' : 'Version published'
+        const toastTitle = wasArchived ? 'Rollback completed' : 'Version published'
+        const toastMessage = wasArchived ? 'Older version is now active' : 'Ready for Field App'
+        get().addActivity(activityTitle, `${form?.name ?? formId} ${v?.version ?? ''}`)
+        get().pushToast({ title: toastTitle, message: toastMessage, variant: 'success' })
       },
 
       archiveForm: (formId) => {
@@ -387,6 +411,7 @@ export const useAppStore = create<State>()(
       storage: createJSONStorage(() => safeStorage),
       partialize: (s) => ({
         theme: s.theme,
+        role: s.role,
         systemOnline: s.systemOnline,
         forcedOffline: s.forcedOffline,
         online: s.online,

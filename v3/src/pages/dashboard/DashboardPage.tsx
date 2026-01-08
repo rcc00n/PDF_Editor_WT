@@ -11,10 +11,12 @@ import { Plus, ArrowRight } from 'lucide-react'
 export default function DashboardPage() {
   const nav = useNavigate()
   const forms = useAppStore(s => s.forms)
+  const role = useAppStore(s => s.role)
   const tickets = useAppStore(s => s.tickets)
   const queue = useAppStore(s => s.queue)
   const activities = useAppStore(s => s.activities)
   const lastSync = useAppStore(s => s.lastSyncSuccess)
+  const canEdit = role === 'admin'
 
   const stats = useMemo(() => {
     const pending = queue.filter(q => q.status === 'pending').length
@@ -38,7 +40,10 @@ export default function DashboardPage() {
           <>
             <Button
               variant="secondary"
+              disabled={!canEdit}
+              title={canEdit ? 'Create new form' : 'Admins only'}
               onClick={() => {
+                if (!canEdit) return
                 const id = useAppStore.getState().createForm('New Form')
                 nav(`/builder/${id}`)
               }}
@@ -108,7 +113,7 @@ export default function DashboardPage() {
                 </thead>
                 <tbody>
                   {forms.map((f) => {
-                    const v = f.versions[0]
+                    const v = f.versions.find(v => v.status === 'active') ?? f.versions[0]
                     return (
                       <tr key={f.id} className="border-t border-neutral-200 dark:border-neutral-800">
                         <td className="py-2">
@@ -125,9 +130,13 @@ export default function DashboardPage() {
                             </Badge>
                           </div>
                           <div className="mt-2 sm:hidden">
-                            <Link className="rf-focus inline-flex items-center gap-2 rounded-xl px-2 py-1 hover:bg-neutral-100 dark:hover:bg-neutral-900" to={`/builder/${f.id}`}>
-                              Open <ArrowRight size={14} />
-                            </Link>
+                            {canEdit ? (
+                              <Link className="rf-focus inline-flex items-center gap-2 rounded-xl px-2 py-1 hover:bg-neutral-100 dark:hover:bg-neutral-900" to={`/builder/${f.id}`}>
+                                Open <ArrowRight size={14} />
+                              </Link>
+                            ) : (
+                              <span className="text-xs text-neutral-500 dark:text-neutral-400">Admin only</span>
+                            )}
                           </div>
                         </td>
                         <td className="py-2 hidden sm:table-cell">{v.version}</td>
@@ -138,9 +147,13 @@ export default function DashboardPage() {
                         </td>
                         <td className="py-2 hidden sm:table-cell">{v.fieldCount}</td>
                         <td className="py-2 text-right hidden sm:table-cell">
-                          <Link className="rf-focus inline-flex items-center gap-2 rounded-xl px-2 py-1 hover:bg-neutral-100 dark:hover:bg-neutral-900" to={`/builder/${f.id}`}>
-                            Open <ArrowRight size={14} />
-                          </Link>
+                          {canEdit ? (
+                            <Link className="rf-focus inline-flex items-center gap-2 rounded-xl px-2 py-1 hover:bg-neutral-100 dark:hover:bg-neutral-900" to={`/builder/${f.id}`}>
+                              Open <ArrowRight size={14} />
+                            </Link>
+                          ) : (
+                            <span className="text-xs text-neutral-500 dark:text-neutral-400">Admin only</span>
+                          )}
                         </td>
                       </tr>
                     )
