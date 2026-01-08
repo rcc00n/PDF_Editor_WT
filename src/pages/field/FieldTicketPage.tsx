@@ -1,4 +1,4 @@
-import { useMemo, useRef } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import SectionHeader from '@/shared/ui/SectionHeader'
 import Button from '@/shared/ui/Button'
@@ -7,7 +7,7 @@ import Badge from '@/shared/ui/Badge'
 import Input from '@/shared/ui/Input'
 import Textarea from '@/shared/ui/Textarea'
 import { useAppStore } from '@/shared/state/useAppStore'
-import type { Field } from '@/entities/types'
+import type { Employee, Field } from '@/entities/types'
 import { dateTimeShort } from '@/shared/lib/format'
 import { downloadDataUrl } from '@/shared/lib/download'
 import SignaturePad from '@/features/field/SignaturePad'
@@ -20,6 +20,7 @@ export default function FieldTicketPage() {
   const ticket = useAppStore(s => s.tickets.find(t => t.id === ticketId))
   const forms = useAppStore(s => s.forms)
   const updateTicket = useAppStore(s => s.updateTicket)
+  const employees = useAppStore(s => s.employees)
   const saveDraft = useAppStore(s => s.saveDraft)
   const submitTicket = useAppStore(s => s.submitTicket)
   const apiEnabled = useAppStore(s => s.apiEnabled)
@@ -90,6 +91,7 @@ export default function FieldTicketPage() {
                   key={f.id}
                   field={f}
                   value={ticket.values[f.key]}
+                  employees={employees}
                   signature={ticket.signature}
                   onChange={(val) => {
                     updateTicket(ticket.id, { values: { ...ticket.values, [f.key]: val } })
@@ -216,6 +218,7 @@ function attachmentSrc(attachment: { url?: string; dataUrl?: string }) {
 function FieldInput({
   field,
   value,
+  employees,
   signature,
   onChange,
   onSignature,
@@ -223,6 +226,7 @@ function FieldInput({
 }: {
   field: Field
   value: any
+  employees: Employee[]
   signature?: { signer: string; dataUrl?: string }
   onChange: (v: any) => void
   onSignature: (dataUrl?: string) => void
@@ -230,6 +234,8 @@ function FieldInput({
 }) {
   const hint = field.hint
   const help = field.helpText
+  const [search, setSearch] = useState('')
+  const [expanded, setExpanded] = useState(false)
 
   if (field.type === 'checkbox') {
     return (
@@ -259,6 +265,60 @@ function FieldInput({
       <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 p-3">
         <div className="font-medium">{field.label}{field.required ? ' *' : ''}</div>
         <div className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">Use the Photo Attachments panel on the right.</div>
+      </div>
+    )
+  }
+
+  if (field.type === 'employee') {
+    const q = search.trim().toLowerCase()
+    const filtered = employees.filter((e) => e.active).filter((e) => {
+      const hay = `${e.name} ${e.email ?? ''} ${e.role ?? ''}`.toLowerCase()
+      return hay.includes(q)
+    })
+    const selected = employees.find((e) => e.name === value)
+    let visible = expanded ? filtered : filtered.slice(0, 8)
+    if (selected && !visible.some((e) => e.id === selected.id)) {
+      visible = [...visible, selected]
+    }
+    return (
+      <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 p-3">
+        <div className="font-medium">{field.label}{field.required ? ' *' : ''}</div>
+        {help && <div className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">{help}</div>}
+        <div className="mt-2 space-y-2">
+          <Input
+            placeholder="Search employees..."
+            value={search}
+            onChange={(e) => {
+              setSearch(e.target.value)
+              setExpanded(false)
+            }}
+          />
+          <select
+            className="rf-focus h-10 w-full rounded-2xl border border-neutral-200 bg-white px-3 text-sm dark:border-neutral-800 dark:bg-neutral-950"
+            value={value ?? ''}
+            onChange={(e) => onChange(e.target.value)}
+          >
+            <option value="">Select employee</option>
+            {visible.map((e) => (
+              <option key={e.id} value={e.name}>
+                {e.name}{e.role ? ` · ${e.role}` : ''}
+              </option>
+            ))}
+          </select>
+          {filtered.length === 0 && (
+            <div className="text-xs text-neutral-500 dark:text-neutral-400">No matching employees</div>
+          )}
+          {filtered.length > 8 && (
+            <button
+              type="button"
+              className="rf-focus text-xs text-neutral-600 dark:text-neutral-300 underline"
+              onClick={() => setExpanded((s) => !s)}
+            >
+              {expanded ? 'Show less' : 'Show more'}
+            </button>
+          )}
+        </div>
+        {hint && <div className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">{hint}</div>}
       </div>
     )
   }

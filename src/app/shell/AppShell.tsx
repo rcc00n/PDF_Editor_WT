@@ -1,6 +1,6 @@
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useEffect } from 'react'
-import { LayoutGrid, FileText, PencilRuler, Smartphone, RefreshCw, ClipboardCheck, Moon, Sun, Globe, Wifi, WifiOff, Command, Shield, User } from 'lucide-react'
+import { LayoutGrid, FileText, PencilRuler, Smartphone, RefreshCw, ClipboardCheck, Moon, Sun, Globe, Wifi, WifiOff, Command, Shield, User, Users } from 'lucide-react'
 import { useAppStore } from '@/shared/state/useAppStore'
 import { cn } from '@/shared/ui/cn'
 
@@ -32,6 +32,7 @@ export default function AppShell() {
   const ThemeIcon = nextTheme === 'light' ? Sun : nextTheme === 'dark' ? Moon : Globe
   const isAdmin = role === 'admin'
   const RoleIcon = isAdmin ? Shield : User
+  const navItems = isAdmin ? [...nav, { to: '/employees', label: 'Employees', icon: Users }] : nav
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -62,7 +63,7 @@ export default function AppShell() {
         </div>
 
         <nav className="p-2 md:p-3 flex flex-col gap-1">
-          {nav.map((item) => {
+          {navItems.map((item) => {
             const Icon = item.icon
             return (
               <NavLink
@@ -178,8 +179,8 @@ export default function AppShell() {
       </div>
 
       <nav className="fixed bottom-0 left-0 right-0 z-40 md:hidden border-t border-neutral-200 dark:border-neutral-800 bg-white/95 dark:bg-neutral-950/95 backdrop-blur">
-        <div className="grid grid-cols-5 gap-1 px-2 py-2">
-          {nav.map((item) => {
+        <div className={cn('grid gap-1 px-2 py-2', navItems.length > 5 ? 'grid-cols-6' : 'grid-cols-5')}>
+          {navItems.map((item) => {
             const Icon = item.icon
             return (
               <NavLink
@@ -212,6 +213,7 @@ function titleForPath(path: string) {
   if (path.startsWith('/field')) return 'Field App'
   if (path.startsWith('/queue')) return 'Sync Queue'
   if (path.startsWith('/review')) return 'Admin Review & Export'
+  if (path.startsWith('/employees')) return 'Employees'
   return 'RelayForms'
 }
 
