@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Card, CardBody, CardHeader, CardSub, CardTitle } from '@/shared/ui/Card'
 import SectionHeader from '@/shared/ui/SectionHeader'
@@ -6,7 +6,9 @@ import Button from '@/shared/ui/Button'
 import Badge from '@/shared/ui/Badge'
 import { useAppStore } from '@/shared/state/useAppStore'
 import { dateTimeShort, timeHHMM } from '@/shared/lib/format'
-import { Plus, ArrowRight } from 'lucide-react'
+import { Plus, ArrowRight, ChevronDown } from 'lucide-react'
+import { cn } from '@/shared/ui/cn'
+import type { TicketStatus } from '@/entities/types'
 
 export default function DashboardPage() {
   const nav = useNavigate()
@@ -19,6 +21,8 @@ export default function DashboardPage() {
   const activities = useAppStore(s => s.activities)
   const lastSync = useAppStore(s => s.lastSyncSuccess)
   const canEdit = role === 'admin'
+  const [pendingOpen, setPendingOpen] = useState(true)
+  const [syncedOpen, setSyncedOpen] = useState(true)
 
   const stats = useMemo(() => {
     const pending = queue.filter(q => q.status === 'pending').length
@@ -32,6 +36,21 @@ export default function DashboardPage() {
     const syncedToday = tickets.filter(t => t.status === 'synced' && sameDay(t.updatedAt)).length
     return { pending, inProgress, failed, syncedToday }
   }, [queue, tickets])
+
+  const dailyTickets = useMemo(() => {
+    const now = new Date()
+    const sameDay = (iso: string) => {
+      const d = new Date(iso)
+      return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate()
+    }
+    return tickets
+      .filter(t => sameDay(t.assignedAt))
+      .slice()
+      .sort((a, b) => b.assignedAt.localeCompare(a.assignedAt))
+  }, [tickets])
+
+  const pendingTickets = dailyTickets.filter(t => t.status === 'pending' || t.status === 'queued' || t.status === 'in_progress')
+  const syncedTickets = dailyTickets.filter(t => t.status === 'synced')
 
   return (
     <div className="pb-10">
@@ -95,6 +114,92 @@ export default function DashboardPage() {
       </div>
 
       <div className="px-4 mt-4 sm:px-6 sm:mt-6 grid grid-cols-1 xl:grid-cols-2 gap-4">
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <CardTitle>Daily Pending Tickets</CardTitle>
+                <CardSub>{pendingTickets.length} pending today</CardSub>
+              </div>
+              <button
+                className="rf-focus rounded-xl p-2 hover:bg-neutral-100 dark:hover:bg-neutral-900"
+                onClick={() => setPendingOpen((v) => !v)}
+                aria-expanded={pendingOpen}
+                title={pendingOpen ? 'Collapse list' : 'Expand list'}
+              >
+                <ChevronDown size={18} className={cn('transition', pendingOpen && 'rotate-180')} />
+              </button>
+            </div>
+          </CardHeader>
+          {pendingOpen && (
+            <CardBody>
+              {pendingTickets.length === 0 ? (
+                <div className="text-sm text-neutral-500 dark:text-neutral-400">No pending tickets for today.</div>
+              ) : (
+                <div className="flex flex-col gap-2">
+                  {pendingTickets.map((t) => (
+                    <Link key={t.id} to={`/field/ticket/${t.id}`} className="rf-focus rounded-2xl border border-neutral-200 dark:border-neutral-800 p-3 hover:bg-neutral-50 dark:hover:bg-neutral-900">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="font-medium truncate">{t.id} — {t.title}</div>
+                          <div className="text-xs text-neutral-500 dark:text-neutral-400 truncate">
+                            Assigned: {t.assignedTo} · {dateTimeShort(t.assignedAt)}
+                          </div>
+                        </div>
+                        <Badge tone={ticketTone(t.status)}>{t.status}</Badge>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </CardBody>
+          )}
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <CardTitle>Synced Tickets</CardTitle>
+                <CardSub>{syncedTickets.length} synced today</CardSub>
+              </div>
+              <button
+                className="rf-focus rounded-xl p-2 hover:bg-neutral-100 dark:hover:bg-neutral-900"
+                onClick={() => setSyncedOpen((v) => !v)}
+                aria-expanded={syncedOpen}
+                title={syncedOpen ? 'Collapse list' : 'Expand list'}
+              >
+                <ChevronDown size={18} className={cn('transition', syncedOpen && 'rotate-180')} />
+              </button>
+            </div>
+          </CardHeader>
+          {syncedOpen && (
+            <CardBody>
+              {syncedTickets.length === 0 ? (
+                <div className="text-sm text-neutral-500 dark:text-neutral-400">No synced tickets yet today.</div>
+              ) : (
+                <div className="flex flex-col gap-2">
+                  {syncedTickets.map((t) => (
+                    <Link key={t.id} to={`/field/ticket/${t.id}`} className="rf-focus rounded-2xl border border-neutral-200 dark:border-neutral-800 p-3 hover:bg-neutral-50 dark:hover:bg-neutral-900">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="font-medium truncate">{t.id} — {t.title}</div>
+                          <div className="text-xs text-neutral-500 dark:text-neutral-400 truncate">
+                            Assigned: {t.assignedTo} · {dateTimeShort(t.assignedAt)}
+                          </div>
+                        </div>
+                        <Badge tone="success">synced</Badge>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </CardBody>
+          )}
+        </Card>
+      </div>
+
+      <div className="px-4 mt-4 sm:px-6 sm:mt-6">
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
@@ -169,54 +274,31 @@ export default function DashboardPage() {
             </div>
           </CardBody>
         </Card>
+      </div>
 
-        <div className="flex flex-col gap-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Daily Field Tickets</CardTitle>
-              <CardSub>Today</CardSub>
-            </CardHeader>
-            <CardBody>
-              <div className="flex flex-col gap-2">
-                {tickets.slice(0, 6).map((t) => (
-                  <Link key={t.id} to={`/field/ticket/${t.id}`} className="rf-focus rounded-2xl border border-neutral-200 dark:border-neutral-800 p-3 hover:bg-neutral-50 dark:hover:bg-neutral-900">
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="min-w-0">
-                        <div className="font-medium truncate">{t.id} — {t.title}</div>
-                        <div className="text-xs text-neutral-500 dark:text-neutral-400 truncate">
-                          Assigned: {t.assignedTo} · {dateTimeShort(t.assignedAt)}
-                        </div>
-                      </div>
-                      <Badge tone={t.status === 'synced' ? 'success' : t.status === 'error' ? 'danger' : t.status === 'queued' ? 'warning' : 'neutral'}>
-                        {t.status}
-                      </Badge>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            </CardBody>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Last Activity</CardTitle>
-              <CardSub>Past 24 hours</CardSub>
-            </CardHeader>
-            <CardBody>
-              <div className="flex flex-col gap-2">
-                {activities.slice(0, 10).map((a) => (
-                  <div key={a.id} className="rounded-2xl border border-neutral-200 dark:border-neutral-800 p-3">
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="font-medium">{a.title}</div>
-                      <div className="text-xs text-neutral-500 dark:text-neutral-400">{timeHHMM(a.at)}</div>
-                    </div>
-                    {a.subtitle && <div className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">{a.subtitle}</div>}
+      <div className="px-4 mt-4 sm:px-6 sm:mt-6">
+        <Card className="xl:max-w-[520px] xl:ml-auto">
+          <CardHeader>
+            <CardTitle>Last Activity</CardTitle>
+            <CardSub>Past 24 hours</CardSub>
+          </CardHeader>
+          <CardBody>
+            <div className="flex flex-col gap-2">
+              {activities.slice(0, 10).map((a) => (
+                <div key={a.id} className="rounded-2xl border border-neutral-200 dark:border-neutral-800 p-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="font-medium">{a.title}</div>
+                    <div className="text-xs text-neutral-500 dark:text-neutral-400">{timeHHMM(a.at)}</div>
                   </div>
-                ))}
-              </div>
-            </CardBody>
-          </Card>
-        </div>
+                  {a.subtitle && <div className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">{a.subtitle}</div>}
+                </div>
+              ))}
+              {activities.length === 0 && (
+                <div className="text-sm text-neutral-500 dark:text-neutral-400">No recent activity.</div>
+              )}
+            </div>
+          </CardBody>
+        </Card>
       </div>
     </div>
   )
@@ -234,4 +316,11 @@ function StatCard({ label, value, tone }: { label: string; value: number; tone: 
       </CardBody>
     </Card>
   )
+}
+
+function ticketTone(status: TicketStatus): 'neutral' | 'success' | 'warning' | 'danger' {
+  if (status === 'synced') return 'success'
+  if (status === 'error') return 'danger'
+  if (status === 'queued' || status === 'pending') return 'warning'
+  return 'neutral'
 }
