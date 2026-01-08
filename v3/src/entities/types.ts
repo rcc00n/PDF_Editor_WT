@@ -3,7 +3,7 @@ export type Id = string
 export type FormStatus = 'draft' | 'active' | 'archived'
 export type SyncState = 'offline_only' | 'synced' | 'has_queue' | 'failed' | 'unknown'
 
-export type FieldType = 'text' | 'numeric' | 'checkbox' | 'date' | 'signature' | 'photo'
+export type FieldType = 'text' | 'numeric' | 'checkbox' | 'date' | 'signature' | 'photo' | 'employee'
 
 export type Validation =
   | { kind: 'none' }
@@ -27,12 +27,25 @@ export type Field = {
   h: number
 }
 
+export type Employee = {
+  id: Id
+  name: string
+  email?: string
+  role?: string
+  phone?: string
+  active: boolean
+}
+
 export type FormVersion = {
   id: Id
   version: string
   status: FormStatus
   fieldCount: number
   publishedAt?: string
+  canvas?: {
+    width: number
+    height: number
+  }
   pdf?: {
     name: string
     mime: string

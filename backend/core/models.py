@@ -116,3 +116,20 @@ class Attachment(models.Model):
 
     class Meta:
         ordering = ['-created_at']
+
+
+class Employee(models.Model):
+    id = models.CharField(primary_key=True, max_length=32, default=lambda: uid('emp'), editable=False)
+    name = models.CharField(max_length=200)
+    email = models.EmailField(blank=True)
+    role = models.CharField(max_length=120, blank=True)
+    phone = models.CharField(max_length=40, blank=True)
+    active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(default=timezone.now)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self) -> str:
+        return self.name
+
+    class Meta:
+        ordering = ['name']

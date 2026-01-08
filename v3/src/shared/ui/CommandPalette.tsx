@@ -4,7 +4,7 @@ import Modal from './Modal'
 import Input from './Input'
 import Kbd from './Kbd'
 import { useAppStore } from '@/shared/state/useAppStore'
-import { Search, Plus, LayoutGrid, FileText, Smartphone, RefreshCw, ClipboardCheck, Moon, Sun, Globe, WifiOff, Wifi, Shield, User, LogOut } from 'lucide-react'
+import { Search, Plus, LayoutGrid, FileText, Smartphone, RefreshCw, ClipboardCheck, Moon, Sun, Globe, WifiOff, Wifi, Shield, User, LogOut, Users } from 'lucide-react'
 
 type Action = {
   id: string
@@ -82,6 +82,14 @@ export default function CommandPalette() {
           nav(`/builder/${id}`)
         },
         keywords: 'create new form template builder'
+      })
+      base.splice(apiEnabled ? 6 : 7, 0, {
+        id: 'employees',
+        title: 'Employees',
+        subtitle: 'Staff directory and imports',
+        icon: Users,
+        run: () => nav('/employees'),
+        keywords: 'employees staff team directory'
       })
     }
 

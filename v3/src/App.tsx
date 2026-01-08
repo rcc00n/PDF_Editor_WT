@@ -9,6 +9,7 @@ import FieldTicketPage from './pages/field/FieldTicketPage'
 import QueuePage from './pages/queue/QueuePage'
 import ReviewPage from './pages/review/ReviewPage'
 import ReviewTicketPage from './pages/review/ReviewTicketPage'
+import EmployeesPage from './pages/employees/EmployeesPage'
 import LoginPage from './pages/auth/LoginPage'
 import { useAppStore } from './shared/state/useAppStore'
 import CommandPalette from './shared/ui/CommandPalette'
@@ -73,6 +74,7 @@ export default function App() {
           <Route path="/queue" element={<QueuePage />} />
           <Route path="/review" element={<ReviewPage />} />
           <Route path="/review/:ticketId" element={<ReviewTicketPage />} />
+          <Route path="/employees" element={<EmployeesPage />} />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Route>
       </Routes>

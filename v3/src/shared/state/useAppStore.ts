@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
-import type { Activity, FormTemplate, FormVersion, Id, QueueItem, Ticket } from '@/entities/types'
+import type { Activity, Employee, FormTemplate, FormVersion, Id, QueueItem, Ticket } from '@/entities/types'
 import { nowIso, uid, nextTicketId } from '@/shared/lib/ids'
 import { clamp } from '@/shared/lib/math'
 import { API_ENABLED } from '@/shared/api/config'
@@ -104,6 +104,7 @@ type State = {
   tickets: Ticket[]
   queue: QueueItem[]
   activities: Activity[]
+  employees: Employee[]
   lastSyncSuccess?: string
 
   toasts: Toast[]
@@ -117,6 +118,7 @@ type State = {
   createVersion: (formId: Id) => Promise<Id>
   renameForm: (formId: Id, name: string) => Promise<void>
   setPdf: (formId: Id, versionId: Id, pdf: FormVersion['pdf']) => void
+  setCanvasSize: (formId: Id, versionId: Id, canvas: NonNullable<FormVersion['canvas']>) => void
   uploadPdf: (formId: Id, versionId: Id, file: File) => Promise<void>
   publishVersion: (formId: Id, versionId: Id) => Promise<void>
   archiveForm: (formId: Id) => Promise<void>
@@ -142,6 +144,12 @@ type State = {
 
   // Activity
   addActivity: (title: string, subtitle?: string) => void
+
+  // Employees
+  createEmployee: (payload: Omit<Employee, 'id'>) => Promise<Id>
+  updateEmployee: (employeeId: Id, patch: Partial<Employee>) => Promise<void>
+  deleteEmployee: (employeeId: Id) => Promise<void>
+  importEmployees: (employees: Employee[]) => Promise<void>
 }
 
 export const useAppStore = create<State>()(
@@ -211,16 +219,31 @@ export const useAppStore = create<State>()(
           tickets: [],
           queue: [],
           activities: [],
+          employees: [],
           lastSyncSuccess: undefined
         })
       },
       refreshRemote: async () => {
         if (!API_ENABLED) return
-        const [forms, tickets] = await Promise.all([
+        const [forms, tickets, employees] = await Promise.all([
           apiJson('/forms/'),
-          apiJson('/tickets/')
+          apiJson('/tickets/'),
+          apiJson('/employees/')
         ])
-        set({ forms, tickets, queue: [], activities: [], lastSyncSuccess: undefined })
+        const canvasByVersion = new Map<string, FormVersion['canvas']>()
+        for (const f of get().forms) {
+          for (const v of f.versions) {
+            if (v.canvas) canvasByVersion.set(v.id, v.canvas)
+          }
+        }
+        const mergedForms = forms.map((f: FormTemplate) => ({
+          ...f,
+          versions: f.versions.map((v) => ({
+            ...v,
+            canvas: canvasByVersion.get(v.id)
+          }))
+        }))
+        set({ forms: mergedForms, tickets, employees, queue: [], activities: [], lastSyncSuccess: undefined })
       },
 
       systemOnline: typeof navigator !== 'undefined' ? navigator.onLine : true,
@@ -246,6 +269,7 @@ export const useAppStore = create<State>()(
       tickets: [],
       queue: [],
       activities: [],
+      employees: [],
       lastSyncSuccess: undefined,
 
       toasts: [],
@@ -317,7 +341,8 @@ export const useAppStore = create<State>()(
               version: next,
               status: 'draft',
               fieldCount: 0,
-              fields: latest ? latest.fields.map((x) => ({ ...x, id: uid('fld') })) : []
+              fields: latest ? latest.fields.map((x) => ({ ...x, id: uid('fld') })) : [],
+              canvas: latest?.canvas
             }
             newV.fieldCount = newV.fields.length
             return { ...f, versions: [newV, ...f.versions] }
@@ -348,6 +373,17 @@ export const useAppStore = create<State>()(
             return {
               ...f,
               versions: f.versions.map((v) => (v.id === versionId ? { ...v, pdf } : v))
+            }
+          })
+        })),
+
+      setCanvasSize: (formId, versionId, canvas) =>
+        set((s) => ({
+          forms: s.forms.map((f) => {
+            if (f.id !== formId) return f
+            return {
+              ...f,
+              versions: f.versions.map((v) => (v.id === versionId ? { ...v, canvas } : v))
             }
           })
         })),
@@ -599,6 +635,74 @@ export const useAppStore = create<State>()(
       addActivity: (title, subtitle) => {
         const a: Activity = { id: uid('act'), at: nowIso(), title, subtitle }
         set((s) => ({ activities: [a, ...s.activities].slice(0, 30) }))
+      },
+
+      createEmployee: async (payload) => {
+        if (API_ENABLED) {
+          const employee = await apiJson('/employees/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          })
+          set((s) => ({ employees: upsertById(s.employees, employee) }))
+          return employee.id
+        }
+        const id = uid('emp')
+        const employee: Employee = { id, ...payload }
+        set((s) => ({ employees: upsertById(s.employees, employee) }))
+        return id
+      },
+
+      updateEmployee: async (employeeId, patch) => {
+        if (API_ENABLED) {
+          const employee = await apiJson(`/employees/${employeeId}/`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(patch)
+          })
+          set((s) => ({ employees: upsertById(s.employees, employee) }))
+          return
+        }
+        set((s) => ({
+          employees: s.employees.map((e) => (e.id === employeeId ? { ...e, ...patch } : e))
+        }))
+      },
+
+      deleteEmployee: async (employeeId) => {
+        if (API_ENABLED) {
+          await apiJson(`/employees/${employeeId}/`, { method: 'DELETE' })
+        }
+        set((s) => ({ employees: s.employees.filter((e) => e.id !== employeeId) }))
+      },
+
+      importEmployees: async (employees) => {
+        if (API_ENABLED) {
+          for (const e of employees) {
+            if (e.id) {
+              const { id, ...patch } = e
+              try {
+                await get().updateEmployee(e.id, patch)
+              } catch {
+                await get().createEmployee(patch)
+              }
+            } else {
+              const { id, ...payload } = e
+              await get().createEmployee(payload)
+            }
+          }
+          return
+        }
+        set((s) => {
+          const merged = s.employees.slice()
+          for (const e of employees) {
+            const id = e.id || uid('emp')
+            const next: Employee = { ...e, id }
+            const idx = merged.findIndex((x) => x.id === id)
+            if (idx === -1) merged.push(next)
+            else merged[idx] = next
+          }
+          return { employees: merged }
+        })
       }
     }),
     {
@@ -614,6 +718,7 @@ export const useAppStore = create<State>()(
         tickets: s.tickets,
         queue: s.queue,
         activities: s.activities,
+        employees: s.employees,
         lastSyncSuccess: s.lastSyncSuccess
       })
     }

@@ -1,5 +1,5 @@
 import { useAppStore } from './useAppStore'
-import type { FormTemplate, Ticket, QueueItem, Activity, Field } from '@/entities/types'
+import type { FormTemplate, Ticket, QueueItem, Activity, Field, Employee } from '@/entities/types'
 import { nowIso, uid } from '@/shared/lib/ids'
 
 export function seedIfEmpty() {
@@ -127,6 +127,13 @@ export function seedIfEmpty() {
     { id: uid('q'), type: 'submit_ticket', ticketId: 'FT-2838', createdAt: nowIso(), status: 'failed', attempts: 2, lastError: 'Network timeout' }
   ]
 
+  const employees: Employee[] = [
+    { id: uid('emp'), name: 'Jordan Miles', email: 'jordan.miles@relayforms.io', role: 'Technician', phone: '+1 555-0184', active: true },
+    { id: uid('emp'), name: 'Luis Ortega', email: 'luis.ortega@relayforms.io', role: 'Technician', phone: '+1 555-0162', active: true },
+    { id: uid('emp'), name: 'Quinn Hart', email: 'quinn.hart@relayforms.io', role: 'Supervisor', phone: '+1 555-0147', active: true },
+    { id: uid('emp'), name: 'Sasha Reed', email: 'sasha.reed@relayforms.io', role: 'Inspector', phone: '+1 555-0199', active: true }
+  ]
+
   const activities: Activity[] = [
     { id: uid('act'), at: nowIso(), title: 'FT-2841 queued from Field App', subtitle: 'Pump Station #12 | Jordan Miles' },
     { id: uid('act'), at: new Date(Date.now() - 40 * 60 * 1000).toISOString(), title: 'Form Builder published v2.3', subtitle: 'Pump Station Safety Inspection' },
@@ -138,6 +145,7 @@ export function seedIfEmpty() {
     tickets: [ticket1, ticket2, ticket3],
     queue,
     activities,
+    employees,
     lastSyncSuccess: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString()
   })
 }

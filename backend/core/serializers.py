@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.utils import timezone
-from .models import FormTemplate, FormVersion, Ticket, Attachment
+from .models import FormTemplate, FormVersion, Ticket, Attachment, Employee
 
 
 def build_file_url(request, file_field):
@@ -109,3 +109,9 @@ class TicketUpdateSerializer(serializers.Serializer):
         instance.updated_at = timezone.now()
         instance.save()
         return instance
+
+
+class EmployeeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Employee
+        fields = ['id', 'name', 'email', 'role', 'phone', 'active']

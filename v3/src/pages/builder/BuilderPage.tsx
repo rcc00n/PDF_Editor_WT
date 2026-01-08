@@ -21,7 +21,8 @@ const tools: Array<{ type: FieldType; label: string }> = [
   { type: 'checkbox', label: 'Checkbox' },
   { type: 'date', label: 'Date' },
   { type: 'signature', label: 'Signature' },
-  { type: 'photo', label: 'Photo' }
+  { type: 'photo', label: 'Photo' },
+  { type: 'employee', label: 'Employees' }
 ]
 
 export default function BuilderPage() {
@@ -33,6 +34,7 @@ export default function BuilderPage() {
   const role = useAppStore(s => s.role)
   const apiEnabled = useAppStore(s => s.apiEnabled)
   const setPdf = useAppStore(s => s.setPdf)
+  const setCanvasSize = useAppStore(s => s.setCanvasSize)
   const uploadPdf = useAppStore(s => s.uploadPdf)
   const publishVersion = useAppStore(s => s.publishVersion)
   const upsertField = useAppStore(s => s.upsertField)
@@ -49,7 +51,7 @@ export default function BuilderPage() {
     return form.versions[0]
   }, [form, vFromQuery])
 
-  const [activeTool, setActiveTool] = useState<FieldType>('text')
+  const [activeTool, setActiveTool] = useState<FieldType | null>('text')
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [page, setPage] = useState(1)
   const [numPages, setNumPages] = useState(1)
@@ -80,6 +82,8 @@ export default function BuilderPage() {
   }
 
   const pdf = version.pdf
+  const canvas = version.canvas ?? { width: 210, height: 297 }
+  const fieldsOnPage = version.fields.filter((f) => f.page === page)
 
   const handleUpsertField = (next: Field) => {
     void upsertField(form.id, version.id, next).catch((err) => {
@@ -158,7 +162,7 @@ export default function BuilderPage() {
           <CardBody>
             <div className="text-sm font-semibold">Tool Palette</div>
             <div className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
-              Click a tool, then click on the canvas.
+              Click a tool (or drag it) onto the canvas. Click it again for Hand mode.
             </div>
             <div className="mt-3 grid grid-cols-2 gap-2">
               {tools.map((t) => (
@@ -170,7 +174,12 @@ export default function BuilderPage() {
                       ? 'border-neutral-900 bg-neutral-900 text-white dark:border-white dark:bg-white dark:text-neutral-900'
                       : 'border-neutral-200 hover:bg-neutral-50 dark:border-neutral-800 dark:hover:bg-neutral-900'
                   )}
-                  onClick={() => setActiveTool(t.type)}
+                  draggable
+                  onDragStart={(e) => {
+                    e.dataTransfer.setData('application/x-rf-tool', t.type)
+                    e.dataTransfer.effectAllowed = 'copy'
+                  }}
+                  onClick={() => setActiveTool((prev) => (prev === t.type ? null : t.type))}
                 >
                   {t.label}
                 </button>
@@ -182,8 +191,56 @@ export default function BuilderPage() {
               <Badge tone={version.status === 'active' ? 'success' : version.status === 'draft' ? 'warning' : 'neutral'}>{version.status}</Badge>
             </div>
 
+            {!pdf && (
+              <div className="mt-4">
+                <div className="text-xs text-neutral-500 dark:text-neutral-400">Canvas size (mm)</div>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <button
+                    className="rf-focus rounded-xl border border-neutral-200 px-2 py-1 text-xs hover:bg-neutral-50 dark:border-neutral-800 dark:hover:bg-neutral-900"
+                    onClick={() => setCanvasSize(form.id, version.id, { width: 210, height: 297 })}
+                  >
+                    A4
+                  </button>
+                  <button
+                    className="rf-focus rounded-xl border border-neutral-200 px-2 py-1 text-xs hover:bg-neutral-50 dark:border-neutral-800 dark:hover:bg-neutral-900"
+                    onClick={() => setCanvasSize(form.id, version.id, { width: 216, height: 279 })}
+                  >
+                    Letter
+                  </button>
+                </div>
+                <div className="mt-2 grid grid-cols-2 gap-2">
+                  <div>
+                    <div className="text-[11px] text-neutral-500 dark:text-neutral-400 mb-1">W</div>
+                    <Input
+                      type="number"
+                      value={Math.round(canvas.width)}
+                      onChange={(e) =>
+                        setCanvasSize(form.id, version.id, {
+                          width: Math.max(50, Number(e.target.value || 0)),
+                          height: canvas.height
+                        })
+                      }
+                    />
+                  </div>
+                  <div>
+                    <div className="text-[11px] text-neutral-500 dark:text-neutral-400 mb-1">H</div>
+                    <Input
+                      type="number"
+                      value={Math.round(canvas.height)}
+                      onChange={(e) =>
+                        setCanvasSize(form.id, version.id, {
+                          width: canvas.width,
+                          height: Math.max(50, Number(e.target.value || 0))
+                        })
+                      }
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="mt-3 text-xs text-neutral-500 dark:text-neutral-400">
-              Tip: drag fields to reposition. All changes are saved in the browser (demo).
+              Tip: drag fields to reposition. Hand mode prevents accidental adds.
             </div>
           </CardBody>
         </Card>
@@ -215,7 +272,10 @@ export default function BuilderPage() {
             <div className="mt-3 relative" ref={stageRef}>
               {!pdf ? (
                 <div className="relative">
-                  <div className="w-full aspect-[210/297] rounded-2xl border border-dashed border-neutral-300 dark:border-neutral-700 bg-white/70 dark:bg-neutral-950/40 flex items-center justify-center p-6 text-center">
+                  <div
+                    className="w-full rounded-2xl border border-dashed border-neutral-300 dark:border-neutral-700 bg-white/70 dark:bg-neutral-950/40 flex items-center justify-center p-6 text-center"
+                    style={{ aspectRatio: `${canvas.width} / ${canvas.height}` }}
+                  >
                     <div className="pointer-events-none">
                       <div className="text-sm font-medium">Upload a PDF to lock the layout</div>
                       <div className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
@@ -226,10 +286,14 @@ export default function BuilderPage() {
 
                   {/* Overlay */}
                   <div
-                    className="absolute inset-0"
+                    className={cn('absolute inset-0', activeTool ? 'cursor-crosshair' : 'cursor-grab')}
                     onPointerDown={(e) => {
                       // only add when clicking empty overlay
                       if ((e.target as HTMLElement).dataset.field === '1') return
+                      if (!activeTool) {
+                        setSelectedId(null)
+                        return
+                      }
                       const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect()
                       const x = (e.clientX - rect.left) / rect.width
                       const y = (e.clientY - rect.top) / rect.height
@@ -237,19 +301,30 @@ export default function BuilderPage() {
                       handleUpsertField(f)
                       setSelectedId(f.id)
                     }}
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={(e) => {
+                      e.preventDefault()
+                      const tool = e.dataTransfer.getData('application/x-rf-tool') as FieldType
+                      if (!tool) return
+                      const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect()
+                      const x = (e.clientX - rect.left) / rect.width
+                      const y = (e.clientY - rect.top) / rect.height
+                      const f = newField(tool, x, y, page)
+                      handleUpsertField(f)
+                      setSelectedId(f.id)
+                    }}
                   >
-                    {version.fields
-                      .filter((f) => f.page === page)
-                      .map((f) => (
-                        <FieldBox
-                          key={f.id}
-                          field={f}
-                          selected={f.id === selectedId}
-                          stage={size}
-                          onSelect={() => setSelectedId(f.id)}
-                          onMove={(nx, ny) => handleUpsertField({ ...f, x: nx, y: ny })}
-                        />
-                      ))}
+                    {fieldsOnPage.map((f) => (
+                      <FieldBox
+                        key={f.id}
+                        field={f}
+                        selected={f.id === selectedId}
+                        stage={size}
+                        onSelect={() => setSelectedId(f.id)}
+                        onMove={(nx, ny) => handleUpsertField({ ...f, x: nx, y: ny })}
+                        onResize={(nw, nh) => handleUpsertField({ ...f, w: nw, h: nh })}
+                      />
+                    ))}
                   </div>
                 </div>
               ) : (
@@ -262,10 +337,14 @@ export default function BuilderPage() {
 
                   {/* Overlay */}
                   <div
-                    className="absolute inset-0"
+                    className={cn('absolute inset-0', activeTool ? 'cursor-crosshair' : 'cursor-grab')}
                     onPointerDown={(e) => {
                       // only add when clicking empty overlay
                       if ((e.target as HTMLElement).dataset.field === '1') return
+                      if (!activeTool) {
+                        setSelectedId(null)
+                        return
+                      }
                       const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect()
                       const x = (e.clientX - rect.left) / rect.width
                       const y = (e.clientY - rect.top) / rect.height
@@ -273,26 +352,45 @@ export default function BuilderPage() {
                       handleUpsertField(f)
                       setSelectedId(f.id)
                     }}
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={(e) => {
+                      e.preventDefault()
+                      const tool = e.dataTransfer.getData('application/x-rf-tool') as FieldType
+                      if (!tool) return
+                      const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect()
+                      const x = (e.clientX - rect.left) / rect.width
+                      const y = (e.clientY - rect.top) / rect.height
+                      const f = newField(tool, x, y, page)
+                      handleUpsertField(f)
+                      setSelectedId(f.id)
+                    }}
                   >
-                    {version.fields
-                      .filter((f) => f.page === page)
-                      .map((f) => (
-                        <FieldBox
-                          key={f.id}
-                          field={f}
-                          selected={f.id === selectedId}
-                          stage={size}
-                          onSelect={() => setSelectedId(f.id)}
-                          onMove={(nx, ny) => handleUpsertField({ ...f, x: nx, y: ny })}
-                        />
-                      ))}
+                    {fieldsOnPage.map((f) => (
+                      <FieldBox
+                        key={f.id}
+                        field={f}
+                        selected={f.id === selectedId}
+                        stage={size}
+                        onSelect={() => setSelectedId(f.id)}
+                        onMove={(nx, ny) => handleUpsertField({ ...f, x: nx, y: ny })}
+                        onResize={(nw, nh) => handleUpsertField({ ...f, w: nw, h: nh })}
+                      />
+                    ))}
                   </div>
                 </div>
               )}
             </div>
 
             <div className="mt-3 text-xs text-neutral-500 dark:text-neutral-400 flex justify-between gap-3">
-              <div>Click on canvas to add: <span className="font-medium">{activeTool}</span></div>
+              <div>
+                {activeTool ? (
+                  <>
+                    Click on canvas to add: <span className="font-medium">{labelFor(activeTool)}</span>
+                  </>
+                ) : (
+                  <span>Hand mode: click fields to select or drag</span>
+                )}
+              </div>
               <div>{pdf ? pdf.name : 'No PDF'}</div>
             </div>
           </CardBody>
@@ -354,6 +452,7 @@ function FieldEditor({ field, onChange }: { field: Field; onChange: (f: Field) =
           <option value="date">Date</option>
           <option value="signature">Signature</option>
           <option value="photo">Photo</option>
+          <option value="employee">Employee list</option>
         </Select>
       </div>
 
@@ -420,16 +519,18 @@ function FieldEditor({ field, onChange }: { field: Field; onChange: (f: Field) =
         <Textarea value={field.helpText ?? ''} onChange={(e) => onChange({ ...field, helpText: e.target.value })} />
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-        <div>
-          <div className="text-xs text-neutral-500 dark:text-neutral-400 mb-1">W</div>
-          <Input type="number" value={Math.round(field.w * 100)} onChange={(e) => onChange({ ...field, w: clamp01(Number(e.target.value) / 100) })} />
+      {field.type !== 'checkbox' && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <div>
+            <div className="text-xs text-neutral-500 dark:text-neutral-400 mb-1">W</div>
+            <Input type="number" value={Math.round(field.w * 100)} onChange={(e) => onChange({ ...field, w: clamp01(Number(e.target.value) / 100) })} />
+          </div>
+          <div>
+            <div className="text-xs text-neutral-500 dark:text-neutral-400 mb-1">H</div>
+            <Input type="number" value={Math.round(field.h * 100)} onChange={(e) => onChange({ ...field, h: clamp01(Number(e.target.value) / 100) })} />
+          </div>
         </div>
-        <div>
-          <div className="text-xs text-neutral-500 dark:text-neutral-400 mb-1">H</div>
-          <Input type="number" value={Math.round(field.h * 100)} onChange={(e) => onChange({ ...field, h: clamp01(Number(e.target.value) / 100) })} />
-        </div>
-      </div>
+      )}
     </div>
   )
 }
@@ -439,15 +540,18 @@ function FieldBox({
   selected,
   stage,
   onSelect,
-  onMove
+  onMove,
+  onResize
 }: {
   field: Field
   selected: boolean
   stage: { width: number; height: number }
   onSelect: () => void
   onMove: (x: number, y: number) => void
+  onResize: (w: number, h: number) => void
 }) {
   const [drag, setDrag] = useState<null | { ox: number; oy: number; pid: number }>(null)
+  const [resize, setResize] = useState<null | { startX: number; startY: number; w: number; h: number; pid: number }>(null)
 
   const style = {
     left: `${field.x * 100}%`,
@@ -456,6 +560,7 @@ function FieldBox({
     height: `${field.h * 100}%`,
     touchAction: 'none'
   } as any
+  const canResize = field.type !== 'checkbox'
 
   return (
     <div
@@ -475,6 +580,18 @@ function FieldBox({
         setDrag({ ox: e.clientX - rect.left, oy: e.clientY - rect.top, pid: e.pointerId })
       }}
       onPointerMove={(e) => {
+        if (resize && resize.pid === e.pointerId) {
+          e.stopPropagation()
+          const parent = (e.currentTarget.parentElement as HTMLDivElement).getBoundingClientRect()
+          const dx = (e.clientX - resize.startX) / parent.width
+          const dy = (e.clientY - resize.startY) / parent.height
+          const maxW = 1 - field.x
+          const maxH = 1 - field.y
+          const nextW = Math.max(0.03, Math.min(maxW, resize.w + dx))
+          const nextH = Math.max(0.03, Math.min(maxH, resize.h + dy))
+          onResize(nextW, nextH)
+          return
+        }
         if (!drag || drag.pid !== e.pointerId) return
         e.stopPropagation()
         const parent = (e.currentTarget.parentElement as HTMLDivElement).getBoundingClientRect()
@@ -483,14 +600,33 @@ function FieldBox({
         onMove(clamp01(nx), clamp01(ny))
       }}
       onPointerUp={(e) => {
-        if (drag?.pid === e.pointerId) {
+        if (drag?.pid === e.pointerId || resize?.pid === e.pointerId) {
           e.stopPropagation()
           setDrag(null)
+          setResize(null)
         }
       }}
-      onPointerCancel={() => setDrag(null)}
+      onPointerCancel={() => {
+        setDrag(null)
+        setResize(null)
+      }}
     >
       <span className="px-2 truncate">{field.label}</span>
+      {canResize && (
+        <div
+          className={cn(
+            'absolute -right-1 -bottom-1 h-3 w-3 rounded-full border border-white shadow-sm cursor-se-resize',
+            selected ? 'bg-blue-500' : 'bg-neutral-400'
+          )}
+          onPointerDown={(e) => {
+            e.stopPropagation()
+            onSelect()
+            const box = (e.currentTarget.parentElement as HTMLDivElement)
+            box.setPointerCapture(e.pointerId)
+            setResize({ startX: e.clientX, startY: e.clientY, w: field.w, h: field.h, pid: e.pointerId })
+          }}
+        />
+      )}
     </div>
   )
 }
@@ -503,7 +639,8 @@ function newField(type: FieldType, x: number, y: number, page: number): Field {
     checkbox: { w: 0.18, h: 0.055 },
     date: { w: 0.24, h: 0.055 },
     signature: { w: 0.50, h: 0.11 },
-    photo: { w: 0.50, h: 0.09 }
+    photo: { w: 0.50, h: 0.09 },
+    employee: { w: 0.40, h: 0.055 }
   }
 
   const wh = sizes[type]
@@ -528,6 +665,7 @@ function labelFor(type: FieldType) {
     case 'date': return 'Date'
     case 'signature': return 'Signature'
     case 'photo': return 'Photo'
+    case 'employee': return 'Employees'
   }
 }
 
