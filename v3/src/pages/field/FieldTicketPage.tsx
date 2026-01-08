@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useRef } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import SectionHeader from '@/shared/ui/SectionHeader'
 import Button from '@/shared/ui/Button'
@@ -25,6 +25,7 @@ export default function FieldTicketPage() {
   const apiEnabled = useAppStore(s => s.apiEnabled)
   const uploadAttachment = useAppStore(s => s.uploadAttachment)
   const pushToast = useAppStore(s => s.pushToast)
+  const attachmentInputRef = useRef<HTMLInputElement | null>(null)
 
   const ctx = useMemo(() => {
     if (!ticket) return null
@@ -109,20 +110,19 @@ export default function FieldTicketPage() {
                 {apiEnabled ? 'Stored on server' : 'Stored locally (demo)'}
               </div>
 
-              <label className="mt-3 inline-flex">
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0]
-                    if (!file) return
-                    if (apiEnabled) {
-                      void uploadAttachment(ticket.id, file)
-                        .then(() => pushToast({ title: 'Attachment added', message: file.name, variant: 'success' }))
-                        .catch((err) => pushToast({ title: 'Upload failed', message: err?.message || 'Unable to upload attachment', variant: 'danger' }))
-                      return
-                    }
+              <input
+                ref={attachmentInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0]
+                  if (!file) return
+                  if (apiEnabled) {
+                    void uploadAttachment(ticket.id, file)
+                      .then(() => pushToast({ title: 'Attachment added', message: file.name, variant: 'success' }))
+                      .catch((err) => pushToast({ title: 'Upload failed', message: err?.message || 'Unable to upload attachment', variant: 'danger' }))
+                  } else {
                     const reader = new FileReader()
                     reader.onload = () => {
                       const dataUrl = String(reader.result)
@@ -134,12 +134,17 @@ export default function FieldTicketPage() {
                       useAppStore.getState().pushToast({ title: 'Attachment added', message: file.name, variant: 'success' })
                     }
                     reader.readAsDataURL(file)
-                  }}
-                />
-                <Button variant="secondary">
-                  <ImagePlus size={16} /> Add photo
-                </Button>
-              </label>
+                  }
+                  e.currentTarget.value = ''
+                }}
+              />
+              <Button
+                variant="secondary"
+                type="button"
+                onClick={() => attachmentInputRef.current?.click()}
+              >
+                <ImagePlus size={16} /> Add photo
+              </Button>
 
               <div className="mt-3 flex flex-col gap-2">
                 {ticket.attachments.length === 0 && (

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import SectionHeader from '@/shared/ui/SectionHeader'
 import Button from '@/shared/ui/Button'
@@ -38,6 +38,7 @@ export default function BuilderPage() {
   const upsertField = useAppStore(s => s.upsertField)
   const deleteField = useAppStore(s => s.deleteField)
   const pushToast = useAppStore(s => s.pushToast)
+  const pdfInputRef = useRef<HTMLInputElement | null>(null)
 
   const form = forms.find(f => f.id === formId)
   const vFromQuery = new URLSearchParams(location.search).get('v')
@@ -103,33 +104,37 @@ export default function BuilderPage() {
               <Eye size={16} /> Preview Field App
             </Button>
 
-            <label className="inline-flex">
-              <input
-                type="file"
-                accept="application/pdf"
-                className="hidden"
-                onChange={(e) => {
-                  const file = e.target.files?.[0]
-                  if (!file) return
+            <input
+              ref={pdfInputRef}
+              type="file"
+              accept="application/pdf"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0]
+                if (!file) return
+                if (apiEnabled) {
+                  void uploadPdf(form.id, version.id, file)
+                    .then(() => pushToast({ title: 'PDF uploaded', message: file.name, variant: 'success' }))
+                    .catch((err) => pushToast({ title: 'Upload failed', message: err?.message || 'Unable to upload PDF', variant: 'danger' }))
+                } else {
                   const reader = new FileReader()
-                  if (apiEnabled) {
-                    void uploadPdf(form.id, version.id, file)
-                      .then(() => pushToast({ title: 'PDF uploaded', message: file.name, variant: 'success' }))
-                      .catch((err) => pushToast({ title: 'Upload failed', message: err?.message || 'Unable to upload PDF', variant: 'danger' }))
-                  } else {
-                    reader.onload = () => {
-                      const dataUrl = String(reader.result)
-                      setPdf(form.id, version.id, { name: file.name, mime: file.type || 'application/pdf', dataUrl })
-                      useAppStore.getState().pushToast({ title: 'PDF uploaded', message: file.name, variant: 'success' })
-                    }
-                    reader.readAsDataURL(file)
+                  reader.onload = () => {
+                    const dataUrl = String(reader.result)
+                    setPdf(form.id, version.id, { name: file.name, mime: file.type || 'application/pdf', dataUrl })
+                    useAppStore.getState().pushToast({ title: 'PDF uploaded', message: file.name, variant: 'success' })
                   }
-                }}
-              />
-              <Button variant="secondary">
-                <Upload size={16} /> {pdf ? 'Replace PDF' : 'Upload PDF'}
-              </Button>
-            </label>
+                  reader.readAsDataURL(file)
+                }
+                e.currentTarget.value = ''
+              }}
+            />
+            <Button
+              variant="secondary"
+              type="button"
+              onClick={() => pdfInputRef.current?.click()}
+            >
+              <Upload size={16} /> {pdf ? 'Replace PDF' : 'Upload PDF'}
+            </Button>
 
             <Button
               onClick={async () => {
@@ -209,10 +214,42 @@ export default function BuilderPage() {
 
             <div className="mt-3 relative" ref={stageRef}>
               {!pdf ? (
-                <div className="rounded-2xl border border-dashed border-neutral-300 dark:border-neutral-700 p-10 text-center">
-                  <div className="text-sm font-medium">Upload a PDF to start</div>
-                  <div className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
-                    Then map structured fields onto the locked layout.
+                <div className="relative">
+                  <div className="w-full aspect-[210/297] rounded-2xl border border-dashed border-neutral-300 dark:border-neutral-700 bg-white/70 dark:bg-neutral-950/40 flex items-center justify-center p-6 text-center">
+                    <div className="pointer-events-none">
+                      <div className="text-sm font-medium">Upload a PDF to lock the layout</div>
+                      <div className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
+                        You can still place fields on this blank page.
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Overlay */}
+                  <div
+                    className="absolute inset-0"
+                    onPointerDown={(e) => {
+                      // only add when clicking empty overlay
+                      if ((e.target as HTMLElement).dataset.field === '1') return
+                      const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect()
+                      const x = (e.clientX - rect.left) / rect.width
+                      const y = (e.clientY - rect.top) / rect.height
+                      const f = newField(activeTool, x, y, page)
+                      handleUpsertField(f)
+                      setSelectedId(f.id)
+                    }}
+                  >
+                    {version.fields
+                      .filter((f) => f.page === page)
+                      .map((f) => (
+                        <FieldBox
+                          key={f.id}
+                          field={f}
+                          selected={f.id === selectedId}
+                          stage={size}
+                          onSelect={() => setSelectedId(f.id)}
+                          onMove={(nx, ny) => handleUpsertField({ ...f, x: nx, y: ny })}
+                        />
+                      ))}
                   </div>
                 </div>
               ) : (
