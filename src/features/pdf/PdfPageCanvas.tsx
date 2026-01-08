@@ -15,7 +15,7 @@ export default function PdfPageCanvas({ dataUrl, page, className, onMeta }: Prop
   const [err, setErr] = useState<string | null>(null)
 
   const isData = useMemo(() => !!dataUrl && dataUrl.startsWith('data:'), [dataUrl])
-  const bytes = useMemo(() => (dataUrl && isData ? dataUrlToBytes(dataUrl) : null), [dataUrl, isData])
+  const bytes = useMemo(() => (dataUrl && isData ? dataUrlToBytes(dataUrl) : undefined), [dataUrl, isData])
 
   useEffect(() => {
     let cancelled = false
