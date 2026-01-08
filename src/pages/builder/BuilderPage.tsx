@@ -30,6 +30,7 @@ export default function BuilderPage() {
   const nav = useNavigate()
 
   const forms = useAppStore(s => s.forms)
+  const role = useAppStore(s => s.role)
   const setPdf = useAppStore(s => s.setPdf)
   const publishVersion = useAppStore(s => s.publishVersion)
   const upsertField = useAppStore(s => s.upsertField)
@@ -52,6 +53,19 @@ export default function BuilderPage() {
   const selected = useMemo(() => version?.fields.find(f => f.id === selectedId) ?? null, [version, selectedId])
 
   const { ref: stageRef, size } = useElementSize<HTMLDivElement>()
+
+  if (role !== 'admin') {
+    return (
+      <div className="p-6">
+        <div className="text-sm text-neutral-500 dark:text-neutral-400">
+          Worker accounts only fill ready forms. Switch to Admin to edit templates.
+        </div>
+        <div className="mt-3">
+          <Button variant="secondary" onClick={() => nav('/field')}>Go to Field App</Button>
+        </div>
+      </div>
+    )
+  }
 
   if (!form || !version) {
     return (

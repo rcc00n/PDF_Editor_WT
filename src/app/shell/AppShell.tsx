@@ -1,6 +1,6 @@
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useEffect } from 'react'
-import { LayoutGrid, FileText, PencilRuler, Smartphone, RefreshCw, ClipboardCheck, Moon, Sun, Wifi, WifiOff, Command } from 'lucide-react'
+import { LayoutGrid, FileText, PencilRuler, Smartphone, RefreshCw, ClipboardCheck, Moon, Sun, Globe, Wifi, WifiOff, Command, Shield, User } from 'lucide-react'
 import { useAppStore } from '@/shared/state/useAppStore'
 import { cn } from '@/shared/ui/cn'
 
@@ -15,6 +15,8 @@ const nav = [
 export default function AppShell() {
   const theme = useAppStore(s => s.theme)
   const toggleTheme = useAppStore(s => s.toggleTheme)
+  const role = useAppStore(s => s.role)
+  const setRole = useAppStore(s => s.setRole)
   const online = useAppStore(s => s.online)
   const forcedOffline = useAppStore(s => s.forcedOffline)
   const setForcedOffline = useAppStore(s => s.setForcedOffline)
@@ -23,6 +25,11 @@ export default function AppShell() {
 
   const location = useLocation()
   const navigate = useNavigate()
+
+  const nextTheme = theme === 'dark' ? 'light' : theme === 'light' ? 'planet' : 'dark'
+  const ThemeIcon = nextTheme === 'light' ? Sun : nextTheme === 'dark' ? Moon : Globe
+  const isAdmin = role === 'admin'
+  const RoleIcon = isAdmin ? Shield : User
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -73,18 +80,20 @@ export default function AppShell() {
             )
           })}
 
-          <div className="mt-2 hidden md:block border-t border-neutral-200 dark:border-neutral-800 pt-3">
-            <button
-              className="rf-focus w-full flex items-center justify-between gap-3 rounded-2xl px-3 py-2.5 text-sm font-medium hover:bg-neutral-100 dark:hover:bg-neutral-900"
-              onClick={() => navigate('/forms')}
-              title="Open Form Builder"
-            >
-              <span className="flex items-center gap-3">
-                <PencilRuler size={18} /> Builder
-              </span>
-              <span className="text-xs text-neutral-500 dark:text-neutral-400">→</span>
-            </button>
-          </div>
+          {isAdmin && (
+            <div className="mt-2 hidden md:block border-t border-neutral-200 dark:border-neutral-800 pt-3">
+              <button
+                className="rf-focus w-full flex items-center justify-between gap-3 rounded-2xl px-3 py-2.5 text-sm font-medium hover:bg-neutral-100 dark:hover:bg-neutral-900"
+                onClick={() => navigate('/forms')}
+                title="Open Form Builder"
+              >
+                <span className="flex items-center gap-3">
+                  <PencilRuler size={18} /> Builder
+                </span>
+                <span className="text-xs text-neutral-500 dark:text-neutral-400">→</span>
+              </button>
+            </div>
+          )}
         </nav>
       </aside>
 
@@ -128,11 +137,22 @@ export default function AppShell() {
               </button>
 
               <button
+                className="rf-focus rounded-2xl border border-neutral-200 dark:border-neutral-800 px-3 py-2 text-sm font-medium hover:bg-neutral-50 dark:hover:bg-neutral-900"
+                onClick={() => setRole(isAdmin ? 'worker' : 'admin')}
+                title={isAdmin ? 'Switch to worker' : 'Switch to admin'}
+              >
+                <span className="inline-flex items-center gap-2">
+                  <RoleIcon size={16} />
+                  <span className="hidden md:inline">{isAdmin ? 'Admin' : 'Worker'}</span>
+                </span>
+              </button>
+
+              <button
                 className="rf-focus rounded-2xl border border-neutral-200 dark:border-neutral-800 px-3 py-2 text-sm hover:bg-neutral-50 dark:hover:bg-neutral-900"
                 onClick={toggleTheme}
-                title="Toggle theme"
+                title={`Switch to ${nextTheme} theme`}
               >
-                {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+                <ThemeIcon size={16} />
               </button>
             </div>
           </div>
