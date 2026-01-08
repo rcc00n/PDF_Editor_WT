@@ -83,6 +83,8 @@ type State = {
   apiEnabled: boolean
   authStatus: AuthStatus
   user?: UserProfile
+  sidebarCollapsed: boolean
+  setSidebarCollapsed: (collapsed: boolean) => void
 
   theme: Theme
   setTheme: (theme: Theme) => void
@@ -159,6 +161,8 @@ export const useAppStore = create<State>()(
       apiEnabled: API_ENABLED,
       authStatus: API_ENABLED ? 'unknown' : 'authenticated',
       user: undefined,
+      sidebarCollapsed: false,
+      setSidebarCollapsed: (collapsed) => set({ sidebarCollapsed: collapsed }),
 
       theme: getStoredTheme(),
       setTheme: (theme) => {
@@ -711,6 +715,7 @@ export const useAppStore = create<State>()(
       partialize: (s) => ({
         theme: s.theme,
         role: s.role,
+        sidebarCollapsed: s.sidebarCollapsed,
         systemOnline: s.systemOnline,
         forcedOffline: s.forcedOffline,
         online: s.online,
