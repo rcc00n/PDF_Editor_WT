@@ -27,6 +27,7 @@ const tools: Array<{ type: FieldType; label: string }> = [
 
 const GRID_PX = 8
 const MIN_FIELD_SIZE = 0.03
+const DEFAULT_FONT_SIZE = 12
 
 export default function BuilderPage() {
   const { formId = '' } = useParams()
@@ -543,6 +544,8 @@ export default function BuilderPage() {
 function FieldEditor({ field, onChange }: { field: Field; onChange: (f: Field) => void | Promise<void> }) {
   const maxW = Math.max(1 - field.x, MIN_FIELD_SIZE)
   const maxH = Math.max(1 - field.y, MIN_FIELD_SIZE)
+  const fontSize = field.fontSize ?? DEFAULT_FONT_SIZE
+  const supportsFontSize = field.type === 'text' || field.type === 'numeric' || field.type === 'date' || field.type === 'employee'
 
   return (
     <div className="mt-4 space-y-4">
@@ -641,6 +644,25 @@ function FieldEditor({ field, onChange }: { field: Field; onChange: (f: Field) =
           <Textarea value={field.helpText ?? ''} onChange={(e) => onChange({ ...field, helpText: e.target.value })} />
         </div>
       </div>
+
+      {supportsFontSize && (
+        <div className="space-y-3 border-t border-neutral-200/80 pt-4 dark:border-neutral-800/80">
+          <div className="text-[11px] font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Typography</div>
+          <div>
+            <div className="text-xs text-neutral-500 dark:text-neutral-400 mb-1">Font size (px)</div>
+            <Input
+              type="number"
+              min={8}
+              max={36}
+              value={fontSize}
+              onChange={(e) => {
+                const next = Number(e.target.value || DEFAULT_FONT_SIZE)
+                onChange({ ...field, fontSize: Math.min(36, Math.max(8, next)) })
+              }}
+            />
+          </div>
+        </div>
+      )}
 
       {field.type !== 'checkbox' && (
         <div className="space-y-3 border-t border-neutral-200/80 pt-4 dark:border-neutral-800/80">
@@ -801,6 +823,7 @@ function newField(type: FieldType, x: number, y: number, page: number, grid?: { 
     key: `${type}_${Math.random().toString(16).slice(2, 6)}`,
     required: false,
     validation: type === 'numeric' ? { kind: 'range', min: 0, max: 300 } : { kind: 'none' },
+    fontSize: DEFAULT_FONT_SIZE,
     x: nx,
     y: ny,
     page,

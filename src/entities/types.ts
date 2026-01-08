@@ -18,6 +18,7 @@ export type Field = {
   required: boolean
   hint?: string
   helpText?: string
+  fontSize?: number
   validation: Validation
   page: number
   // normalized 0..1 relative to page box

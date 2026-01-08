@@ -427,6 +427,8 @@ type VersionDiff = {
   pdfChanged: boolean
 }
 
+const DEFAULT_FONT_SIZE = 12
+
 function diffVersions(left: FormVersion, right: FormVersion): VersionDiff {
   const leftByKey = new Map(left.fields.map(f => [f.key, f]))
   const rightByKey = new Map(right.fields.map(f => [f.key, f]))
@@ -483,6 +485,10 @@ function diffField(left: Field, right: Field) {
     left.h !== right.h
 
   if (layoutChanged) changes.push('layout')
+
+  if ((left.fontSize ?? DEFAULT_FONT_SIZE) !== (right.fontSize ?? DEFAULT_FONT_SIZE)) {
+    changes.push('font size')
+  }
 
   return changes
 }
