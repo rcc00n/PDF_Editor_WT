@@ -12,10 +12,15 @@ type Props = {
 export default function PdfPageCanvas({ dataUrl, page, className, onMeta }: Props) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const wrapRef = useRef<HTMLDivElement | null>(null)
+  const onMetaRef = useRef<typeof onMeta>(onMeta)
   const [err, setErr] = useState<string | null>(null)
 
   const isData = useMemo(() => !!dataUrl && dataUrl.startsWith('data:'), [dataUrl])
   const bytes = useMemo(() => (dataUrl && isData ? dataUrlToBytes(dataUrl) : undefined), [dataUrl, isData])
+
+  useEffect(() => {
+    onMetaRef.current = onMeta
+  }, [onMeta])
 
   useEffect(() => {
     let cancelled = false
@@ -38,7 +43,7 @@ export default function PdfPageCanvas({ dataUrl, page, className, onMeta }: Prop
           : pdfjs.getDocument({ url: dataUrl })
         const pdf = await loadingTask.promise
         if (cancelled) return
-        onMeta?.({ numPages: pdf.numPages })
+        onMetaRef.current?.({ numPages: pdf.numPages })
 
         const p = Math.min(Math.max(1, page), pdf.numPages)
         const pdfPage = await pdf.getPage(p)
@@ -64,7 +69,7 @@ export default function PdfPageCanvas({ dataUrl, page, className, onMeta }: Prop
     return () => {
       cancelled = true
     }
-  }, [bytes, page, onMeta])
+  }, [bytes, dataUrl, isData, page])
 
   return (
     <div ref={wrapRef} className={cn('w-full', className)}>
