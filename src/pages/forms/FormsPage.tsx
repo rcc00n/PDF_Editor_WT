@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import SectionHeader from '@/shared/ui/SectionHeader'
 import Button from '@/shared/ui/Button'
@@ -10,11 +10,14 @@ import Select from '@/shared/ui/Select'
 import { useAppStore } from '@/shared/state/useAppStore'
 import { dateTimeShort } from '@/shared/lib/format'
 import type { Field, FormVersion } from '@/entities/types'
-import { Plus, GitBranchPlus, Archive, ArrowRight, History, RotateCcw, CheckCircle2 } from 'lucide-react'
+import RenderedPdfPreview from '@/features/pdf/RenderedPdfPreview'
+import { exportRenderedFormPdf } from '@/features/export/exporters'
+import { Plus, GitBranchPlus, Archive, ArrowRight, History, RotateCcw, CheckCircle2, Eye, FileDown } from 'lucide-react'
 
 export default function FormsPage() {
   const nav = useNavigate()
   const forms = useAppStore(s => s.forms)
+  const tickets = useAppStore(s => s.tickets)
   const role = useAppStore(s => s.role)
   const createForm = useAppStore(s => s.createForm)
   const createVersion = useAppStore(s => s.createVersion)
@@ -28,6 +31,8 @@ export default function FormsPage() {
   const [compareLeftId, setCompareLeftId] = useState('')
   const [compareRightId, setCompareRightId] = useState('')
   const [query, setQuery] = useState('')
+  const [renderFormId, setRenderFormId] = useState<string | null>(null)
+  const [renderTicketId, setRenderTicketId] = useState('')
 
   const canEdit = role === 'admin'
 
@@ -57,6 +62,22 @@ export default function FormsPage() {
     [forms, historyFormId]
   )
 
+  const renderForm = useMemo(
+    () => forms.find(f => f.id === renderFormId) ?? null,
+    [forms, renderFormId]
+  )
+
+  const renderTickets = useMemo(() => {
+    if (!renderFormId) return []
+    return tickets
+      .filter(t => t.formId === renderFormId)
+      .slice()
+      .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+  }, [renderFormId, tickets])
+
+  const renderTicket = renderTickets.find(t => t.id === renderTicketId) ?? renderTickets[0] ?? null
+  const renderVersion = renderForm?.versions.find(v => v.id === renderTicket?.versionId) ?? null
+
   const leftVersion = historyForm?.versions.find(v => v.id === compareLeftId)
   const rightVersion = historyForm?.versions.find(v => v.id === compareRightId)
 
@@ -77,6 +98,22 @@ export default function FormsPage() {
     setCompareLeftId(first?.id ?? '')
     setCompareRightId((second ?? first)?.id ?? '')
   }
+
+  const openRendered = (formId: string) => {
+    const formTickets = tickets
+      .filter(t => t.formId === formId)
+      .slice()
+      .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+    setRenderFormId(formId)
+    setRenderTicketId(formTickets[0]?.id ?? '')
+  }
+
+  useEffect(() => {
+    if (!renderFormId) return
+    if (!renderTicketId && renderTickets.length) {
+      setRenderTicketId(renderTickets[0].id)
+    }
+  }, [renderFormId, renderTicketId, renderTickets])
 
   return (
     <div className="pb-10">
@@ -188,6 +225,15 @@ export default function FormsPage() {
                             title="Version history"
                           >
                             <History size={16} /> History
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            className="w-full sm:w-auto"
+                            onClick={() => openRendered(f.id)}
+                            title="View rendered PDF"
+                          >
+                            <Eye size={16} /> View PDF
                           </Button>
                           <Button
                             size="sm"
@@ -413,6 +459,83 @@ export default function FormsPage() {
                 )}
               </div>
             </div>
+          </div>
+        )}
+      </Modal>
+
+      <Modal
+        open={Boolean(renderForm)}
+        onClose={() => {
+          setRenderFormId(null)
+          setRenderTicketId('')
+        }}
+        title="Rendered form"
+        className="max-w-5xl"
+      >
+        {renderForm && (
+          <div className="space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <div className="text-sm font-semibold">{renderForm.name}</div>
+                {renderForm.subtitle && (
+                  <div className="text-xs text-neutral-500 dark:text-neutral-400">{renderForm.subtitle}</div>
+                )}
+              </div>
+              <div className="min-w-[220px]">
+                <Select
+                  value={renderTicket?.id ?? ''}
+                  onChange={(e) => setRenderTicketId(e.target.value)}
+                >
+                  {renderTickets.length === 0 && <option value="">No tickets yet</option>}
+                  {renderTickets.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.id} · {t.title}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+            </div>
+
+            {renderTickets.length === 0 && (
+              <div className="text-sm text-neutral-500 dark:text-neutral-400">
+                No tickets for this form yet.
+              </div>
+            )}
+
+            {renderTicket && renderVersion && (
+              <>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="text-xs text-neutral-500 dark:text-neutral-400">
+                    {renderTicket.id} · {renderTicket.assignedTo} · {renderVersion.version}
+                  </div>
+                  <Button
+                    variant="secondary"
+                    disabled={!renderVersion.pdf}
+                    onClick={async () => {
+                      try {
+                        await exportRenderedFormPdf(renderTicket, renderVersion)
+                      } catch (err: any) {
+                        pushToast({ title: 'Export failed', message: err?.message || 'Unable to export rendered PDF', variant: 'danger' })
+                      }
+                    }}
+                  >
+                    <FileDown size={16} /> Download PDF
+                  </Button>
+                </div>
+
+                <RenderedPdfPreview
+                  pdfUrl={renderVersion.pdf?.dataUrl ?? renderVersion.pdf?.url}
+                  fields={renderVersion.fields}
+                  ticket={renderTicket}
+                />
+              </>
+            )}
+
+            {renderTicket && !renderVersion && (
+              <div className="text-sm text-neutral-500 dark:text-neutral-400">
+                This ticket version is no longer available.
+              </div>
+            )}
           </div>
         )}
       </Modal>
