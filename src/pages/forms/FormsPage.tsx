@@ -27,6 +27,7 @@ export default function FormsPage() {
   const [historyFormId, setHistoryFormId] = useState<string | null>(null)
   const [compareLeftId, setCompareLeftId] = useState('')
   const [compareRightId, setCompareRightId] = useState('')
+  const [query, setQuery] = useState('')
 
   const canEdit = role === 'admin'
 
@@ -34,6 +35,22 @@ export default function FormsPage() {
     () => forms.map(f => ({ f, v: f.versions.find(v => v.status === 'active') ?? f.versions[0] })),
     [forms]
   )
+
+  const filteredRows = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    if (!q) return rows
+    return rows.filter(({ f, v }) => {
+      const haystack = [
+        f.name,
+        f.subtitle ?? '',
+        f.id,
+        v.version,
+        v.status,
+        String(v.fieldCount)
+      ]
+      return haystack.some((value) => value.toLowerCase().includes(q))
+    })
+  }, [rows, query])
 
   const historyForm = useMemo(
     () => forms.find(f => f.id === historyFormId) ?? null,
@@ -67,18 +84,28 @@ export default function FormsPage() {
         title="Forms"
         subtitle="Templates, versions, and publish flow."
         right={
-          <Button
-            variant="secondary"
-            disabled={!canEdit}
-            title={canEdit ? 'Create new form' : 'Admins only'}
-            onClick={() => {
-              if (!canEdit) return
-              setName('')
-              setOpen(true)
-            }}
-          >
-            <Plus size={16} /> New Form
-          </Button>
+          <>
+            <div className="w-full sm:w-64">
+              <Input
+                type="search"
+                placeholder="Search forms"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+              />
+            </div>
+            <Button
+              variant="secondary"
+              disabled={!canEdit}
+              title={canEdit ? 'Create new form' : 'Admins only'}
+              onClick={() => {
+                if (!canEdit) return
+                setName('')
+                setOpen(true)
+              }}
+            >
+              <Plus size={16} /> New Form
+            </Button>
+          </>
         }
       />
 
@@ -97,7 +124,7 @@ export default function FormsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {rows.map(({ f, v }) => (
+                  {filteredRows.map(({ f, v }) => (
                     <tr key={f.id} className="border-t border-neutral-200 dark:border-neutral-800">
                       <td className="py-3">
                         <div className="font-medium">{f.name}</div>
@@ -184,10 +211,10 @@ export default function FormsPage() {
                     </tr>
                   ))}
 
-                  {rows.length === 0 && (
+                  {filteredRows.length === 0 && (
                     <tr>
                       <td className="py-10 text-center text-sm text-neutral-500 dark:text-neutral-400" colSpan={5}>
-                        No forms yet
+                        {query.trim() ? 'No forms match that search' : 'No forms yet'}
                       </td>
                     </tr>
                   )}
