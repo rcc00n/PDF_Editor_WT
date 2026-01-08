@@ -17,6 +17,8 @@ from .views import (
     TicketApproveView,
     TicketAttachmentUploadView,
     TicketSignatureUploadView,
+    EmployeeListCreateView,
+    EmployeeDetailView,
 )
 
 urlpatterns = [
@@ -38,4 +40,6 @@ urlpatterns = [
     path('tickets/<str:ticket_id>/approve/', TicketApproveView.as_view()),
     path('tickets/<str:ticket_id>/attachments/', TicketAttachmentUploadView.as_view()),
     path('tickets/<str:ticket_id>/signature/', TicketSignatureUploadView.as_view()),
+    path('employees/', EmployeeListCreateView.as_view()),
+    path('employees/<str:employee_id>/', EmployeeDetailView.as_view()),
 ]

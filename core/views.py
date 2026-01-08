@@ -9,8 +9,8 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.parsers import JSONParser, MultiPartParser, FormParser
-from .models import FormTemplate, FormVersion, Ticket, Attachment, uid
-from .serializers import FormTemplateSerializer, TicketSerializer, TicketUpdateSerializer
+from .models import FormTemplate, FormVersion, Ticket, Attachment, Employee, uid
+from .serializers import FormTemplateSerializer, TicketSerializer, TicketUpdateSerializer, EmployeeSerializer
 from .permissions import is_admin
 
 
@@ -287,3 +287,39 @@ class TicketSignatureUploadView(APIView):
         ticket.updated_at = timezone.now()
         ticket.save()
         return Response(TicketSerializer(ticket, context={'request': request}).data)
+
+
+class EmployeeListCreateView(APIView):
+    def get(self, request):
+        employees = Employee.objects.all()
+        return Response(EmployeeSerializer(employees, many=True).data)
+
+    def post(self, request):
+        if not is_admin(request.user):
+            return Response({'detail': 'Admin only'}, status=status.HTTP_403_FORBIDDEN)
+        serializer = EmployeeSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        employee = serializer.save()
+        return Response(EmployeeSerializer(employee).data, status=status.HTTP_201_CREATED)
+
+
+class EmployeeDetailView(APIView):
+    def get(self, request, employee_id):
+        employee = get_object_or_404(Employee, pk=employee_id)
+        return Response(EmployeeSerializer(employee).data)
+
+    def patch(self, request, employee_id):
+        if not is_admin(request.user):
+            return Response({'detail': 'Admin only'}, status=status.HTTP_403_FORBIDDEN)
+        employee = get_object_or_404(Employee, pk=employee_id)
+        serializer = EmployeeSerializer(employee, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        employee = serializer.save()
+        return Response(EmployeeSerializer(employee).data)
+
+    def delete(self, request, employee_id):
+        if not is_admin(request.user):
+            return Response({'detail': 'Admin only'}, status=status.HTTP_403_FORBIDDEN)
+        employee = get_object_or_404(Employee, pk=employee_id)
+        employee.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
