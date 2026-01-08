@@ -12,6 +12,8 @@ export default function DashboardPage() {
   const nav = useNavigate()
   const forms = useAppStore(s => s.forms)
   const role = useAppStore(s => s.role)
+  const createForm = useAppStore(s => s.createForm)
+  const pushToast = useAppStore(s => s.pushToast)
   const tickets = useAppStore(s => s.tickets)
   const queue = useAppStore(s => s.queue)
   const activities = useAppStore(s => s.activities)
@@ -42,10 +44,14 @@ export default function DashboardPage() {
               variant="secondary"
               disabled={!canEdit}
               title={canEdit ? 'Create new form' : 'Admins only'}
-              onClick={() => {
+              onClick={async () => {
                 if (!canEdit) return
-                const id = useAppStore.getState().createForm('New Form')
-                nav(`/builder/${id}`)
+                try {
+                  const id = await createForm('New Form')
+                  nav(`/builder/${id}`)
+                } catch (err: any) {
+                  pushToast({ title: 'Create failed', message: err?.message || 'Unable to create form', variant: 'danger' })
+                }
               }}
             >
               <Plus size={16} /> Create New Form

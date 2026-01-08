@@ -14,7 +14,8 @@ export default function PdfPageCanvas({ dataUrl, page, className, onMeta }: Prop
   const wrapRef = useRef<HTMLDivElement | null>(null)
   const [err, setErr] = useState<string | null>(null)
 
-  const bytes = useMemo(() => (dataUrl ? dataUrlToBytes(dataUrl) : null), [dataUrl])
+  const isData = useMemo(() => !!dataUrl && dataUrl.startsWith('data:'), [dataUrl])
+  const bytes = useMemo(() => (dataUrl && isData ? dataUrlToBytes(dataUrl) : null), [dataUrl, isData])
 
   useEffect(() => {
     let cancelled = false
@@ -22,7 +23,7 @@ export default function PdfPageCanvas({ dataUrl, page, className, onMeta }: Prop
       setErr(null)
       const canvas = canvasRef.current
       const wrap = wrapRef.current
-      if (!canvas || !wrap || !bytes) return
+      if (!canvas || !wrap || !dataUrl) return
 
       try {
         const pdfjs = await import('pdfjs-dist')
@@ -32,7 +33,9 @@ export default function PdfPageCanvas({ dataUrl, page, className, onMeta }: Prop
         // @ts-ignore
         pdfjs.GlobalWorkerOptions.workerSrc = workerSrc
 
-        const loadingTask = pdfjs.getDocument({ data: bytes })
+        const loadingTask = isData
+          ? pdfjs.getDocument({ data: bytes })
+          : pdfjs.getDocument({ url: dataUrl })
         const pdf = await loadingTask.promise
         if (cancelled) return
         onMeta?.({ numPages: pdf.numPages })

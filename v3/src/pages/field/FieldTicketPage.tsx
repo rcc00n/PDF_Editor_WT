@@ -22,6 +22,9 @@ export default function FieldTicketPage() {
   const updateTicket = useAppStore(s => s.updateTicket)
   const saveDraft = useAppStore(s => s.saveDraft)
   const submitTicket = useAppStore(s => s.submitTicket)
+  const apiEnabled = useAppStore(s => s.apiEnabled)
+  const uploadAttachment = useAppStore(s => s.uploadAttachment)
+  const pushToast = useAppStore(s => s.pushToast)
 
   const ctx = useMemo(() => {
     if (!ticket) return null
@@ -54,10 +57,10 @@ export default function FieldTicketPage() {
             <Button variant="secondary" onClick={() => nav('/field')}>
               <ArrowLeft size={16} /> Back
             </Button>
-            <Button variant="secondary" onClick={() => saveDraft(ticket.id)}>
+            <Button variant="secondary" onClick={() => void saveDraft(ticket.id)}>
               <Save size={16} /> Save Draft
             </Button>
-            <Button onClick={() => submitTicket(ticket.id)}>
+            <Button onClick={() => void submitTicket(ticket.id)}>
               <Send size={16} /> Submit (Queued)
             </Button>
           </>
@@ -103,7 +106,7 @@ export default function FieldTicketPage() {
             <CardBody>
               <div className="text-sm font-semibold">Photo Attachments</div>
               <div className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
-                Stored locally (demo)
+                {apiEnabled ? 'Stored on server' : 'Stored locally (demo)'}
               </div>
 
               <label className="mt-3 inline-flex">
@@ -114,6 +117,12 @@ export default function FieldTicketPage() {
                   onChange={(e) => {
                     const file = e.target.files?.[0]
                     if (!file) return
+                    if (apiEnabled) {
+                      void uploadAttachment(ticket.id, file)
+                        .then(() => pushToast({ title: 'Attachment added', message: file.name, variant: 'success' }))
+                        .catch((err) => pushToast({ title: 'Upload failed', message: err?.message || 'Unable to upload attachment', variant: 'danger' }))
+                      return
+                    }
                     const reader = new FileReader()
                     reader.onload = () => {
                       const dataUrl = String(reader.result)
@@ -136,23 +145,31 @@ export default function FieldTicketPage() {
                 {ticket.attachments.length === 0 && (
                   <div className="text-sm text-neutral-500 dark:text-neutral-400">No photos</div>
                 )}
-                {ticket.attachments.map((a) => (
-                  <div key={a.id} className="rounded-2xl border border-neutral-200 dark:border-neutral-800 p-2">
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="min-w-0">
-                        <div className="text-sm font-medium truncate">{a.name}</div>
-                        <div className="text-xs text-neutral-500 dark:text-neutral-400 truncate">{a.mime}</div>
+                {ticket.attachments.map((a) => {
+                  const src = attachmentSrc(a)
+                  return (
+                    <div key={a.id} className="rounded-2xl border border-neutral-200 dark:border-neutral-800 p-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="min-w-0">
+                          <div className="text-sm font-medium truncate">{a.name}</div>
+                          <div className="text-xs text-neutral-500 dark:text-neutral-400 truncate">{a.mime}</div>
+                        </div>
+                        <button
+                          className="rf-focus rounded-xl px-2 py-1 text-sm hover:bg-neutral-100 dark:hover:bg-neutral-900"
+                          onClick={() => {
+                            if (a.dataUrl) return downloadDataUrl(a.name, a.dataUrl)
+                            if (a.url) window.open(a.url, '_blank', 'noopener,noreferrer')
+                          }}
+                        >
+                          <FileDown size={16} />
+                        </button>
                       </div>
-                      <button
-                        className="rf-focus rounded-xl px-2 py-1 text-sm hover:bg-neutral-100 dark:hover:bg-neutral-900"
-                        onClick={() => downloadDataUrl(a.name, a.dataUrl)}
-                      >
-                        <FileDown size={16} />
-                      </button>
+                      {src && (
+                        <img src={src} alt={a.name} className="mt-2 w-full rounded-xl border border-neutral-200 dark:border-neutral-800" />
+                      )}
                     </div>
-                    <img src={a.dataUrl} alt={a.name} className="mt-2 w-full rounded-xl border border-neutral-200 dark:border-neutral-800" />
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             </CardBody>
           </Card>
@@ -165,7 +182,10 @@ export default function FieldTicketPage() {
                   <div className="text-xs text-neutral-500 dark:text-neutral-400 mb-1">Signer</div>
                   <Input value={ticket.signature?.signer ?? ticket.assignedTo} onChange={(e) => updateTicket(ticket.id, { signature: { signer: e.target.value, dataUrl: ticket.signature?.dataUrl } })} />
                 </div>
-                <SignaturePad value={ticket.signature?.dataUrl} onChange={(sig) => updateTicket(ticket.id, { signature: { signer: ticket.signature?.signer ?? ticket.assignedTo, dataUrl: sig } })} />
+                <SignaturePad
+                  value={ticket.signature?.dataUrl ?? ticket.signature?.url}
+                  onChange={(sig) => updateTicket(ticket.id, { signature: { signer: ticket.signature?.signer ?? ticket.assignedTo, dataUrl: sig } })}
+                />
               </div>
             </CardBody>
           </Card>
@@ -182,6 +202,10 @@ export default function FieldTicketPage() {
       </div>
     </div>
   )
+}
+
+function attachmentSrc(attachment: { url?: string; dataUrl?: string }) {
+  return attachment.url || attachment.dataUrl || ''
 }
 
 function FieldInput({

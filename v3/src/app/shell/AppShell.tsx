@@ -17,6 +17,8 @@ export default function AppShell() {
   const toggleTheme = useAppStore(s => s.toggleTheme)
   const role = useAppStore(s => s.role)
   const setRole = useAppStore(s => s.setRole)
+  const apiEnabled = useAppStore(s => s.apiEnabled)
+  const user = useAppStore(s => s.user)
   const online = useAppStore(s => s.online)
   const forcedOffline = useAppStore(s => s.forcedOffline)
   const setForcedOffline = useAppStore(s => s.setForcedOffline)
@@ -136,16 +138,28 @@ export default function AppShell() {
                 </span>
               </button>
 
-              <button
-                className="rf-focus rounded-2xl border border-neutral-200 dark:border-neutral-800 px-3 py-2 text-sm font-medium hover:bg-neutral-50 dark:hover:bg-neutral-900"
-                onClick={() => setRole(isAdmin ? 'worker' : 'admin')}
-                title={isAdmin ? 'Switch to worker' : 'Switch to admin'}
-              >
-                <span className="inline-flex items-center gap-2">
-                  <RoleIcon size={16} />
-                  <span className="hidden md:inline">{isAdmin ? 'Admin' : 'Worker'}</span>
-                </span>
-              </button>
+              {apiEnabled ? (
+                <div
+                  className="rounded-2xl border border-neutral-200 dark:border-neutral-800 px-3 py-2 text-sm font-medium"
+                  title={user?.email || (isAdmin ? 'Admin' : 'Worker')}
+                >
+                  <span className="inline-flex items-center gap-2">
+                    <RoleIcon size={16} />
+                    <span className="hidden md:inline">{isAdmin ? 'Admin' : 'Worker'}</span>
+                  </span>
+                </div>
+              ) : (
+                <button
+                  className="rf-focus rounded-2xl border border-neutral-200 dark:border-neutral-800 px-3 py-2 text-sm font-medium hover:bg-neutral-50 dark:hover:bg-neutral-900"
+                  onClick={() => setRole(isAdmin ? 'worker' : 'admin')}
+                  title={isAdmin ? 'Switch to worker' : 'Switch to admin'}
+                >
+                  <span className="inline-flex items-center gap-2">
+                    <RoleIcon size={16} />
+                    <span className="hidden md:inline">{isAdmin ? 'Admin' : 'Worker'}</span>
+                  </span>
+                </button>
+              )}
 
               <button
                 className="rf-focus rounded-2xl border border-neutral-200 dark:border-neutral-800 px-3 py-2 text-sm hover:bg-neutral-50 dark:hover:bg-neutral-900"

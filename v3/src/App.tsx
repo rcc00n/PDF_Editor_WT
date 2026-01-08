@@ -9,23 +9,28 @@ import FieldTicketPage from './pages/field/FieldTicketPage'
 import QueuePage from './pages/queue/QueuePage'
 import ReviewPage from './pages/review/ReviewPage'
 import ReviewTicketPage from './pages/review/ReviewTicketPage'
+import LoginPage from './pages/auth/LoginPage'
 import { useAppStore } from './shared/state/useAppStore'
 import CommandPalette from './shared/ui/CommandPalette'
 import ToastHost from './shared/ui/ToastHost'
 import { useQueueProcessor } from './features/offline-queue/useQueueProcessor'
 import { seedIfEmpty } from './shared/state/seed'
+import { API_ENABLED } from './shared/api/config'
 
 export default function App() {
   const boot = useAppStore(s => s.boot)
   const online = useAppStore(s => s.online)
   const setSystemOnline = useAppStore(s => s.setSystemOnline)
+  const initAuth = useAppStore(s => s.initAuth)
+  const authStatus = useAppStore(s => s.authStatus)
 
   useQueueProcessor()
 
   useEffect(() => {
-    seedIfEmpty()
+    if (!API_ENABLED) seedIfEmpty()
     boot()
-  }, [boot])
+    if (API_ENABLED) void initAuth()
+  }, [boot, initAuth])
 
   useEffect(() => {
     const on = () => setSystemOnline(true)
@@ -37,6 +42,23 @@ export default function App() {
       window.removeEventListener('offline', off)
     }
   }, [setSystemOnline])
+
+  if (API_ENABLED && authStatus === 'unknown') {
+    return (
+      <div className="h-full flex items-center justify-center text-sm text-neutral-500 dark:text-neutral-400">
+        Loading session…
+      </div>
+    )
+  }
+
+  if (API_ENABLED && authStatus !== 'authenticated') {
+    return (
+      <>
+        <LoginPage />
+        <ToastHost />
+      </>
+    )
+  }
 
   return (
     <>

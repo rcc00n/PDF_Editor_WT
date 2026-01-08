@@ -31,10 +31,13 @@ export default function BuilderPage() {
 
   const forms = useAppStore(s => s.forms)
   const role = useAppStore(s => s.role)
+  const apiEnabled = useAppStore(s => s.apiEnabled)
   const setPdf = useAppStore(s => s.setPdf)
+  const uploadPdf = useAppStore(s => s.uploadPdf)
   const publishVersion = useAppStore(s => s.publishVersion)
   const upsertField = useAppStore(s => s.upsertField)
   const deleteField = useAppStore(s => s.deleteField)
+  const pushToast = useAppStore(s => s.pushToast)
 
   const form = forms.find(f => f.id === formId)
   const vFromQuery = new URLSearchParams(location.search).get('v')
@@ -97,12 +100,18 @@ export default function BuilderPage() {
                   const file = e.target.files?.[0]
                   if (!file) return
                   const reader = new FileReader()
-                  reader.onload = () => {
-                    const dataUrl = String(reader.result)
-                    setPdf(form.id, version.id, { name: file.name, mime: file.type || 'application/pdf', dataUrl })
-                    useAppStore.getState().pushToast({ title: 'PDF uploaded', message: file.name, variant: 'success' })
+                  if (apiEnabled) {
+                    void uploadPdf(form.id, version.id, file)
+                      .then(() => pushToast({ title: 'PDF uploaded', message: file.name, variant: 'success' }))
+                      .catch((err) => pushToast({ title: 'Upload failed', message: err?.message || 'Unable to upload PDF', variant: 'danger' }))
+                  } else {
+                    reader.onload = () => {
+                      const dataUrl = String(reader.result)
+                      setPdf(form.id, version.id, { name: file.name, mime: file.type || 'application/pdf', dataUrl })
+                      useAppStore.getState().pushToast({ title: 'PDF uploaded', message: file.name, variant: 'success' })
+                    }
+                    reader.readAsDataURL(file)
                   }
-                  reader.readAsDataURL(file)
                 }}
               />
               <Button variant="secondary">
@@ -111,7 +120,13 @@ export default function BuilderPage() {
             </label>
 
             <Button
-              onClick={() => publishVersion(form.id, version.id)}
+              onClick={async () => {
+                try {
+                  await publishVersion(form.id, version.id)
+                } catch (err: any) {
+                  pushToast({ title: 'Publish failed', message: err?.message || 'Unable to publish', variant: 'danger' })
+                }
+              }}
               disabled={version.status === 'active'}
             >
               <CheckCircle2 size={16} /> Publish
@@ -191,7 +206,7 @@ export default function BuilderPage() {
               ) : (
                 <div className="relative">
                   <PdfPageCanvas
-                    dataUrl={pdf.dataUrl}
+                    dataUrl={pdf.dataUrl ?? pdf.url}
                     page={page}
                     onMeta={(m) => setNumPages(m.numPages)}
                   />
@@ -206,7 +221,7 @@ export default function BuilderPage() {
                       const x = (e.clientX - rect.left) / rect.width
                       const y = (e.clientY - rect.top) / rect.height
                       const f = newField(activeTool, x, y, page)
-                      upsertField(form.id, version.id, f)
+                      void upsertField(form.id, version.id, f)
                       setSelectedId(f.id)
                     }}
                   >
@@ -220,7 +235,7 @@ export default function BuilderPage() {
                           stage={size}
                           onSelect={() => setSelectedId(f.id)}
                           onMove={(nx, ny) => {
-                            upsertField(form.id, version.id, { ...f, x: nx, y: ny })
+                            void upsertField(form.id, version.id, { ...f, x: nx, y: ny })
                           }}
                         />
                       ))}
@@ -246,7 +261,7 @@ export default function BuilderPage() {
                   className="rf-focus rounded-xl p-2 hover:bg-neutral-100 dark:hover:bg-neutral-900"
                   title="Delete field"
                   onClick={() => {
-                    deleteField(form.id, version.id, selected.id)
+                    void deleteField(form.id, version.id, selected.id)
                     setSelectedId(null)
                   }}
                 >
@@ -272,7 +287,7 @@ export default function BuilderPage() {
   )
 }
 
-function FieldEditor({ field, onChange }: { field: Field; onChange: (f: Field) => void }) {
+function FieldEditor({ field, onChange }: { field: Field; onChange: (f: Field) => void | Promise<void> }) {
   return (
     <div className="mt-4 space-y-3">
       <div>

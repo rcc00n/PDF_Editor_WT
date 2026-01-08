@@ -36,7 +36,8 @@ export type FormVersion = {
   pdf?: {
     name: string
     mime: string
-    dataUrl: string // base64 data url (demo)
+    dataUrl?: string // base64 data url (demo)
+    url?: string // API media URL
   }
   fields: Field[]
 }
@@ -60,8 +61,8 @@ export type Ticket = {
   status: TicketStatus
   approvalState: 'pending' | 'approved'
   values: Record<string, any>
-  attachments: Array<{ id: Id; name: string; mime: string; dataUrl: string }>
-  signature?: { signer: string; dataUrl?: string }
+  attachments: Array<{ id: Id; name: string; mime: string; dataUrl?: string; url?: string }>
+  signature?: { signer: string; dataUrl?: string; url?: string }
   lastError?: string
   updatedAt: string // ISO
 }

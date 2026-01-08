@@ -1,0 +1,41 @@
+from django.urls import path
+from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
+from .views import (
+    HealthView,
+    MeView,
+    FormListCreateView,
+    FormDetailView,
+    FormArchiveView,
+    FormVersionCreateView,
+    FormVersionPublishView,
+    FormVersionPdfUploadView,
+    FormVersionFieldUpsertView,
+    FormVersionFieldDeleteView,
+    TicketListCreateView,
+    TicketDetailView,
+    TicketSubmitView,
+    TicketApproveView,
+    TicketAttachmentUploadView,
+    TicketSignatureUploadView,
+)
+
+urlpatterns = [
+    path('health/', HealthView.as_view()),
+    path('auth/token/', TokenObtainPairView.as_view()),
+    path('auth/refresh/', TokenRefreshView.as_view()),
+    path('auth/me/', MeView.as_view()),
+    path('forms/', FormListCreateView.as_view()),
+    path('forms/<str:form_id>/', FormDetailView.as_view()),
+    path('forms/<str:form_id>/archive/', FormArchiveView.as_view()),
+    path('forms/<str:form_id>/versions/', FormVersionCreateView.as_view()),
+    path('forms/<str:form_id>/versions/<str:version_id>/publish/', FormVersionPublishView.as_view()),
+    path('forms/<str:form_id>/versions/<str:version_id>/pdf/', FormVersionPdfUploadView.as_view()),
+    path('forms/<str:form_id>/versions/<str:version_id>/fields/', FormVersionFieldUpsertView.as_view()),
+    path('forms/<str:form_id>/versions/<str:version_id>/fields/<str:field_id>/', FormVersionFieldDeleteView.as_view()),
+    path('tickets/', TicketListCreateView.as_view()),
+    path('tickets/<str:ticket_id>/', TicketDetailView.as_view()),
+    path('tickets/<str:ticket_id>/submit/', TicketSubmitView.as_view()),
+    path('tickets/<str:ticket_id>/approve/', TicketApproveView.as_view()),
+    path('tickets/<str:ticket_id>/attachments/', TicketAttachmentUploadView.as_view()),
+    path('tickets/<str:ticket_id>/signature/', TicketSignatureUploadView.as_view()),
+]

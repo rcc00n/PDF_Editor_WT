@@ -20,6 +20,7 @@ export default function FormsPage() {
   const createVersion = useAppStore(s => s.createVersion)
   const archiveForm = useAppStore(s => s.archiveForm)
   const publishVersion = useAppStore(s => s.publishVersion)
+  const pushToast = useAppStore(s => s.pushToast)
 
   const [open, setOpen] = useState(false)
   const [name, setName] = useState('')
@@ -126,10 +127,14 @@ export default function FormsPage() {
                             variant="secondary"
                             className="w-full sm:w-auto"
                             disabled={!canEdit}
-                            onClick={() => {
+                            onClick={async () => {
                               if (!canEdit) return
-                              const newV = createVersion(f.id)
-                              nav(`/builder/${f.id}?v=${newV}`)
+                              try {
+                                const newV = await createVersion(f.id)
+                                nav(`/builder/${f.id}?v=${newV}`)
+                              } catch (err: any) {
+                                pushToast({ title: 'Version failed', message: err?.message || 'Unable to create version', variant: 'danger' })
+                              }
                             }}
                             title={canEdit ? 'Create new version' : 'Admins only'}
                           >
@@ -162,9 +167,13 @@ export default function FormsPage() {
                             variant="ghost"
                             className="w-full sm:w-auto"
                             disabled={!canEdit}
-                            onClick={() => {
+                            onClick={async () => {
                               if (!canEdit) return
-                              archiveForm(f.id)
+                              try {
+                                await archiveForm(f.id)
+                              } catch (err: any) {
+                                pushToast({ title: 'Archive failed', message: err?.message || 'Unable to archive', variant: 'danger' })
+                              }
                             }}
                             title={canEdit ? 'Archive' : 'Admins only'}
                           >
@@ -200,11 +209,15 @@ export default function FormsPage() {
             <Button
               disabled={!canEdit}
               title={canEdit ? 'Create form' : 'Admins only'}
-              onClick={() => {
+              onClick={async () => {
                 if (!canEdit) return
-                const id = createForm((name || 'New Form').trim())
-                setOpen(false)
-                nav(`/builder/${id}`)
+                try {
+                  const id = await createForm((name || 'New Form').trim())
+                  setOpen(false)
+                  nav(`/builder/${id}`)
+                } catch (err: any) {
+                  pushToast({ title: 'Create failed', message: err?.message || 'Unable to create form', variant: 'danger' })
+                }
               }}
             >
               Create
@@ -254,9 +267,13 @@ export default function FormsPage() {
                             variant="secondary"
                             disabled={!canEdit}
                             title={canEdit ? (v.status === 'archived' ? 'Rollback to this version' : 'Publish version') : 'Admins only'}
-                            onClick={() => {
+                            onClick={async () => {
                               if (!canEdit) return
-                              publishVersion(historyForm.id, v.id)
+                              try {
+                                await publishVersion(historyForm.id, v.id)
+                              } catch (err: any) {
+                                pushToast({ title: 'Publish failed', message: err?.message || 'Unable to publish version', variant: 'danger' })
+                              }
                             }}
                           >
                             {v.status === 'archived' ? <RotateCcw size={14} /> : <CheckCircle2 size={14} />}

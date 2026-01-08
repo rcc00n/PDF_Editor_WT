@@ -71,9 +71,11 @@ export async function exportTicketPdf(ticket: Ticket, form: FormTemplate, versio
   doc.text(ticket.signature?.signer ?? '—', 40, y)
   y += 10
 
-  if (ticket.signature?.dataUrl) {
+  const signatureDataUrl = ticket.signature?.dataUrl || (ticket.signature?.url ? await fetchDataUrl(ticket.signature.url) : null)
+  if (signatureDataUrl) {
     try {
-      doc.addImage(ticket.signature.dataUrl, 'PNG', 40, y, 240, 80)
+      const format = signatureDataUrl.startsWith('data:image/jpeg') ? 'JPEG' : 'PNG'
+      doc.addImage(signatureDataUrl, format, 40, y, 240, 80)
     } catch {
       // ignore
     }
@@ -95,4 +97,24 @@ function writeWrap(doc: jsPDF, text: string, x: number, y: number, width: number
   const lines = doc.splitTextToSize(text, width)
   doc.text(lines, x, y)
   return y + lines.length * 12
+}
+
+async function fetchDataUrl(url: string) {
+  try {
+    const res = await fetch(url, { mode: 'cors' })
+    if (!res.ok) return null
+    const blob = await res.blob()
+    return await blobToDataUrl(blob)
+  } catch {
+    return null
+  }
+}
+
+function blobToDataUrl(blob: Blob) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onerror = () => reject(new Error('Failed to read image'))
+    reader.onload = () => resolve(String(reader.result))
+    reader.readAsDataURL(blob)
+  })
 }
