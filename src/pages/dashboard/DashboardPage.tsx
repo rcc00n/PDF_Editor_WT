@@ -18,7 +18,6 @@ export default function DashboardPage() {
   const pushToast = useAppStore(s => s.pushToast)
   const tickets = useAppStore(s => s.tickets)
   const queue = useAppStore(s => s.queue)
-  const activities = useAppStore(s => s.activities)
   const lastSync = useAppStore(s => s.lastSyncSuccess)
   const canEdit = role === 'admin'
   const [pendingOpen, setPendingOpen] = useState(true)
@@ -276,30 +275,6 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      <div className="px-4 mt-4 sm:px-6 sm:mt-6">
-        <Card className="xl:max-w-[520px] xl:ml-auto">
-          <CardHeader>
-            <CardTitle>Last Activity</CardTitle>
-            <CardSub>Past 24 hours</CardSub>
-          </CardHeader>
-          <CardBody>
-            <div className="flex flex-col gap-2">
-              {activities.slice(0, 10).map((a) => (
-                <div key={a.id} className="rounded-2xl border border-neutral-200 dark:border-neutral-800 p-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="font-medium">{a.title}</div>
-                    <div className="text-xs text-neutral-500 dark:text-neutral-400">{timeHHMM(a.at)}</div>
-                  </div>
-                  {a.subtitle && <div className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">{a.subtitle}</div>}
-                </div>
-              ))}
-              {activities.length === 0 && (
-                <div className="text-sm text-neutral-500 dark:text-neutral-400">No recent activity.</div>
-              )}
-            </div>
-          </CardBody>
-        </Card>
-      </div>
     </div>
   )
 }
