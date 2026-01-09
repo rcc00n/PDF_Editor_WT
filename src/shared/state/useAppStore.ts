@@ -51,14 +51,14 @@ const safeStorage = {
 
 function normalizeTheme(value: string | null): Theme {
   if (value === 'light' || value === 'dark' || value === 'planet') return value
-  return 'dark'
+  return 'planet'
 }
 
 function getStoredTheme(): Theme {
   try {
     return normalizeTheme(localStorage.getItem('rf_theme'))
   } catch {
-    return 'dark'
+    return 'planet'
   }
 }
 
