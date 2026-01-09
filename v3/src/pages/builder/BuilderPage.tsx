@@ -432,6 +432,7 @@ export default function BuilderPage() {
                     key={canvasFocus ? 'focus' : 'normal'}
                     dataUrl={pdf.dataUrl ?? pdf.url}
                     page={page}
+                    refreshKey={`${propertiesOpen}-${size.width}-${size.height}`}
                     onMeta={(m) => setNumPages(m.numPages)}
                   />
 
