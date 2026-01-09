@@ -1,13 +1,15 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import SectionHeader from '@/shared/ui/SectionHeader'
 import Button from '@/shared/ui/Button'
 import { Card, CardBody, CardHeader, CardSub, CardTitle } from '@/shared/ui/Card'
 import Badge from '@/shared/ui/Badge'
+import Modal from '@/shared/ui/Modal'
 import { useAppStore } from '@/shared/state/useAppStore'
 import { dateTimeShort } from '@/shared/lib/format'
-import { exportTicketCsv, exportTicketPdf } from '@/features/export/exporters'
-import { ArrowLeft, FileDown, FileSpreadsheet, CheckCircle2 } from 'lucide-react'
+import { exportRenderedFormPdf, exportTicketCsv, exportTicketPdf } from '@/features/export/exporters'
+import RenderedPdfPreview from '@/features/pdf/RenderedPdfPreview'
+import { ArrowLeft, FileDown, FileSpreadsheet, CheckCircle2, Eye } from 'lucide-react'
 
 export default function ReviewTicketPage() {
   const { ticketId = '' } = useParams()
@@ -16,6 +18,8 @@ export default function ReviewTicketPage() {
   const ticket = useAppStore(s => s.tickets.find(t => t.id === ticketId))
   const forms = useAppStore(s => s.forms)
   const approveTicket = useAppStore(s => s.approveTicket)
+  const pushToast = useAppStore(s => s.pushToast)
+  const [renderOpen, setRenderOpen] = useState(false)
 
   const ctx = useMemo(() => {
     if (!ticket) return null
@@ -36,6 +40,7 @@ export default function ReviewTicketPage() {
   }
 
   const { form, version } = ctx
+  const renderPdfUrl = version.pdf?.dataUrl ?? version.pdf?.url
 
   return (
     <div className="pb-10">
@@ -49,6 +54,14 @@ export default function ReviewTicketPage() {
             </Button>
             <Button variant="secondary" onClick={() => exportTicketPdf(ticket, form, version)}>
               <FileDown size={16} /> Export PDF
+            </Button>
+            <Button
+              variant="secondary"
+              disabled={!renderPdfUrl}
+              onClick={() => setRenderOpen(true)}
+              title={renderPdfUrl ? 'View rendered PDF' : 'No PDF uploaded yet'}
+            >
+              <Eye size={16} /> View Rendered PDF
             </Button>
             <Button variant="secondary" onClick={() => exportTicketCsv(ticket, form, version)}>
               <FileSpreadsheet size={16} /> Export CSV
@@ -177,6 +190,42 @@ export default function ReviewTicketPage() {
           </Card>
         </div>
       </div>
+
+      <Modal
+        open={renderOpen}
+        onClose={() => setRenderOpen(false)}
+        title="Rendered PDF"
+        className="max-w-5xl"
+      >
+        {!renderPdfUrl ? (
+          <div className="text-sm text-neutral-500 dark:text-neutral-400">
+            No PDF uploaded for this version yet.
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="text-xs text-neutral-500 dark:text-neutral-400">
+                {ticket.id} · {ticket.assignedTo} · {version.version}
+              </div>
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  void exportRenderedFormPdf(ticket, version).catch((err: any) => {
+                    pushToast({ title: 'Export failed', message: err?.message || 'Unable to export rendered PDF', variant: 'danger' })
+                  })
+                }}
+              >
+                <FileDown size={16} /> Download Rendered PDF
+              </Button>
+            </div>
+            <RenderedPdfPreview
+              pdfUrl={renderPdfUrl}
+              fields={version.fields}
+              ticket={ticket}
+            />
+          </div>
+        )}
+      </Modal>
     </div>
   )
 }
