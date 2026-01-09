@@ -1,6 +1,6 @@
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useEffect, useState } from 'react'
-import { LayoutGrid, FileText, PencilRuler, Smartphone, RefreshCw, ClipboardCheck, Moon, Sun, Globe, Wifi, WifiOff, Command, Shield, User, Users, ChevronLeft, ChevronRight, ChevronDown, LogOut } from 'lucide-react'
+import { LayoutGrid, FileText, PencilRuler, Smartphone, RefreshCw, ClipboardCheck, Moon, Sun, Globe, Wifi, WifiOff, Command, Shield, User, Users, ChevronLeft, ChevronRight, ChevronDown, LogOut, Sparkles } from 'lucide-react'
 import { useAppStore } from '@/shared/state/useAppStore'
 import { cn } from '@/shared/ui/cn'
 import Modal from '@/shared/ui/Modal'
@@ -71,8 +71,10 @@ export default function AppShell() {
             sidebarCollapsed ? 'px-2 justify-between gap-2' : 'px-3 md:px-4 gap-3'
           )}
         >
-          <div className="h-10 w-10 rounded-2xl border border-neutral-200 dark:border-neutral-800 flex items-center justify-center font-semibold">
-            RF
+          <div className="h-10 w-10 rounded-2xl border border-neutral-200 dark:border-neutral-800 overflow-hidden">
+            <div className="h-full w-full bg-gradient-to-br from-cyan-400/80 via-blue-500/70 to-fuchsia-500/70 text-white flex items-center justify-center">
+              <Sparkles size={18} />
+            </div>
           </div>
           {!sidebarCollapsed && (
             <div className="hidden md:block leading-tight">
