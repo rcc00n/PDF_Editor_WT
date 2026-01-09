@@ -14,6 +14,7 @@ export default function PdfPageCanvas({ dataUrl, page, className, onMeta }: Prop
   const wrapRef = useRef<HTMLDivElement | null>(null)
   const onMetaRef = useRef<typeof onMeta>(onMeta)
   const [err, setErr] = useState<string | null>(null)
+  const [wrapWidth, setWrapWidth] = useState(0)
 
   const isData = useMemo(() => !!dataUrl && dataUrl.startsWith('data:'), [dataUrl])
   const bytes = useMemo(() => (dataUrl && isData ? dataUrlToBytes(dataUrl) : undefined), [dataUrl, isData])
@@ -23,12 +24,23 @@ export default function PdfPageCanvas({ dataUrl, page, className, onMeta }: Prop
   }, [onMeta])
 
   useEffect(() => {
+    const wrap = wrapRef.current
+    if (!wrap) return
+    const update = () => setWrapWidth(wrap.clientWidth)
+    update()
+    if (typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(() => update())
+    observer.observe(wrap)
+    return () => observer.disconnect()
+  }, [])
+
+  useEffect(() => {
     let cancelled = false
     async function run() {
       setErr(null)
       const canvas = canvasRef.current
       const wrap = wrapRef.current
-      if (!canvas || !wrap || !dataUrl) return
+      if (!canvas || !wrap || !dataUrl || !wrapWidth) return
 
       try {
         const pdfjs = await import('pdfjs-dist')
@@ -49,18 +61,22 @@ export default function PdfPageCanvas({ dataUrl, page, className, onMeta }: Prop
         const pdfPage = await pdf.getPage(p)
         if (cancelled) return
 
-        const desiredWidth = Math.max(320, wrap.clientWidth - 2)
+        const desiredWidth = Math.max(320, wrapWidth - 2)
         const viewport1 = pdfPage.getViewport({ scale: 1 })
         const scale = desiredWidth / viewport1.width
         const viewport = pdfPage.getViewport({ scale })
+        const dpr = window.devicePixelRatio || 1
+        const renderViewport = pdfPage.getViewport({ scale: scale * dpr })
 
         const context = canvas.getContext('2d')
         if (!context) return
 
-        canvas.width = Math.floor(viewport.width)
-        canvas.height = Math.floor(viewport.height)
+        canvas.width = Math.floor(renderViewport.width)
+        canvas.height = Math.floor(renderViewport.height)
+        canvas.style.width = `${Math.floor(viewport.width)}px`
+        canvas.style.height = `${Math.floor(viewport.height)}px`
 
-        await pdfPage.render({ canvasContext: context, viewport }).promise
+        await pdfPage.render({ canvasContext: context, viewport: renderViewport }).promise
       } catch (e: any) {
         setErr(e?.message || 'PDF render error')
       }
@@ -69,7 +85,7 @@ export default function PdfPageCanvas({ dataUrl, page, className, onMeta }: Prop
     return () => {
       cancelled = true
     }
-  }, [bytes, dataUrl, isData, page])
+  }, [bytes, dataUrl, isData, page, wrapWidth])
 
   return (
     <div ref={wrapRef} className={cn('w-full', className)}>

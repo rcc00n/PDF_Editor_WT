@@ -8,12 +8,14 @@ export default function Modal({
   title,
   onClose,
   children,
-  className
+  className,
+  bodyClassName
 }: PropsWithChildren<{
   open: boolean
   title?: string
   onClose: () => void
   className?: string
+  bodyClassName?: string
 }>) {
   if (!open) return null
   return createPortal(
@@ -27,7 +29,7 @@ export default function Modal({
               <X size={18} />
             </button>
           </div>
-          <div className="p-4">{children}</div>
+          <div className={cn('p-4', bodyClassName)}>{children}</div>
         </div>
       </div>
     </div>,
