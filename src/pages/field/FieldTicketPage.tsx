@@ -6,12 +6,15 @@ import { Card, CardBody } from '@/shared/ui/Card'
 import Badge from '@/shared/ui/Badge'
 import Input from '@/shared/ui/Input'
 import Textarea from '@/shared/ui/Textarea'
+import Modal from '@/shared/ui/Modal'
 import { useAppStore } from '@/shared/state/useAppStore'
 import type { Employee, Field } from '@/entities/types'
 import { dateTimeShort } from '@/shared/lib/format'
 import { downloadDataUrl } from '@/shared/lib/download'
+import { exportRenderedFormPdf } from '@/features/export/exporters'
+import RenderedPdfPreview from '@/features/pdf/RenderedPdfPreview'
 import SignaturePad from '@/features/field/SignaturePad'
-import { ArrowLeft, Save, Send, ImagePlus, FileDown } from 'lucide-react'
+import { ArrowLeft, Save, Send, ImagePlus, FileDown, Eye } from 'lucide-react'
 
 const DEFAULT_FONT_SIZE = 12
 
@@ -29,6 +32,7 @@ export default function FieldTicketPage() {
   const uploadAttachment = useAppStore(s => s.uploadAttachment)
   const pushToast = useAppStore(s => s.pushToast)
   const attachmentInputRef = useRef<HTMLInputElement | null>(null)
+  const [renderOpen, setRenderOpen] = useState(false)
 
   const ctx = useMemo(() => {
     if (!ticket) return null
@@ -50,6 +54,7 @@ export default function FieldTicketPage() {
   }
 
   const { form, version, fields } = ctx
+  const renderPdfUrl = version.pdf?.dataUrl ?? version.pdf?.url
 
   return (
     <div className="pb-10">
@@ -63,6 +68,14 @@ export default function FieldTicketPage() {
             </Button>
             <Button variant="secondary" onClick={() => void saveDraft(ticket.id)}>
               <Save size={16} /> Save Draft
+            </Button>
+            <Button
+              variant="secondary"
+              disabled={!renderPdfUrl}
+              onClick={() => setRenderOpen(true)}
+              title={renderPdfUrl ? 'View rendered PDF' : 'No PDF uploaded yet'}
+            >
+              <Eye size={16} /> View Rendered PDF
             </Button>
             <Button onClick={() => void submitTicket(ticket.id)}>
               <Send size={16} /> Submit (Queued)
@@ -209,6 +222,42 @@ export default function FieldTicketPage() {
           )}
         </div>
       </div>
+
+      <Modal
+        open={renderOpen}
+        onClose={() => setRenderOpen(false)}
+        title="Rendered PDF"
+        className="max-w-5xl"
+      >
+        {!renderPdfUrl ? (
+          <div className="text-sm text-neutral-500 dark:text-neutral-400">
+            No PDF uploaded for this version yet.
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="text-xs text-neutral-500 dark:text-neutral-400">
+                {ticket.id} · {ticket.assignedTo} · {version.version}
+              </div>
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  void exportRenderedFormPdf(ticket, version).catch((err: any) => {
+                    pushToast({ title: 'Export failed', message: err?.message || 'Unable to export rendered PDF', variant: 'danger' })
+                  })
+                }}
+              >
+                <FileDown size={16} /> Download Rendered PDF
+              </Button>
+            </div>
+            <RenderedPdfPreview
+              pdfUrl={renderPdfUrl}
+              fields={version.fields}
+              ticket={ticket}
+            />
+          </div>
+        )}
+      </Modal>
     </div>
   )
 }
