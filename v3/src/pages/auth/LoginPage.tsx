@@ -20,8 +20,8 @@ export default function LoginPage() {
         <div className="absolute bottom-0 left-1/4 h-64 w-64 rounded-full bg-emerald-400/15 blur-3xl" />
       </div>
 
-      <div className="relative z-10 mx-auto flex min-h-screen w-full max-w-md flex-col items-center justify-center gap-6 py-12">
-        <div className="flex flex-col items-center gap-3">
+      <div className="relative z-10 mx-auto flex min-h-screen w-full max-w-md flex-col items-center justify-center gap-8 py-14">
+        <div className="flex flex-col items-center gap-4">
           <div className="h-14 w-14 rounded-2xl border border-neutral-200 dark:border-neutral-800 overflow-hidden">
             <div className="h-full w-full bg-gradient-to-br from-cyan-400/80 via-blue-500/70 to-fuchsia-500/70 text-white flex items-center justify-center">
               <Sparkles size={22} />
@@ -31,9 +31,9 @@ export default function LoginPage() {
         </div>
 
         <Card className="w-full">
-          <CardBody>
+          <CardBody className="px-6 py-6 sm:px-7 sm:py-7">
             <form
-              className="space-y-3"
+              className="space-y-5"
               onSubmit={async (e) => {
                 e.preventDefault()
                 setError(null)
@@ -48,12 +48,12 @@ export default function LoginPage() {
               }}
             >
               <div>
-                <div className="text-xs text-neutral-500 dark:text-neutral-400 mb-1">Email</div>
-                <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="username" />
+                <div className="text-xs text-neutral-500 dark:text-neutral-400 mb-2">Email</div>
+                <Input className="h-11" type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="username" />
               </div>
               <div>
-                <div className="text-xs text-neutral-500 dark:text-neutral-400 mb-1">Password</div>
-                <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" />
+                <div className="text-xs text-neutral-500 dark:text-neutral-400 mb-2">Password</div>
+                <Input className="h-11" type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" />
               </div>
               {error && <div className="text-sm text-red-600 dark:text-red-300">{error}</div>}
               <Button type="submit" className="w-full" disabled={!email || !password || loading}>
