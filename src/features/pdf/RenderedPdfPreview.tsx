@@ -31,7 +31,7 @@ export default function RenderedPdfPreview({ pdfUrl, fields, ticket }: Props) {
   }
 
   const preview = (fullscreen: boolean) => (
-    <div className={fullscreen ? 'flex h-full flex-col gap-3' : 'space-y-3'}>
+    <div className={fullscreen ? 'flex h-full min-h-0 flex-col gap-3' : 'space-y-3'}>
       <div className="flex items-center justify-between gap-3 text-xs text-neutral-500 dark:text-neutral-400">
         <div>Page {page} / {numPages}</div>
         <div className="flex items-center gap-2">
@@ -61,7 +61,7 @@ export default function RenderedPdfPreview({ pdfUrl, fields, ticket }: Props) {
         </div>
       </div>
 
-      <div className={fullscreen ? 'flex-1 overflow-auto' : ''}>
+      <div className={fullscreen ? 'flex-1 min-h-0 overflow-auto rf-scrollbar' : ''}>
         <div className="relative">
           <PdfPageCanvas
             dataUrl={pdfUrl}
@@ -90,7 +90,7 @@ export default function RenderedPdfPreview({ pdfUrl, fields, ticket }: Props) {
         onClose={() => setFullOpen(false)}
         title="Rendered PDF"
         className="max-w-none w-[96vw] h-[96vh] flex flex-col"
-        bodyClassName="flex-1"
+        bodyClassName="flex-1 min-h-0 overflow-hidden"
       >
         {preview(true)}
       </Modal>
