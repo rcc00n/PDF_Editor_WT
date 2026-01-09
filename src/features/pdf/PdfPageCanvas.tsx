@@ -7,9 +7,10 @@ type Props = {
   page: number
   className?: string
   onMeta?: (meta: { numPages: number }) => void
+  refreshKey?: string | number
 }
 
-export default function PdfPageCanvas({ dataUrl, page, className, onMeta }: Props) {
+export default function PdfPageCanvas({ dataUrl, page, className, onMeta, refreshKey }: Props) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const wrapRef = useRef<HTMLDivElement | null>(null)
   const onMetaRef = useRef<typeof onMeta>(onMeta)
@@ -85,7 +86,7 @@ export default function PdfPageCanvas({ dataUrl, page, className, onMeta }: Prop
     return () => {
       cancelled = true
     }
-  }, [bytes, dataUrl, isData, page, wrapWidth])
+  }, [bytes, dataUrl, isData, page, wrapWidth, refreshKey])
 
   return (
     <div ref={wrapRef} className={cn('w-full', className)}>
