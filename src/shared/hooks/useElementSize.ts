@@ -6,13 +6,14 @@ export function useElementSize<T extends HTMLElement>() {
 
   useEffect(() => {
     if (!el) return
-    const ro = new ResizeObserver(() => {
+    const measure = () => {
       const r = el.getBoundingClientRect()
-      setSize({ width: r.width, height: r.height })
-    })
+      const next = { width: Math.round(r.width), height: Math.round(r.height) }
+      setSize((prev) => (prev.width === next.width && prev.height === next.height ? prev : next))
+    }
+    const ro = new ResizeObserver(measure)
     ro.observe(el)
-    const r = el.getBoundingClientRect()
-    setSize({ width: r.width, height: r.height })
+    measure()
     return () => ro.disconnect()
   }, [el])
 

@@ -68,6 +68,7 @@ export default function BuilderPage() {
   const selected = useMemo(() => version?.fields.find(f => f.id === selectedId) ?? null, [version, selectedId])
 
   const { ref: stageRef, size } = useElementSize<HTMLDivElement>()
+  const stageWidthKey = Math.round(size.width)
   const grid = getGridStep(size)
   const showProperties = propertiesOpen && !canvasFocus
 
@@ -432,7 +433,7 @@ export default function BuilderPage() {
                     key={canvasFocus ? 'focus' : 'normal'}
                     dataUrl={pdf.dataUrl ?? pdf.url}
                     page={page}
-                    refreshKey={`${propertiesOpen}-${size.width}-${size.height}`}
+                    refreshKey={`${propertiesOpen}-${stageWidthKey}`}
                     onMeta={(m) => setNumPages(m.numPages)}
                   />
 
