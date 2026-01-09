@@ -95,7 +95,7 @@ export default function PdfPageCanvas({ dataUrl, page, className, onMeta, refres
           PDF preview unavailable: {err}
         </div>
       ) : (
-        <canvas ref={canvasRef} className="w-full rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white" />
+        <canvas ref={canvasRef} className="block w-full rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white" />
       )}
     </div>
   )
