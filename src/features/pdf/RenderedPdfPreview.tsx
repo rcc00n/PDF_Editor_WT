@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react'
+import { Maximize2, Minimize2 } from 'lucide-react'
 import type { Field, Ticket } from '@/entities/types'
 import PdfPageCanvas from '@/features/pdf/PdfPageCanvas'
+import Modal from '@/shared/ui/Modal'
 
 const DEFAULT_FONT_SIZE = 12
 
@@ -13,6 +15,7 @@ type Props = {
 export default function RenderedPdfPreview({ pdfUrl, fields, ticket }: Props) {
   const [page, setPage] = useState(1)
   const [numPages, setNumPages] = useState(1)
+  const [fullOpen, setFullOpen] = useState(false)
 
   const pageFields = useMemo(
     () => fields.filter((f) => f.page === page),
@@ -27,8 +30,8 @@ export default function RenderedPdfPreview({ pdfUrl, fields, ticket }: Props) {
     )
   }
 
-  return (
-    <div className="space-y-3">
+  const preview = (fullscreen: boolean) => (
+    <div className={fullscreen ? 'flex h-full flex-col gap-3' : 'space-y-3'}>
       <div className="flex items-center justify-between gap-3 text-xs text-neutral-500 dark:text-neutral-400">
         <div>Page {page} / {numPages}</div>
         <div className="flex items-center gap-2">
@@ -46,26 +49,52 @@ export default function RenderedPdfPreview({ pdfUrl, fields, ticket }: Props) {
           >
             &gt;
           </button>
+          <button
+            className="rf-focus rounded-xl p-1 text-sm hover:bg-neutral-100 dark:hover:bg-neutral-900"
+            onClick={() => setFullOpen((s) => !s)}
+            type="button"
+            title={fullscreen ? 'Exit full screen' : 'Full screen'}
+            aria-label={fullscreen ? 'Exit full screen' : 'Full screen'}
+          >
+            {fullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+          </button>
         </div>
       </div>
 
-      <div className="relative">
-        <PdfPageCanvas
-          dataUrl={pdfUrl}
-          page={page}
-          onMeta={(meta) => {
-            setNumPages(meta.numPages)
-            setPage((p) => Math.min(p, meta.numPages))
-          }}
-        />
+      <div className={fullscreen ? 'flex-1 overflow-auto' : ''}>
+        <div className="relative">
+          <PdfPageCanvas
+            dataUrl={pdfUrl}
+            page={page}
+            onMeta={(meta) => {
+              setNumPages(meta.numPages)
+              setPage((p) => Math.min(p, meta.numPages))
+            }}
+          />
 
-        <div className="absolute inset-0 pointer-events-none">
-          {pageFields.map((field) => (
-            <RenderedField key={field.id} field={field} ticket={ticket} />
-          ))}
+          <div className="absolute inset-0 pointer-events-none">
+            {pageFields.map((field) => (
+              <RenderedField key={field.id} field={field} ticket={ticket} />
+            ))}
+          </div>
         </div>
       </div>
     </div>
+  )
+
+  return (
+    <>
+      {!fullOpen && preview(false)}
+      <Modal
+        open={fullOpen}
+        onClose={() => setFullOpen(false)}
+        title="Rendered PDF"
+        className="max-w-none w-[96vw] h-[96vh] flex flex-col"
+        bodyClassName="flex-1"
+      >
+        {preview(true)}
+      </Modal>
+    </>
   )
 }
 
@@ -90,7 +119,7 @@ function RenderedField({ field, ticket }: { field: Field; ticket: Ticket }) {
         {signatureSrc ? (
           <img src={signatureSrc} alt="signature" className="h-full w-full object-contain" />
         ) : (
-          <div className="px-1 py-0.5 text-neutral-900 dark:text-neutral-100 break-words">
+          <div className="px-1 py-0.5 text-neutral-900 break-words">
             {signer}
           </div>
         )}
@@ -103,7 +132,7 @@ function RenderedField({ field, ticket }: { field: Field; ticket: Ticket }) {
     if (!label) return null
     return (
       <div
-        className="absolute px-1 py-0.5 text-neutral-900 dark:text-neutral-100 overflow-hidden break-words"
+        className="absolute px-1 py-0.5 text-neutral-900 overflow-hidden break-words"
         style={style}
       >
         {label}
@@ -115,7 +144,7 @@ function RenderedField({ field, ticket }: { field: Field; ticket: Ticket }) {
     const checked = Boolean(value)
     if (!checked) return null
     return (
-      <div className="absolute flex items-center justify-center font-semibold text-neutral-900 dark:text-neutral-100" style={style}>
+      <div className="absolute flex items-center justify-center font-semibold text-neutral-900" style={style}>
         X
       </div>
     )
@@ -126,7 +155,7 @@ function RenderedField({ field, ticket }: { field: Field; ticket: Ticket }) {
 
   return (
     <div
-      className="absolute px-1 py-0.5 text-neutral-900 dark:text-neutral-100 overflow-hidden whitespace-pre-wrap break-words"
+      className="absolute px-1 py-0.5 text-neutral-900 overflow-hidden whitespace-pre-wrap break-words"
       style={style}
     >
       {text}
