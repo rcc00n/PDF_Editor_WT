@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Ticket } from '@/entities/types'
-import { extractRig, filterTickets } from './ticketFilters'
+import { extractRig, filterTickets, groupTicketsByForm } from './ticketFilters'
 
 const baseTicket: Ticket = {
   id: 'FT-0001',
@@ -84,5 +84,27 @@ describe('filterTickets', () => {
 
   it('filters by assigned date range', () => {
     expect(filterTickets(tickets, { from: '2024-01-11', to: '2024-01-11' })).toEqual([tickets[1]])
+  })
+})
+
+describe('groupTicketsByForm', () => {
+  it('groups by form and sorts by name then date', () => {
+    const forms = [
+      { id: 'f-2', name: 'Beta', versions: [] },
+      { id: 'f-1', name: 'Alpha', versions: [] }
+    ]
+
+    const grouped = groupTicketsByForm(
+      [
+        makeTicket({ id: 'FT-1', formId: 'f-1', assignedAt: '2024-01-10T10:00:00.000Z' }),
+        makeTicket({ id: 'FT-2', formId: 'f-1', assignedAt: '2024-01-11T10:00:00.000Z' }),
+        makeTicket({ id: 'FT-3', formId: 'f-2', assignedAt: '2024-01-09T10:00:00.000Z' }),
+        makeTicket({ id: 'FT-4', formId: 'missing', assignedAt: '2024-01-12T10:00:00.000Z' })
+      ],
+      forms
+    )
+
+    expect(grouped.map((group) => group.name)).toEqual(['Alpha', 'Beta', 'Unknown Form'])
+    expect(grouped[0].tickets.map((ticket) => ticket.id)).toEqual(['FT-2', 'FT-1'])
   })
 })
