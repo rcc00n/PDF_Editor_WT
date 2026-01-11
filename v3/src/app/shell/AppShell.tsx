@@ -271,7 +271,7 @@ export default function AppShell() {
   )
 }
 
-function titleForPath(path: string) {
+export function titleForPath(path: string) {
   if (path.startsWith('/dashboard')) return 'Dashboard'
   if (path.startsWith('/forms')) return 'Forms'
   if (path.startsWith('/builder')) return 'Form Builder'
@@ -282,7 +282,7 @@ function titleForPath(path: string) {
   return 'RelayForms'
 }
 
-function formatTime(iso?: string) {
+export function formatTime(iso?: string) {
   if (!iso) return ''
   const d = new Date(iso)
   return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
