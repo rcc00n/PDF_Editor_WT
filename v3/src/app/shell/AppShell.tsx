@@ -22,8 +22,6 @@ export default function AppShell() {
   const setRole = useAppStore(s => s.setRole)
   const apiEnabled = useAppStore(s => s.apiEnabled)
   const user = useAppStore(s => s.user)
-  const sidebarCollapsed = useAppStore(s => s.sidebarCollapsed)
-  const setSidebarCollapsed = useAppStore(s => s.setSidebarCollapsed)
   const logout = useAppStore(s => s.logout)
   const online = useAppStore(s => s.online)
   const forcedOffline = useAppStore(s => s.forcedOffline)
@@ -64,13 +62,12 @@ export default function AppShell() {
       <aside
         className={cn(
           'hidden md:flex md:flex-col shrink-0 border-r border-neutral-200 dark:border-neutral-800 bg-white/80 dark:bg-neutral-950/70 backdrop-blur',
-          sidebarCollapsed ? 'md:w-[88px]' : 'md:w-[240px]'
+          'md:w-[240px]'
         )}
       >
         <div
           className={cn(
-            'h-16 flex items-center border-b border-neutral-200 dark:border-neutral-800',
-            sidebarCollapsed ? 'px-2 justify-between gap-2' : 'px-3 md:px-4 gap-3'
+            'h-16 flex items-center border-b border-neutral-200 dark:border-neutral-800 px-3 md:px-4 gap-3'
           )}
         >
           <div className="h-10 w-10 rounded-2xl border border-neutral-200 dark:border-neutral-800 overflow-hidden">
@@ -78,23 +75,10 @@ export default function AppShell() {
               <Sparkles size={18} />
             </div>
           </div>
-          {!sidebarCollapsed && (
-            <div className="hidden md:block leading-tight">
-              <div className="font-semibold">RelayForms</div>
-              <div className="text-xs text-neutral-500 dark:text-neutral-400">Offline-ready</div>
-            </div>
-          )}
-          <button
-            className={cn(
-              'rf-focus rounded-xl p-2 hover:bg-neutral-100 dark:hover:bg-neutral-900',
-              !sidebarCollapsed && 'ml-auto'
-            )}
-            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-            title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-            aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          >
-            {sidebarCollapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
-          </button>
+          <div className="hidden md:block leading-tight">
+            <div className="font-semibold">RelayForms</div>
+            <div className="text-xs text-neutral-500 dark:text-neutral-400">Offline-ready</div>
+          </div>
         </div>
 
         <nav className="p-2 md:p-3 flex flex-col gap-1">
@@ -110,32 +94,30 @@ export default function AppShell() {
                   cn(
                     'rf-focus flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-medium transition',
                     'hover:bg-neutral-100 dark:hover:bg-neutral-900',
-                    isActive && 'bg-neutral-100 dark:bg-neutral-900',
-                    sidebarCollapsed && 'justify-center px-2'
+                    isActive && 'bg-neutral-100 dark:bg-neutral-900'
                   )
                 }
               >
                 <Icon size={18} className="shrink-0" />
-                {!sidebarCollapsed && <span className="hidden md:block">{item.label}</span>}
+                <span className="hidden md:block">{item.label}</span>
               </NavLink>
             )
           })}
 
           {isAdmin && (
-            <div className={cn('mt-2 hidden md:block border-t border-neutral-200 dark:border-neutral-800 pt-3', sidebarCollapsed && 'px-0')}>
+            <div className="mt-2 hidden md:block border-t border-neutral-200 dark:border-neutral-800 pt-3">
               <button
                 className={cn(
-                  'rf-focus w-full flex items-center justify-between gap-3 rounded-2xl px-3 py-2.5 text-sm font-medium hover:bg-neutral-100 dark:hover:bg-neutral-900',
-                  sidebarCollapsed && 'justify-center px-2'
+                  'rf-focus w-full flex items-center justify-between gap-3 rounded-2xl px-3 py-2.5 text-sm font-medium hover:bg-neutral-100 dark:hover:bg-neutral-900'
                 )}
                 onClick={() => navigate('/forms')}
                 title="Open Form Builder"
               >
                 <span className="flex items-center gap-3">
                   <PencilRuler size={18} />
-                  {!sidebarCollapsed && 'Builder'}
+                  Builder
                 </span>
-                {!sidebarCollapsed && <span className="text-xs text-neutral-500 dark:text-neutral-400">→</span>}
+                <span className="text-xs text-neutral-500 dark:text-neutral-400">→</span>
               </button>
             </div>
           )}

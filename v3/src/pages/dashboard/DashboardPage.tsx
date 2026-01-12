@@ -20,22 +20,8 @@ export default function DashboardPage() {
   const queue = useAppStore(s => s.queue)
   const lastSync = useAppStore(s => s.lastSyncSuccess)
   const canEdit = role === 'admin'
-  const [pendingOpen, setPendingOpen] = useState(false)
-  const [syncedOpen, setSyncedOpen] = useState(false)
+  const [dailyOpen, setDailyOpen] = useState(false)
   const [formsOpen, setFormsOpen] = useState(false)
-
-  const stats = useMemo(() => {
-    const pending = queue.filter(q => q.status === 'pending').length
-    const inProgress = queue.filter(q => q.status === 'in_progress').length
-    const failed = queue.filter(q => q.status === 'failed').length
-    const now = new Date()
-    const sameDay = (iso: string) => {
-      const d = new Date(iso)
-      return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate()
-    }
-    const syncedToday = tickets.filter(t => t.status === 'synced' && sameDay(t.updatedAt)).length
-    return { pending, inProgress, failed, syncedToday }
-  }, [queue, tickets])
 
   const dailyTickets = useMemo(() => {
     const now = new Date()
@@ -49,10 +35,24 @@ export default function DashboardPage() {
       .sort((a, b) => b.assignedAt.localeCompare(a.assignedAt))
   }, [tickets])
 
+  const stats = useMemo(() => {
+    let pending = 0
+    let inProgress = 0
+    let failed = 0
+    let syncedToday = 0
+    for (const t of dailyTickets) {
+      if (t.status === 'pending' || t.status === 'queued' || t.status === 'in_progress') pending += 1
+      if (t.status === 'in_progress') inProgress += 1
+      if (t.status === 'error') failed += 1
+      if (t.status === 'synced') syncedToday += 1
+    }
+    return { pending, inProgress, failed, syncedToday }
+  }, [dailyTickets])
+
   const pendingTickets = dailyTickets.filter(t => t.status === 'pending' || t.status === 'queued' || t.status === 'in_progress')
   const syncedTickets = dailyTickets.filter(t => t.status === 'synced')
-  const pendingVisible = pendingOpen ? pendingTickets : pendingTickets.slice(0, 2)
-  const syncedVisible = syncedOpen ? syncedTickets : syncedTickets.slice(0, 2)
+  const pendingVisible = dailyOpen ? pendingTickets : pendingTickets.slice(0, 2)
+  const syncedVisible = dailyOpen ? syncedTickets : syncedTickets.slice(0, 2)
   const formsVisible = formsOpen ? forms : forms.slice(0, 15)
 
   return (
@@ -126,11 +126,11 @@ export default function DashboardPage() {
               </div>
               <button
                 className="rf-focus rounded-xl p-2 hover:bg-neutral-100 dark:hover:bg-neutral-900"
-                onClick={() => setPendingOpen((v) => !v)}
-                aria-expanded={pendingOpen}
-                title={pendingOpen ? 'Collapse list' : 'Expand list'}
+                onClick={() => setDailyOpen((v) => !v)}
+                aria-expanded={dailyOpen}
+                title={dailyOpen ? 'Collapse lists' : 'Expand lists'}
               >
-                <ChevronDown size={18} className={cn('transition', pendingOpen && 'rotate-180')} />
+                <ChevronDown size={18} className={cn('transition', dailyOpen && 'rotate-180')} />
               </button>
             </div>
           </CardHeader>
@@ -164,14 +164,6 @@ export default function DashboardPage() {
                 <CardTitle>Synced Tickets</CardTitle>
                 <CardSub>{syncedTickets.length} synced today</CardSub>
               </div>
-              <button
-                className="rf-focus rounded-xl p-2 hover:bg-neutral-100 dark:hover:bg-neutral-900"
-                onClick={() => setSyncedOpen((v) => !v)}
-                aria-expanded={syncedOpen}
-                title={syncedOpen ? 'Collapse list' : 'Expand list'}
-              >
-                <ChevronDown size={18} className={cn('transition', syncedOpen && 'rotate-180')} />
-              </button>
             </div>
           </CardHeader>
           <CardBody className="pt-1">
