@@ -7,6 +7,7 @@ import Badge from '@/shared/ui/Badge'
 import { useAppStore } from '@/shared/state/useAppStore'
 import { dateTimeShort } from '@/shared/lib/format'
 import { resolveAvailableForms } from '@/shared/lib/access'
+import { extractRig } from '@/shared/lib/ticketFilters'
 import { Plus, ArrowRight, ChevronDown } from 'lucide-react'
 import { cn } from '@/shared/ui/cn'
 import type { TicketStatus } from '@/entities/types'
@@ -77,6 +78,8 @@ export default function DashboardPage() {
   const pendingVisible = dailyOpen ? pendingTickets : pendingTickets.slice(0, 2)
   const syncedVisible = dailyOpen ? syncedTickets : syncedTickets.slice(0, 2)
   const formsVisible = formsOpen ? availableForms : availableForms.slice(0, 15)
+  const pendingReview = tickets.filter((t) => t.status === 'synced' && t.approvalState !== 'approved').slice(0, 6)
+  const attentionTickets = tickets.filter((t) => t.status === 'error' || t.status === 'queued' || t.status === 'pending').slice(0, 6)
 
   return (
     <div className="pb-10">
@@ -186,6 +189,78 @@ export default function DashboardPage() {
                         </div>
                       </div>
                       <Badge tone="success">synced</Badge>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </CardBody>
+        </Card>
+      </div>
+
+      <div className="px-4 mt-4 sm:px-6 sm:mt-6 grid grid-cols-1 xl:grid-cols-2 gap-4">
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <CardTitle>Pending Review</CardTitle>
+                <CardSub>{pendingReview.length} awaiting approval</CardSub>
+              </div>
+              <Button variant="secondary" size="sm" onClick={() => nav('/review')}>
+                Open Review
+              </Button>
+            </div>
+          </CardHeader>
+          <CardBody>
+            {pendingReview.length === 0 ? (
+              <div className="text-sm text-neutral-500 dark:text-neutral-400">No tickets waiting for approval.</div>
+            ) : (
+              <div className="flex flex-col gap-2">
+                {pendingReview.map((t) => (
+                  <Link key={t.id} to={`/review/${t.id}`} className="rf-focus rounded-2xl border border-neutral-200 dark:border-neutral-800 p-3 hover:bg-neutral-50 dark:hover:bg-neutral-900">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="font-medium truncate">{t.id} — {t.title}</div>
+                        <div className="text-xs text-neutral-500 dark:text-neutral-400 truncate">
+                          {t.assignedTo} · {dateTimeShort(t.assignedAt)} · Rig: {extractRig(t) || '—'}
+                        </div>
+                      </div>
+                      <Badge tone="warning">pending</Badge>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </CardBody>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <CardTitle>Needs Attention</CardTitle>
+                <CardSub>Errors and queued submissions</CardSub>
+              </div>
+              <Button variant="secondary" size="sm" onClick={() => nav('/field')}>
+                View Forms
+              </Button>
+            </div>
+          </CardHeader>
+          <CardBody>
+            {attentionTickets.length === 0 ? (
+              <div className="text-sm text-neutral-500 dark:text-neutral-400">Nothing needs attention.</div>
+            ) : (
+              <div className="flex flex-col gap-2">
+                {attentionTickets.map((t) => (
+                  <Link key={t.id} to={`/field/ticket/${t.id}`} className="rf-focus rounded-2xl border border-neutral-200 dark:border-neutral-800 p-3 hover:bg-neutral-50 dark:hover:bg-neutral-900">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="font-medium truncate">{t.id} — {t.title}</div>
+                        <div className="text-xs text-neutral-500 dark:text-neutral-400 truncate">
+                          {t.assignedTo} · {dateTimeShort(t.assignedAt)}
+                        </div>
+                      </div>
+                      <Badge tone={t.status === 'error' ? 'danger' : 'warning'}>{t.status}</Badge>
                     </div>
                   </Link>
                 ))}

@@ -381,7 +381,7 @@ export default function BuilderPage() {
         </div>
 
         {/* Properties */}
-        <Card>
+        <Card className="xl:sticky xl:top-6">
           <CardBody>
             <div className="flex items-center justify-between gap-2">
               <div className="text-sm font-semibold">Field Properties</div>
@@ -460,6 +460,7 @@ function PageCanvas({
             page={pageIndex}
             refreshKey={stageWidthKey}
             onMeta={onMeta}
+            className="min-h-[260px]"
           />
         ) : (
           <div
