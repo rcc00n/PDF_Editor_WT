@@ -9,7 +9,6 @@ import { dateTimeShort } from '@/shared/lib/format'
 import { Plus, ArrowRight, ChevronDown } from 'lucide-react'
 import { cn } from '@/shared/ui/cn'
 import type { TicketStatus } from '@/entities/types'
-import AdminReviewPanel from '@/pages/review/AdminReviewPanel'
 
 export default function DashboardPage() {
   const nav = useNavigate()
@@ -21,11 +20,6 @@ export default function DashboardPage() {
   const canEdit = role === 'admin'
   const [dailyOpen, setDailyOpen] = useState(false)
   const [formsOpen, setFormsOpen] = useState(false)
-
-  const isInteractive = (target: EventTarget | null) => {
-    if (!(target instanceof HTMLElement)) return false
-    return Boolean(target.closest('a, button, input, select, textarea'))
-  }
 
   const dailyTickets = useMemo(() => {
     const now = new Date()
@@ -170,12 +164,6 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      {canEdit && (
-        <div className="px-4 mt-4 sm:px-6 sm:mt-6">
-          <AdminReviewPanel />
-        </div>
-      )}
-
       <div className="px-4 mt-4 sm:px-6 sm:mt-6">
         <Card>
           <CardHeader>
@@ -213,25 +201,7 @@ export default function DashboardPage() {
                   {formsVisible.map((f) => {
                     const v = f.versions.find(v => v.status === 'active') ?? f.versions[0]
                     return (
-                      <tr
-                        key={f.id}
-                        className={cn(
-                          'border-t border-neutral-200 dark:border-neutral-800',
-                          'cursor-pointer hover:bg-neutral-50 dark:hover:bg-neutral-900'
-                        )}
-                        role="button"
-                        tabIndex={0}
-                        onClick={(e) => {
-                          if (isInteractive(e.target)) return
-                          nav(`/builder/${f.id}`)
-                        }}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' || e.key === ' ') {
-                            e.preventDefault()
-                            nav(`/builder/${f.id}`)
-                          }
-                        }}
-                      >
+                      <tr key={f.id} className="border-t border-neutral-200 dark:border-neutral-800">
                         <td className="py-2">
                           <Link className="rf-focus font-medium hover:underline" to={`/builder/${f.id}`}>
                             {f.name}

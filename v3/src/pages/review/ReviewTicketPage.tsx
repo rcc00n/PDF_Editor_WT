@@ -33,7 +33,7 @@ export default function ReviewTicketPage() {
       <div className="p-6">
         <div className="text-sm text-neutral-500 dark:text-neutral-400">Ticket not found.</div>
         <div className="mt-3">
-          <Link to="/dashboard" className="underline">Back</Link>
+          <Link to="/review" className="underline">Back</Link>
         </div>
       </div>
     )
@@ -49,7 +49,7 @@ export default function ReviewTicketPage() {
         subtitle={`${form.name} · ${ticket.id} · ${ticket.title}`}
         right={
           <>
-            <Button variant="secondary" onClick={() => nav('/dashboard')}>
+            <Button variant="secondary" onClick={() => nav('/review')}>
               <ArrowLeft size={16} /> Back
             </Button>
             <Button variant="secondary" onClick={() => exportTicketPdf(ticket, form, version)}>
@@ -92,62 +92,22 @@ export default function ReviewTicketPage() {
               <div className="text-sm text-neutral-500 dark:text-neutral-400">{ticket.id} · {ticket.title}</div>
 
               <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-                {version.fields.map((f) => {
-                  if (f.type === 'signature') {
-                    const sig = signatureFromValue(ticket.values[f.key]) ?? ticket.signature ?? null
-                    const src = signatureSrc(sig)
-                    return (
-                      <div key={f.id} className="rounded-2xl border border-neutral-200 dark:border-neutral-800 p-3">
-                        <div className="text-xs text-neutral-500 dark:text-neutral-400">{f.label}</div>
-                        <div className="mt-1 font-medium">{sig?.signer || '—'}</div>
-                        {src && (
-                          <img src={src} alt="signature" className="mt-2 h-[80px] w-auto rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white" />
-                        )}
-                      </div>
-                    )
-                  }
-
-                  if (f.type === 'photo') {
-                    return (
-                      <div key={f.id} className="rounded-2xl border border-neutral-200 dark:border-neutral-800 p-3">
-                        <div className="text-xs text-neutral-500 dark:text-neutral-400">{f.label}</div>
-                        <div className="mt-1 font-medium">{ticket.attachments.length ? `${ticket.attachments.length} file(s)` : '—'}</div>
-                      </div>
-                    )
-                  }
-
-                  const raw = ticket.values[f.key]
-                  return (
-                    <div key={f.id} className="rounded-2xl border border-neutral-200 dark:border-neutral-800 p-3">
-                      <div className="text-xs text-neutral-500 dark:text-neutral-400">{f.label}</div>
-                      <div className="mt-1 font-medium break-words">
-                        {raw == null || raw === '' ? '—' : String(raw)}
-                      </div>
+                {version.fields.map((f) => (
+                  <div key={f.id} className="rounded-2xl border border-neutral-200 dark:border-neutral-800 p-3">
+                    <div className="text-xs text-neutral-500 dark:text-neutral-400">{f.label}</div>
+                    <div className="mt-1 font-medium break-words">
+                      {ticket.values[f.key] == null || ticket.values[f.key] === '' ? '—' : String(ticket.values[f.key])}
                     </div>
-                  )
-                })}
+                  </div>
+                ))}
               </div>
 
               <div className="mt-4 rounded-2xl border border-neutral-200 dark:border-neutral-800 p-3">
-                <div className="text-xs text-neutral-500 dark:text-neutral-400">Signatures</div>
-                <div className="mt-3 space-y-3">
-                  {version.fields.filter((f) => f.type === 'signature').length === 0 && (
-                    <div className="font-medium">—</div>
-                  )}
-                  {version.fields.filter((f) => f.type === 'signature').map((f) => {
-                    const sig = signatureFromValue(ticket.values[f.key]) ?? ticket.signature ?? null
-                    const src = signatureSrc(sig)
-                    return (
-                      <div key={f.id}>
-                        <div className="text-xs text-neutral-500 dark:text-neutral-400">{f.label}</div>
-                        <div className="mt-1 font-medium">{sig?.signer || '—'}</div>
-                        {src && (
-                          <img src={src} alt="signature" className="mt-2 h-[80px] w-auto rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white" />
-                        )}
-                      </div>
-                    )
-                  })}
-                </div>
+                <div className="text-xs text-neutral-500 dark:text-neutral-400">Signature</div>
+                <div className="mt-1 font-medium">{ticket.signature?.signer ?? '—'}</div>
+                {signatureSrc(ticket.signature) && (
+                  <img src={signatureSrc(ticket.signature)} alt="signature" className="mt-2 h-[80px] w-auto rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white" />
+                )}
               </div>
             </div>
           </CardBody>
@@ -271,15 +231,7 @@ function attachmentSrc(attachment: { url?: string; dataUrl?: string }) {
   return attachment.url || attachment.dataUrl || ''
 }
 
-type SignatureValue = { signer?: string; dataUrl?: string; url?: string }
-
-function signatureFromValue(value: any): SignatureValue | null {
-  if (!value || typeof value !== 'object') return null
-  if (!('signer' in value) && !('dataUrl' in value) && !('url' in value)) return null
-  return value as SignatureValue
-}
-
-function signatureSrc(signature?: SignatureValue | null) {
+function signatureSrc(signature?: { url?: string; dataUrl?: string }) {
   if (!signature) return ''
   return signature.dataUrl || signature.url || ''
 }
