@@ -331,6 +331,7 @@ export default function BuilderPage() {
             </div>
           </CardBody>
         </Card>
+        )}
 
         {/* Canvas */}
         <div>
