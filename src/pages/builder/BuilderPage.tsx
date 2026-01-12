@@ -964,7 +964,7 @@ function newField(tool: ToolPreset, x: number, y: number, page: number, grid?: {
   const nx = clamp(snapToGrid(x, grid?.x ?? 0), 0, maxX)
   const ny = clamp(snapToGrid(y, grid?.y ?? 0), 0, maxY)
   const label = tool.label || labelFor(type)
-  const keyBase = slugifyKey(tool.keyBase ?? label || type || 'field')
+  const keyBase = slugifyKey((tool.keyBase ?? label) || type || 'field')
   const options = normalizeOptionList(tool.options)
   return {
     id: uid('fld'),
