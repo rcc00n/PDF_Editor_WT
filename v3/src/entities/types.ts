@@ -3,7 +3,7 @@ export type Id = string
 export type FormStatus = 'draft' | 'active' | 'archived'
 export type SyncState = 'offline_only' | 'synced' | 'has_queue' | 'failed' | 'unknown'
 
-export type FieldType = 'text' | 'numeric' | 'checkbox' | 'date' | 'signature' | 'photo' | 'employee'
+export type FieldType = 'text' | 'numeric' | 'checkbox' | 'date' | 'signature' | 'photo' | 'employee' | 'select' | 'radio'
 
 export type Validation =
   | { kind: 'none' }
@@ -19,6 +19,10 @@ export type Field = {
   hint?: string
   helpText?: string
   fontSize?: number
+  maxLength?: number
+  options?: string[]
+  autoValue?: 'today' | 'creator'
+  readOnly?: boolean
   validation: Validation
   page: number
   // normalized 0..1 relative to page box
@@ -35,6 +39,18 @@ export type Employee = {
   role?: string
   phone?: string
   active: boolean
+}
+
+export type AccessGroup = {
+  id: Id
+  name: string
+  description?: string
+  includeAllEmployees?: boolean
+  includeAllForms?: boolean
+  employeeIds: Id[]
+  formIds: Id[]
+  excludedEmployeeIds?: Id[]
+  excludedFormIds?: Id[]
 }
 
 export type FormVersion = {

@@ -38,7 +38,9 @@ export default function AppShell() {
   const ThemeIcon = nextTheme === 'light' ? Sun : nextTheme === 'dark' ? Moon : Globe
   const isAdmin = role === 'admin'
   const RoleIcon = isAdmin ? Shield : User
-  const navItems = isAdmin ? [...nav, { to: '/employees', label: 'Employees', icon: Users }] : nav
+  const navItems = isAdmin
+    ? [...nav, { to: '/employees', label: 'Employees', icon: User }, { to: '/groups', label: 'Groups', icon: Users }]
+    : nav
   const [profileOpen, setProfileOpen] = useState(false)
   const profileLabel = user?.email || (isAdmin ? 'Admin' : 'Worker')
 
@@ -279,6 +281,7 @@ function titleForPath(path: string) {
   if (path.startsWith('/queue')) return 'Sync Queue'
   if (path.startsWith('/review')) return 'Admin Review & Export'
   if (path.startsWith('/employees')) return 'Employees'
+  if (path.startsWith('/groups')) return 'Groups'
   return 'RelayForms'
 }
 
