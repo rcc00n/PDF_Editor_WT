@@ -12,16 +12,18 @@ import { dateTimeShort } from '@/shared/lib/format'
 import type { Field, FormVersion } from '@/entities/types'
 import RenderedPdfPreview from '@/features/pdf/RenderedPdfPreview'
 import { exportRenderedFormPdf } from '@/features/export/exporters'
-import { Plus, GitBranchPlus, Archive, ArrowRight, History, RotateCcw, CheckCircle2, Eye, FileDown } from 'lucide-react'
+import { Plus, GitBranchPlus, Archive, ArrowRight, History, RotateCcw, CheckCircle2, Eye, FileDown, Send } from 'lucide-react'
 
 export default function FormsPage() {
   const nav = useNavigate()
   const forms = useAppStore(s => s.forms)
   const tickets = useAppStore(s => s.tickets)
+  const employees = useAppStore(s => s.employees)
   const role = useAppStore(s => s.role)
   const createForm = useAppStore(s => s.createForm)
   const createVersion = useAppStore(s => s.createVersion)
   const archiveForm = useAppStore(s => s.archiveForm)
+  const createTicket = useAppStore(s => s.createTicket)
   const publishVersion = useAppStore(s => s.publishVersion)
   const pushToast = useAppStore(s => s.pushToast)
 
@@ -33,6 +35,9 @@ export default function FormsPage() {
   const [query, setQuery] = useState('')
   const [renderFormId, setRenderFormId] = useState<string | null>(null)
   const [renderTicketId, setRenderTicketId] = useState('')
+  const [assignFormId, setAssignFormId] = useState<string | null>(null)
+  const [assignTitle, setAssignTitle] = useState('')
+  const [assignTo, setAssignTo] = useState('')
 
   const canEdit = role === 'admin'
 
@@ -78,6 +83,13 @@ export default function FormsPage() {
   const renderTicket = renderTickets.find(t => t.id === renderTicketId) ?? renderTickets[0] ?? null
   const renderVersion = renderForm?.versions.find(v => v.id === renderTicket?.versionId) ?? null
 
+  const activeEmployees = useMemo(() => employees.filter((e) => e.active), [employees])
+  const assignForm = useMemo(
+    () => forms.find((f) => f.id === assignFormId) ?? null,
+    [assignFormId, forms]
+  )
+  const assignVersion = assignForm?.versions.find(v => v.status === 'active') ?? assignForm?.versions[0] ?? null
+
   const leftVersion = historyForm?.versions.find(v => v.id === compareLeftId)
   const rightVersion = historyForm?.versions.find(v => v.id === compareRightId)
 
@@ -106,6 +118,13 @@ export default function FormsPage() {
       .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
     setRenderFormId(formId)
     setRenderTicketId(formTickets[0]?.id ?? '')
+  }
+
+  const openAssign = (formId: string) => {
+    const form = forms.find((f) => f.id === formId)
+    setAssignFormId(formId)
+    setAssignTitle(form?.name ?? 'New Assignment')
+    setAssignTo(activeEmployees[0]?.name ?? '')
   }
 
   useEffect(() => {
@@ -234,6 +253,19 @@ export default function FormsPage() {
                             title="View rendered PDF"
                           >
                             <Eye size={16} /> View PDF
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            className="w-full sm:w-auto"
+                            disabled={!canEdit}
+                            onClick={() => {
+                              if (!canEdit) return
+                              openAssign(f.id)
+                            }}
+                            title={canEdit ? 'Assign to employee' : 'Admins only'}
+                          >
+                            <Send size={16} /> Assign
                           </Button>
                           <Button
                             size="sm"
@@ -536,6 +568,70 @@ export default function FormsPage() {
                 This ticket version is no longer available.
               </div>
             )}
+          </div>
+        )}
+      </Modal>
+
+      <Modal
+        open={Boolean(assignForm)}
+        onClose={() => {
+          setAssignFormId(null)
+          setAssignTitle('')
+          setAssignTo('')
+        }}
+        title="Assign form"
+      >
+        {assignForm && (
+          <div className="space-y-3">
+            <div>
+              <div className="text-xs text-neutral-500 dark:text-neutral-400 mb-1">Template</div>
+              <div className="text-sm font-medium">{assignForm.name}</div>
+              <div className="text-xs text-neutral-500 dark:text-neutral-400">
+                {assignVersion ? `${assignVersion.version} · ${assignVersion.status}` : 'No version available'}
+              </div>
+            </div>
+            <div>
+              <div className="text-xs text-neutral-500 dark:text-neutral-400 mb-1">Title</div>
+              <Input value={assignTitle} onChange={(e) => setAssignTitle(e.target.value)} />
+            </div>
+            <div>
+              <div className="text-xs text-neutral-500 dark:text-neutral-400 mb-1">Assigned to</div>
+              {activeEmployees.length ? (
+                <Select value={assignTo} onChange={(e) => setAssignTo(e.target.value)}>
+                  {activeEmployees.map((e) => (
+                    <option key={e.id} value={e.name}>
+                      {e.name}{e.role ? ` · ${e.role}` : ''}
+                    </option>
+                  ))}
+                </Select>
+              ) : (
+                <Input value={assignTo} onChange={(e) => setAssignTo(e.target.value)} />
+              )}
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="secondary" onClick={() => setAssignFormId(null)}>Cancel</Button>
+              <Button
+                disabled={!assignVersion || !assignTo.trim()}
+                onClick={async () => {
+                  if (!assignForm || !assignVersion) return
+                  if (!assignTo.trim()) {
+                    pushToast({ title: 'Assignee required', message: 'Choose an employee before assigning.', variant: 'warning' })
+                    return
+                  }
+                  try {
+                    const id = await createTicket(assignForm.id, assignVersion.id, (assignTitle || assignForm.name).trim(), assignTo.trim())
+                    pushToast({ title: 'Form assigned', message: `${id} → ${assignTo.trim()}`, variant: 'success' })
+                    setAssignFormId(null)
+                    setAssignTitle('')
+                    setAssignTo('')
+                  } catch (err: any) {
+                    pushToast({ title: 'Assignment failed', message: err?.message || 'Unable to assign form', variant: 'danger' })
+                  }
+                }}
+              >
+                Assign
+              </Button>
+            </div>
           </div>
         )}
       </Modal>

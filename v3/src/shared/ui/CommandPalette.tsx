@@ -30,8 +30,9 @@ export default function CommandPalette() {
   const setForcedOffline = useAppStore(s => s.setForcedOffline)
   const createForm = useAppStore(s => s.createForm)
 
-  const nextTheme = theme === 'dark' ? 'light' : theme === 'light' ? 'planet' : 'dark'
-  const ThemeIcon = nextTheme === 'light' ? Sun : nextTheme === 'dark' ? Moon : Globe
+  const nextTheme = theme === 'light' ? 'planet' : 'light'
+  const ThemeIcon = nextTheme === 'light' ? Sun : Globe
+  const nextThemeLabel = nextTheme === 'light' ? 'light' : 'color'
   const isAdmin = role === 'admin'
 
   useEffect(() => {
@@ -56,7 +57,7 @@ export default function CommandPalette() {
       { id: 'field', title: 'Field App', subtitle: 'Offline tickets', icon: Smartphone, run: () => nav('/field') },
       { id: 'queue', title: 'Sync Queue', subtitle: 'Pending / failed mutations', icon: RefreshCw, run: () => nav('/queue') },
       { id: 'review', title: 'Admin Review', subtitle: 'Preview and export', icon: ClipboardCheck, run: () => nav('/review') },
-      { id: 'theme', title: `Switch to ${nextTheme}`, icon: ThemeIcon, run: () => toggleTheme(), keywords: 'theme dark light planet' },
+      { id: 'theme', title: `Switch to ${nextThemeLabel} theme`, icon: ThemeIcon, run: () => toggleTheme(), keywords: 'theme light color' },
       { id: 'offline', title: forcedOffline ? 'Disable offline simulation' : 'Enable offline simulation', icon: forcedOffline ? Wifi : WifiOff, run: () => setForcedOffline(!forcedOffline), keywords: 'offline online network' }
     ]
 

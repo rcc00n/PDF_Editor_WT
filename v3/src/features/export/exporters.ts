@@ -1,5 +1,6 @@
 import type { Ticket, FormTemplate, FormVersion } from '@/entities/types'
 import { jsPDF } from 'jspdf'
+import { signatureRoleLabel } from '@/shared/lib/signatureRoles'
 
 const DEFAULT_FONT_SIZE = 12
 
@@ -58,7 +59,7 @@ export async function exportTicketPdf(ticket: Ticket, form: FormTemplate, versio
 
   y += 10
   doc.setFont('helvetica', 'bold')
-  doc.text('Signature', 40, y)
+  doc.text(`Signature (${signatureRoleLabel(ticket.signatureRole ?? 'employee')})`, 40, y)
   y += 14
   doc.setFont('helvetica', 'normal')
   doc.text(ticket.signature?.signer ?? '—', 40, y)
