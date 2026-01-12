@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Optional
+from typing import Any, Optional
 
 from django.db.models.fields.files import FieldFile
 from django.utils import timezone
@@ -8,6 +8,7 @@ from rest_framework import serializers
 from rest_framework.request import Request
 
 from .models import (
+    AccessGroup,
     Attachment,
     Employee,
     FormTemplate,
@@ -16,9 +17,6 @@ from .models import (
     TicketApprovalState,
     TicketStatus,
 )
-
-if TYPE_CHECKING:
-    from rest_framework.request import Request
 
 
 def build_file_url(request: Optional[Request], file_field: Optional[FieldFile]) -> Optional[str]:
@@ -73,13 +71,13 @@ class AttachmentSerializer(serializers.ModelSerializer):
 
 
 class TicketSerializer(serializers.ModelSerializer):
-    formId = serializers.CharField(source='form_id')
-    versionId = serializers.CharField(source='version_id')
-    assignedTo = serializers.CharField(source='assigned_to')
-    assignedAt = serializers.DateTimeField(source='assigned_at')
-    approvalState = serializers.CharField(source='approval_state')
-    updatedAt = serializers.DateTimeField(source='updated_at')
-    lastError = serializers.CharField(source='last_error', required=False, allow_blank=True)
+    formId = serializers.CharField(source='form_id', read_only=True)
+    versionId = serializers.CharField(source='version_id', read_only=True)
+    assignedTo = serializers.CharField(source='assigned_to', read_only=True)
+    assignedAt = serializers.DateTimeField(source='assigned_at', read_only=True)
+    approvalState = serializers.CharField(source='approval_state', read_only=True)
+    updatedAt = serializers.DateTimeField(source='updated_at', read_only=True)
+    lastError = serializers.CharField(source='last_error', read_only=True)
     attachments = AttachmentSerializer(many=True, read_only=True)
     signature = serializers.SerializerMethodField()
 
