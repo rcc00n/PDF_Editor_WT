@@ -24,7 +24,7 @@ export default function FieldHomePage() {
   const pushToast = useAppStore(s => s.pushToast)
 
   const [open, setOpen] = useState(false)
-  const [title, setTitle] = useState('New Ticket')
+  const [title, setTitle] = useState('Pending Forms')
   const [assignedTo, setAssignedTo] = useState('Technician')
   const [formId, setFormId] = useState(forms[0]?.id ?? '')
   const [fromDate, setFromDate] = useState('')
@@ -93,7 +93,7 @@ export default function FieldHomePage() {
         right={
           <>
             <Button variant="secondary" onClick={() => { setOpen(true) }}>
-              <Plus size={16} /> New Ticket
+              <Plus size={16} /> Pending Forms
             </Button>
           </>
         }
@@ -206,7 +206,7 @@ export default function FieldHomePage() {
                 const { v } = activeVersions
                 if (!v) return
                 try {
-                  const id = await createTicket(formId, v.id, (title || 'Ticket').trim(), (assignedTo || 'Technician').trim())
+                  const id = await createTicket(formId, v.id, (title || 'Pending Forms').trim(), (assignedTo || 'Technician').trim())
                   setOpen(false)
                   nav(`/field/ticket/${id}`)
                 } catch (err: any) {
