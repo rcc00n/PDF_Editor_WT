@@ -1,18 +1,24 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import SectionHeader from '@/shared/ui/SectionHeader'
 import Button from '@/shared/ui/Button'
 import { Card, CardBody, CardHeader, CardSub, CardTitle } from '@/shared/ui/Card'
 import Badge from '@/shared/ui/Badge'
+import Input from '@/shared/ui/Input'
 import { useAppStore } from '@/shared/state/useAppStore'
-import { dateShort, dateTimeShort, timeHHMM } from '@/shared/lib/format'
+import { dateTimeShort, timeHHMM } from '@/shared/lib/format'
+import { extractRig, filterTickets, groupTicketsByForm } from '@/shared/lib/ticketFilters'
 import { RefreshCw, RotateCcw, ShieldAlert } from 'lucide-react'
 
 export default function QueuePage() {
   const queue = useAppStore(s => s.queue)
   const tickets = useAppStore(s => s.tickets)
+  const forms = useAppStore(s => s.forms)
   const lastSuccess = useAppStore(s => s.lastSyncSuccess)
   const retryFailed = useAppStore(s => s.retryFailed)
+  const [fromDate, setFromDate] = useState('')
+  const [toDate, setToDate] = useState('')
+  const [rigQuery, setRigQuery] = useState('')
 
   const stats = useMemo(() => ({
     pending: queue.filter(q => q.status === 'pending').length,
@@ -20,15 +26,12 @@ export default function QueuePage() {
     failed: queue.filter(q => q.status === 'failed').length
   }), [queue])
 
-  const grouped = useMemo(() => {
-    const by: Record<string, typeof tickets> = {}
-    for (const t of tickets.slice().sort((a, b) => b.assignedAt.localeCompare(a.assignedAt))) {
-      const k = dateShort(t.assignedAt)
-      by[k] = by[k] || []
-      by[k].push(t)
-    }
-    return Object.entries(by)
-  }, [tickets])
+  const filtered = useMemo(
+    () => filterTickets(tickets, { from: fromDate, to: toDate, rig: rigQuery }),
+    [tickets, fromDate, toDate, rigQuery]
+  )
+
+  const grouped = useMemo(() => groupTicketsByForm(filtered, forms), [filtered, forms])
 
   return (
     <div className="pb-10">
@@ -51,21 +54,42 @@ export default function QueuePage() {
         <Card>
           <CardHeader>
             <CardTitle>Daily Field Tickets</CardTitle>
-            <CardSub>Grouped by date</CardSub>
+            <CardSub>Grouped by form</CardSub>
           </CardHeader>
           <CardBody>
-            <div className="space-y-6">
-              {grouped.map(([day, items]) => (
-                <div key={day}>
-                  <div className="text-xs text-neutral-500 dark:text-neutral-400 mb-2">{day}</div>
-                  <div className="flex flex-col gap-2">
-                    {items.map((t) => (
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <div>
+                <div className="text-xs text-neutral-500 dark:text-neutral-400 mb-1">From</div>
+                <Input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
+              </div>
+              <div>
+                <div className="text-xs text-neutral-500 dark:text-neutral-400 mb-1">To</div>
+                <Input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} />
+              </div>
+              <div>
+                <div className="text-xs text-neutral-500 dark:text-neutral-400 mb-1">Rig</div>
+                <Input placeholder="Search rig" value={rigQuery} onChange={(e) => setRigQuery(e.target.value)} />
+              </div>
+            </div>
+
+            <div className="mt-4 space-y-6">
+              {grouped.map((group) => (
+                <div key={group.id}>
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="text-sm font-semibold">{group.name}</div>
+                    <Badge tone={group.tickets.length ? 'success' : 'warning'}>{group.tickets.length}</Badge>
+                  </div>
+                  <div className="mt-2 flex flex-col gap-2">
+                    {group.tickets.map((t) => (
                       <Link key={t.id} to={`/review/${t.id}`} className="rf-focus rounded-2xl border border-neutral-200 dark:border-neutral-800 p-3 hover:bg-neutral-50 dark:hover:bg-neutral-900">
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
                             <div className="font-medium truncate">{t.id} · {t.title}</div>
                             <div className="text-xs text-neutral-500 dark:text-neutral-400 truncate">
                               {t.assignedTo} · {dateTimeShort(t.assignedAt)}
+                            </div>
+                            <div className="text-xs text-neutral-500 dark:text-neutral-400 truncate">
+                              Rig: {extractRig(t) || '—'}
                             </div>
                           </div>
                           <Badge tone={t.status === 'synced' ? 'success' : t.status === 'error' ? 'danger' : t.status === 'queued' ? 'warning' : 'neutral'}>
@@ -82,6 +106,11 @@ export default function QueuePage() {
                   </div>
                 </div>
               ))}
+              {grouped.length === 0 && (
+                <div className="py-6 text-center text-sm text-neutral-500 dark:text-neutral-400">
+                  Nothing here
+                </div>
+              )}
             </div>
           </CardBody>
         </Card>
