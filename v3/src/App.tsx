@@ -6,7 +6,6 @@ import FormsPage from './pages/forms/FormsPage'
 import BuilderPage from './pages/builder/BuilderPage'
 import FieldHomePage from './pages/field/FieldHomePage'
 import FieldTicketPage from './pages/field/FieldTicketPage'
-import QueuePage from './pages/queue/QueuePage'
 import ReviewPage from './pages/review/ReviewPage'
 import ReviewTicketPage from './pages/review/ReviewTicketPage'
 import EmployeesPage from './pages/employees/EmployeesPage'
@@ -72,7 +71,6 @@ export default function App() {
           <Route path="/builder/:formId" element={<BuilderPage />} />
           <Route path="/field" element={<FieldHomePage />} />
           <Route path="/field/ticket/:ticketId" element={<FieldTicketPage />} />
-          <Route path="/queue" element={<QueuePage />} />
           <Route path="/review" element={<ReviewPage />} />
           <Route path="/review/:ticketId" element={<ReviewTicketPage />} />
           <Route path="/employees" element={<EmployeesPage />} />
@@ -86,7 +84,7 @@ export default function App() {
       {!online && (
         <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50">
           <div className="px-3 py-2 rounded-full text-xs font-medium border border-neutral-200 bg-white/90 backdrop-blur dark:border-neutral-800 dark:bg-neutral-900/80">
-            Offline: changes are saved locally and will go to the sync queue
+            Offline: changes are saved locally and will sync when you're online
           </div>
         </div>
       )}
