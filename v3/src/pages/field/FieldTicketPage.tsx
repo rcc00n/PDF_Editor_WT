@@ -38,6 +38,12 @@ export default function FieldTicketPage() {
   const pushToast = useAppStore(s => s.pushToast)
   const attachmentInputRef = useRef<HTMLInputElement | null>(null)
   const [renderOpen, setRenderOpen] = useState(false)
+  const scrollToSignature = () => {
+    document.getElementById('signature-panel')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }
+  const scrollToPhotos = () => {
+    document.getElementById('photos-panel')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }
 
   const ctx = useMemo(() => {
     if (!ticket) return null
@@ -166,6 +172,13 @@ export default function FieldTicketPage() {
                     pdfUrl={renderPdfUrl}
                     fields={version.fields}
                     ticket={ticket}
+                    interactive
+                    employees={employees}
+                    onFieldChange={(field, val) => {
+                      updateTicket(ticket.id, { values: { ...ticket.values, [field.key]: val } })
+                    }}
+                    onRequestSignaturePanel={scrollToSignature}
+                    onRequestPhotoPanel={scrollToPhotos}
                   />
                 ) : (
                   <div className="text-sm text-neutral-500 dark:text-neutral-400">
@@ -178,7 +191,7 @@ export default function FieldTicketPage() {
         </div>
 
         <div className="flex flex-col gap-4">
-          <Card>
+          <Card id="photos-panel">
             <CardBody>
               <div className="text-sm font-semibold">Photo Attachments</div>
               <div className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
@@ -254,7 +267,7 @@ export default function FieldTicketPage() {
             </CardBody>
           </Card>
 
-          <Card>
+          <Card id="signature-panel">
             <CardBody>
               <div className="text-sm font-semibold">Signature</div>
               <div className="mt-3 space-y-2">
