@@ -3,7 +3,7 @@ export type Id = string
 export type FormStatus = 'draft' | 'active' | 'archived'
 export type SyncState = 'offline_only' | 'synced' | 'has_queue' | 'failed' | 'unknown'
 
-export type FieldType = 'text' | 'numeric' | 'checkbox' | 'date' | 'signature' | 'photo' | 'employee'
+export type FieldType = 'text' | 'numeric' | 'checkbox' | 'date' | 'signature' | 'photo' | 'employee' | 'select' | 'radio'
 
 export type Validation =
   | { kind: 'none' }
@@ -19,6 +19,9 @@ export type Field = {
   hint?: string
   helpText?: string
   fontSize?: number
+  options?: string[]
+  autoValue?: 'today' | 'creator'
+  readOnly?: boolean
   validation: Validation
   page: number
   // normalized 0..1 relative to page box

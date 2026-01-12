@@ -8,22 +8,68 @@ import Textarea from '@/shared/ui/Textarea'
 import Select from '@/shared/ui/Select'
 import { Card, CardBody } from '@/shared/ui/Card'
 import { useAppStore } from '@/shared/state/useAppStore'
-import type { Field, FieldType } from '@/entities/types'
+import type { Field, FieldType, Validation } from '@/entities/types'
 import { uid } from '@/shared/lib/ids'
 import { useElementSize } from '@/shared/hooks/useElementSize'
 import PdfPageCanvas from '@/features/pdf/PdfPageCanvas'
 import { cn } from '@/shared/ui/cn'
 import { Eye, Upload, CheckCircle2, Trash2, Maximize2, Minimize2 } from 'lucide-react'
 
-const tools: Array<{ type: FieldType; label: string }> = [
-  { type: 'text', label: 'Text' },
-  { type: 'numeric', label: 'Numeric' },
-  { type: 'checkbox', label: 'Checkbox' },
-  { type: 'date', label: 'Date' },
-  { type: 'signature', label: 'Signature' },
-  { type: 'photo', label: 'Photo' },
-  { type: 'employee', label: 'Employees' }
+type ToolPreset = {
+  id: string
+  label: string
+  type: FieldType
+  required?: boolean
+  options?: string[]
+  autoValue?: Field['autoValue']
+  readOnly?: boolean
+  validation?: Validation
+  keyBase?: string
+  hint?: string
+  helpText?: string
+  description?: string
+}
+
+const TOOL_SECTIONS: Array<{ title?: string; tools: ToolPreset[] }> = [
+  {
+    tools: [
+      { id: 'required_text', label: 'Required Text', type: 'text', required: true, description: 'Text input (required).' },
+      { id: 'optional_text', label: 'Optional Text', type: 'text', description: 'Text input (optional).' },
+      { id: 'custom_list', label: 'Customized List', type: 'select', options: ['Option 1', 'Option 2'], description: 'Dropdown with custom options.' },
+      { id: 'list_yes_no', label: 'List Yes, No', type: 'select', options: ['Yes', 'No'], description: 'Dropdown with Yes/No.' },
+      { id: 'list_yes_no_na', label: 'List Yes, No, or NA', type: 'select', options: ['Yes', 'No', 'NA'], description: 'Dropdown with Yes/No/NA.' },
+      { id: 'checkbox', label: 'Check Box', type: 'checkbox', description: 'Single checkbox.' },
+      { id: 'required_signature', label: 'Required Signature', type: 'signature', required: true, description: 'Signature block (required).' },
+      { id: 'radio', label: 'Radio Buttons', type: 'radio', options: ['Option 1', 'Option 2'], description: 'Single-choice radio list.' },
+      { id: 'crew_member', label: 'Crew Member', type: 'employee', description: 'Select from employees.' },
+      { id: 'crew_signature', label: 'Crew Signature', type: 'signature', description: 'Signature block.' },
+      { id: 'manager', label: 'Manager', type: 'employee', description: 'Select from employees.' },
+      { id: 'client_name', label: 'Client Name', type: 'text', description: 'Text input for client.' },
+      { id: 'current_date', label: 'Current Date', type: 'date', autoValue: 'today', readOnly: true, description: "Auto-filled with today's date." },
+      { id: 'creator', label: 'Creator', type: 'text', autoValue: 'creator', readOnly: true, description: 'Auto-filled with assigned user.' },
+      {
+        id: 'unit_number',
+        label: 'Unit #',
+        type: 'numeric',
+        validation: { kind: 'range', min: 0, max: 999999 },
+        keyBase: 'unit_number',
+        description: 'Numeric unit identifier.'
+      },
+      { id: 'uwi_location', label: 'UWI location', type: 'text', description: 'Text input for UWI location.' },
+      { id: 'employee_list', label: 'Employee List', type: 'employee', description: 'Select from employees.' }
+    ]
+  },
+  {
+    title: 'Extras',
+    tools: [
+      { id: 'photo', label: 'Photo', type: 'photo', description: 'Attachment placeholder.' }
+    ]
+  }
 ]
+
+const ALL_TOOLS = TOOL_SECTIONS.flatMap((section) => section.tools)
+const TOOL_BY_ID = Object.fromEntries(ALL_TOOLS.map((tool) => [tool.id, tool])) as Record<string, ToolPreset>
+const DEFAULT_TOOL_ID = ALL_TOOLS[0]?.id ?? null
 
 const GRID_PX = 8
 const MIN_FIELD_SIZE = 0.03
@@ -55,7 +101,7 @@ export default function BuilderPage() {
     return form.versions[0]
   }, [form, vFromQuery])
 
-  const [activeTool, setActiveTool] = useState<FieldType | null>('text')
+  const [activeToolId, setActiveToolId] = useState<string | null>(DEFAULT_TOOL_ID)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [page, setPage] = useState(1)
   const [numPages, setNumPages] = useState(1)
@@ -66,6 +112,7 @@ export default function BuilderPage() {
   const [canvasFocus, setCanvasFocus] = useState(false)
 
   const selected = useMemo(() => version?.fields.find(f => f.id === selectedId) ?? null, [version, selectedId])
+  const activeTool = activeToolId ? TOOL_BY_ID[activeToolId] : null
 
   const { ref: stageRef, size } = useElementSize<HTMLDivElement>()
   const stageWidthKey = Math.round(size.width)
@@ -227,27 +274,37 @@ export default function BuilderPage() {
               <div className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
                 Click a tool (or drag it) onto the canvas. Click it again for Hand mode.
               </div>
-              <div className="mt-3 grid grid-cols-2 gap-2">
-                {tools.map((t) => (
-                  <button
-                    key={t.type}
-                    className={cn(
-                      'rf-focus rounded-2xl border px-3 py-2 text-sm font-medium transition',
-                      activeTool === t.type
-                        ? 'border-neutral-900 bg-neutral-900 text-white dark:border-white dark:bg-white dark:text-neutral-900'
-                        : 'border-neutral-200 hover:bg-neutral-50 dark:border-neutral-800 dark:hover:bg-neutral-900'
-                    )}
-                    draggable
-                    onDragStart={(e) => {
-                      e.dataTransfer.setData('application/x-rf-tool', t.type)
-                      e.dataTransfer.effectAllowed = 'copy'
-                    }}
-                    onClick={() => setActiveTool((prev) => (prev === t.type ? null : t.type))}
-                  >
-                    {t.label}
-                  </button>
-                ))}
-              </div>
+              {TOOL_SECTIONS.map((section, idx) => (
+                <div key={section.title ?? `tools-${idx}`} className={idx === 0 ? 'mt-3' : 'mt-4'}>
+                  {section.title && (
+                    <div className="text-[11px] font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
+                      {section.title}
+                    </div>
+                  )}
+                  <div className={cn('grid grid-cols-2 gap-2', section.title ? 'mt-2' : '')}>
+                    {section.tools.map((t) => (
+                      <button
+                        key={t.id}
+                        className={cn(
+                          'rf-focus rounded-2xl border px-3 py-2 text-sm font-medium transition',
+                          activeToolId === t.id
+                            ? 'border-neutral-900 bg-neutral-900 text-white dark:border-white dark:bg-white dark:text-neutral-900'
+                            : 'border-neutral-200 hover:bg-neutral-50 dark:border-neutral-800 dark:hover:bg-neutral-900'
+                        )}
+                        draggable
+                        title={t.description ?? t.label}
+                        onDragStart={(e) => {
+                          e.dataTransfer.setData('application/x-rf-tool', t.id)
+                          e.dataTransfer.effectAllowed = 'copy'
+                        }}
+                        onClick={() => setActiveToolId((prev) => (prev === t.id ? null : t.id))}
+                      >
+                        {t.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
 
               <div className="mt-4 flex items-center justify-between">
                 <div className="text-xs text-neutral-500 dark:text-neutral-400">Status</div>
@@ -403,7 +460,8 @@ export default function BuilderPage() {
                     onDragOver={(e) => e.preventDefault()}
                     onDrop={(e) => {
                       e.preventDefault()
-                      const tool = e.dataTransfer.getData('application/x-rf-tool') as FieldType
+                      const toolId = e.dataTransfer.getData('application/x-rf-tool')
+                      const tool = TOOL_BY_ID[toolId]
                       if (!tool) return
                       const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect()
                       const x = (e.clientX - rect.left) / rect.width
@@ -457,7 +515,8 @@ export default function BuilderPage() {
                     onDragOver={(e) => e.preventDefault()}
                     onDrop={(e) => {
                       e.preventDefault()
-                      const tool = e.dataTransfer.getData('application/x-rf-tool') as FieldType
+                      const toolId = e.dataTransfer.getData('application/x-rf-tool')
+                      const tool = TOOL_BY_ID[toolId]
                       if (!tool) return
                       const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect()
                       const x = (e.clientX - rect.left) / rect.width
@@ -488,7 +547,7 @@ export default function BuilderPage() {
               <div>
                 {activeTool ? (
                   <>
-                    Click on canvas to add: <span className="font-medium">{labelFor(activeTool)}</span>
+                    Click on canvas to add: <span className="font-medium">{activeTool.label}</span>
                   </>
                 ) : (
                   <span>Hand mode: click fields to select or drag</span>
@@ -547,7 +606,10 @@ function FieldEditor({ field, onChange }: { field: Field; onChange: (f: Field) =
   const maxW = Math.max(1 - field.x, MIN_FIELD_SIZE)
   const maxH = Math.max(1 - field.y, MIN_FIELD_SIZE)
   const fontSize = field.fontSize ?? DEFAULT_FONT_SIZE
-  const supportsFontSize = field.type === 'text' || field.type === 'numeric' || field.type === 'date' || field.type === 'employee'
+  const supportsFontSize = field.type === 'text' || field.type === 'numeric' || field.type === 'date' || field.type === 'employee' || field.type === 'select' || field.type === 'radio'
+  const supportsOptions = field.type === 'select' || field.type === 'radio'
+  const supportsAutoValue = field.type === 'text' || field.type === 'date'
+  const optionText = supportsOptions ? (field.options ?? []).join('\n') : ''
 
   return (
     <div className="mt-4 space-y-4">
@@ -566,7 +628,18 @@ function FieldEditor({ field, onChange }: { field: Field; onChange: (f: Field) =
 
         <div>
           <div className="text-xs text-neutral-500 dark:text-neutral-400 mb-1">Type</div>
-          <Select value={field.type} onChange={(e) => onChange({ ...field, type: e.target.value as any })}>
+          <Select
+            value={field.type}
+            onChange={(e) => {
+              const nextType = e.target.value as FieldType
+              const next = { ...field, type: nextType }
+              if (nextType !== 'text' && nextType !== 'date') {
+                next.autoValue = undefined
+                next.readOnly = false
+              }
+              onChange(next)
+            }}
+          >
             <option value="text">Text</option>
             <option value="numeric">Numeric</option>
             <option value="checkbox">Checkbox</option>
@@ -574,6 +647,8 @@ function FieldEditor({ field, onChange }: { field: Field; onChange: (f: Field) =
             <option value="signature">Signature</option>
             <option value="photo">Photo</option>
             <option value="employee">Employee list</option>
+            <option value="select">List (dropdown)</option>
+            <option value="radio">Radio buttons</option>
           </Select>
         </div>
 
@@ -586,6 +661,39 @@ function FieldEditor({ field, onChange }: { field: Field; onChange: (f: Field) =
             onChange={(e) => onChange({ ...field, required: e.target.checked })}
           />
         </div>
+
+        {supportsAutoValue && (
+          <div>
+            <div className="text-xs text-neutral-500 dark:text-neutral-400 mb-1">Auto-fill</div>
+            <Select
+              value={field.autoValue ?? 'none'}
+              onChange={(e) => {
+                const next = e.target.value as Field['autoValue'] | 'none'
+                if (next === 'none') {
+                  onChange({ ...field, autoValue: undefined, readOnly: false })
+                  return
+                }
+                onChange({ ...field, autoValue: next, readOnly: field.readOnly ?? true })
+              }}
+            >
+              <option value="none">None</option>
+              {field.type === 'date' && <option value="today">Current date</option>}
+              {field.type === 'text' && <option value="creator">Creator (assigned to)</option>}
+            </Select>
+          </div>
+        )}
+
+        {field.autoValue && (
+          <div className="flex items-center justify-between">
+            <div className="text-xs text-neutral-500 dark:text-neutral-400">Read-only</div>
+            <input
+              type="checkbox"
+              className="h-4 w-4"
+              checked={field.readOnly ?? false}
+              onChange={(e) => onChange({ ...field, readOnly: e.target.checked })}
+            />
+          </div>
+        )}
       </div>
 
       <div className="space-y-3 border-t border-neutral-200/80 pt-4 dark:border-neutral-800/80">
@@ -633,6 +741,40 @@ function FieldEditor({ field, onChange }: { field: Field; onChange: (f: Field) =
           )}
         </div>
       </div>
+
+      {supportsOptions && (
+        <div className="space-y-3 border-t border-neutral-200/80 pt-4 dark:border-neutral-800/80">
+          <div className="text-[11px] font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Options</div>
+          <div>
+            <div className="text-xs text-neutral-500 dark:text-neutral-400 mb-1">List items</div>
+            <Textarea
+              value={optionText}
+              placeholder="One option per line"
+              onChange={(e) => {
+                const nextOptions = normalizeOptionList(e.target.value.split('\n')) ?? []
+                onChange({ ...field, options: nextOptions })
+              }}
+            />
+            <div className="text-[11px] text-neutral-500 dark:text-neutral-400 mt-1">One option per line. Empty lines are ignored.</div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              className="rf-focus rounded-xl border border-neutral-200 px-2 py-1 text-xs hover:bg-neutral-50 dark:border-neutral-800 dark:hover:bg-neutral-900"
+              onClick={() => onChange({ ...field, options: ['Yes', 'No'] })}
+            >
+              Yes / No
+            </button>
+            <button
+              type="button"
+              className="rf-focus rounded-xl border border-neutral-200 px-2 py-1 text-xs hover:bg-neutral-50 dark:border-neutral-800 dark:hover:bg-neutral-900"
+              onClick={() => onChange({ ...field, options: ['Yes', 'No', 'NA'] })}
+            >
+              Yes / No / NA
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="space-y-3 border-t border-neutral-200/80 pt-4 dark:border-neutral-800/80">
         <div className="text-[11px] font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Guidance</div>
@@ -802,7 +944,7 @@ function FieldBox({
   )
 }
 
-function newField(type: FieldType, x: number, y: number, page: number, grid?: { x: number; y: number }): Field {
+function newField(tool: ToolPreset, x: number, y: number, page: number, grid?: { x: number; y: number }): Field {
   const sizes: Record<FieldType, { w: number; h: number }> = {
     text: { w: 0.34, h: 0.055 },
     numeric: { w: 0.26, h: 0.055 },
@@ -810,22 +952,33 @@ function newField(type: FieldType, x: number, y: number, page: number, grid?: { 
     date: { w: 0.24, h: 0.055 },
     signature: { w: 0.50, h: 0.11 },
     photo: { w: 0.50, h: 0.09 },
-    employee: { w: 0.40, h: 0.055 }
+    employee: { w: 0.40, h: 0.055 },
+    select: { w: 0.34, h: 0.055 },
+    radio: { w: 0.34, h: 0.11 }
   }
 
+  const type = tool.type
   const wh = sizes[type]
   const maxX = 1 - wh.w
   const maxY = 1 - wh.h
   const nx = clamp(snapToGrid(x, grid?.x ?? 0), 0, maxX)
   const ny = clamp(snapToGrid(y, grid?.y ?? 0), 0, maxY)
+  const label = tool.label || labelFor(type)
+  const keyBase = slugifyKey(tool.keyBase ?? label || type || 'field')
+  const options = normalizeOptionList(tool.options)
   return {
     id: uid('fld'),
     type,
-    label: labelFor(type),
-    key: `${type}_${Math.random().toString(16).slice(2, 6)}`,
-    required: false,
-    validation: type === 'numeric' ? { kind: 'range', min: 0, max: 300 } : { kind: 'none' },
+    label,
+    key: `${keyBase}_${Math.random().toString(16).slice(2, 6)}`,
+    required: tool.required ?? false,
+    validation: tool.validation ?? (type === 'numeric' ? { kind: 'range', min: 0, max: 300 } : { kind: 'none' }),
     fontSize: DEFAULT_FONT_SIZE,
+    options: options ?? (type === 'select' || type === 'radio' ? ['Option 1', 'Option 2'] : undefined),
+    autoValue: tool.autoValue,
+    readOnly: tool.readOnly,
+    hint: tool.hint,
+    helpText: tool.helpText,
     x: nx,
     y: ny,
     page,
@@ -843,7 +996,21 @@ function labelFor(type: FieldType) {
     case 'signature': return 'Signature'
     case 'photo': return 'Photo'
     case 'employee': return 'Employees'
+    case 'select': return 'List'
+    case 'radio': return 'Radio Buttons'
   }
+}
+
+function slugifyKey(value: string) {
+  const cleaned = value.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '')
+  return cleaned || 'field'
+}
+
+function normalizeOptionList(options?: string[]) {
+  if (!options) return undefined
+  const trimmed = options.map((opt) => opt.trim()).filter(Boolean)
+  if (trimmed.length === 0) return undefined
+  return Array.from(new Set(trimmed))
 }
 
 function getGridStep(stage: { width: number; height: number }) {
