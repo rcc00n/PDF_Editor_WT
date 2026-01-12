@@ -10,6 +10,7 @@ import Modal from '@/shared/ui/Modal'
 import Input from '@/shared/ui/Input'
 import Select from '@/shared/ui/Select'
 import { useEffect, useMemo, useState } from 'react'
+import { extractRig, filterTickets, groupTicketsByForm } from '@/shared/lib/ticketFilters'
 
 export default function FieldHomePage() {
   const nav = useNavigate()
@@ -28,6 +29,9 @@ export default function FieldHomePage() {
   const [title, setTitle] = useState('New Ticket')
   const [assignedTo, setAssignedTo] = useState('Technician')
   const [formId, setFormId] = useState(forms[0]?.id ?? '')
+  const [fromDate, setFromDate] = useState('')
+  const [toDate, setToDate] = useState('')
+  const [rigQuery, setRigQuery] = useState('')
 
   const availableForms = useMemo(() => {
     if (role === 'admin') return forms
@@ -66,6 +70,16 @@ export default function FieldHomePage() {
   const queuedTickets = queue.filter(q => q.status === 'pending' || q.status === 'in_progress').length
   const needsRetry = queue.filter(q => q.status === 'failed').length
 
+  const filteredTickets = useMemo(
+    () => filterTickets(tickets, { from: fromDate, to: toDate, rig: rigQuery }),
+    [tickets, fromDate, toDate, rigQuery]
+  )
+
+  const groupedTickets = useMemo(
+    () => groupTicketsByForm(filteredTickets, forms),
+    [filteredTickets, forms]
+  )
+
   return (
     <div className="pb-10">
       <SectionHeader
@@ -90,22 +104,55 @@ export default function FieldHomePage() {
             <CardSub>Tap a ticket to open the form</CardSub>
           </CardHeader>
           <CardBody>
-            <div className="flex flex-col gap-2">
-              {tickets.map((t) => (
-                <Link key={t.id} to={`/field/ticket/${t.id}`} className="rf-focus rounded-2xl border border-neutral-200 dark:border-neutral-800 p-3 hover:bg-neutral-50 dark:hover:bg-neutral-900">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="font-medium truncate">{t.id} · {t.title}</div>
-                      <div className="text-xs text-neutral-500 dark:text-neutral-400 truncate">
-                        {t.assignedTo} · {dateTimeShort(t.assignedAt)}
-                      </div>
-                    </div>
-                    <Badge tone={t.status === 'synced' ? 'success' : t.status === 'error' ? 'danger' : t.status === 'queued' ? 'warning' : 'neutral'}>
-                      {t.status}
-                    </Badge>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <div>
+                <div className="text-xs text-neutral-500 dark:text-neutral-400 mb-1">From</div>
+                <Input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
+              </div>
+              <div>
+                <div className="text-xs text-neutral-500 dark:text-neutral-400 mb-1">To</div>
+                <Input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} />
+              </div>
+              <div>
+                <div className="text-xs text-neutral-500 dark:text-neutral-400 mb-1">Rig</div>
+                <Input placeholder="Search rig" value={rigQuery} onChange={(e) => setRigQuery(e.target.value)} />
+              </div>
+            </div>
+
+            <div className="mt-4 space-y-6">
+              {groupedTickets.map((group) => (
+                <div key={group.id}>
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="text-sm font-semibold">{group.name}</div>
+                    <Badge tone={group.tickets.length ? 'success' : 'warning'}>{group.tickets.length}</Badge>
                   </div>
-                </Link>
+                  <div className="mt-2 flex flex-col gap-2">
+                    {group.tickets.map((t) => (
+                      <Link key={t.id} to={`/field/ticket/${t.id}`} className="rf-focus rounded-2xl border border-neutral-200 dark:border-neutral-800 p-3 hover:bg-neutral-50 dark:hover:bg-neutral-900">
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="font-medium truncate">{t.id} · {t.title}</div>
+                            <div className="text-xs text-neutral-500 dark:text-neutral-400 truncate">
+                              {t.assignedTo} · {dateTimeShort(t.assignedAt)}
+                            </div>
+                            <div className="text-xs text-neutral-500 dark:text-neutral-400 truncate">
+                              Rig: {extractRig(t) || '—'}
+                            </div>
+                          </div>
+                          <Badge tone={t.status === 'synced' ? 'success' : t.status === 'error' ? 'danger' : t.status === 'queued' ? 'warning' : 'neutral'}>
+                            {t.status}
+                          </Badge>
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                </div>
               ))}
+              {groupedTickets.length === 0 && (
+                <div className="py-6 text-center text-sm text-neutral-500 dark:text-neutral-400">
+                  Nothing here
+                </div>
+              )}
             </div>
           </CardBody>
         </Card>

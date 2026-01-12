@@ -7,8 +7,7 @@ import Modal from '@/shared/ui/Modal'
 import { Card, CardBody } from '@/shared/ui/Card'
 import { useAppStore } from '@/shared/state/useAppStore'
 import type { Employee } from '@/entities/types'
-import { downloadText } from '@/shared/lib/download'
-import { FileDown, FileSpreadsheet, Plus, Upload, Pencil, Trash2 } from 'lucide-react'
+import { FileSpreadsheet, Plus, Upload, Pencil, Trash2 } from 'lucide-react'
 import { read, utils, writeFile } from 'xlsx'
 
 const PAGE_SIZE = 10
@@ -107,20 +106,6 @@ export default function EmployeesPage() {
     }
   }
 
-  const exportCsv = () => {
-    const header = ['id', 'name', 'email', 'role', 'phone', 'active']
-    const rows = employees.map((e) => [
-      csvCell(e.id),
-      csvCell(e.name),
-      csvCell(e.email ?? ''),
-      csvCell(e.role ?? ''),
-      csvCell(e.phone ?? ''),
-      csvCell(e.active ? 'true' : 'false')
-    ])
-    const csv = [header.join(','), ...rows.map((r) => r.join(','))].join('\n')
-    downloadText('employees.csv', csv, 'text/csv')
-  }
-
   const exportXlsx = () => {
     const data = employees.map((e) => ({
       id: e.id,
@@ -163,9 +148,6 @@ export default function EmployeesPage() {
         subtitle="Manage the staff directory used by employee dropdown fields."
         right={
           <div className="flex flex-wrap gap-2">
-            <Button variant="secondary" onClick={exportCsv}>
-              <FileDown size={16} /> Export CSV
-            </Button>
             <Button variant="secondary" onClick={exportXlsx}>
               <FileSpreadsheet size={16} /> Export XLSX
             </Button>
@@ -322,13 +304,6 @@ export default function EmployeesPage() {
       </Modal>
     </div>
   )
-}
-
-function csvCell(value: string) {
-  if (value.includes(',') || value.includes('"') || value.includes('\n')) {
-    return `"${value.replaceAll('"', '""')}"`
-  }
-  return value
 }
 
 function normalizeEmployee(row: Record<string, any>): Employee {
