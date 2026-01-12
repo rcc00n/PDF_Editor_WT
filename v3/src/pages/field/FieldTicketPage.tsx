@@ -115,40 +115,67 @@ export default function FieldTicketPage() {
       />
 
       <div className="px-4 mt-4 sm:px-6 sm:mt-6 grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-4 items-start">
-        <Card>
-          <CardBody>
-            <div className="flex items-center justify-between gap-3">
-              <div className="text-sm font-semibold">Fields</div>
-              <Badge tone={ticket.status === 'synced' ? 'success' : ticket.status === 'error' ? 'danger' : ticket.status === 'queued' ? 'warning' : 'neutral'}>
-                {ticket.status}
-              </Badge>
-            </div>
+        <div className="flex flex-col gap-4">
+          <Card>
+            <CardBody>
+              <div className="flex items-center justify-between gap-3">
+                <div className="text-sm font-semibold">Fields</div>
+                <Badge tone={ticket.status === 'synced' ? 'success' : ticket.status === 'error' ? 'danger' : ticket.status === 'queued' ? 'warning' : 'neutral'}>
+                  {ticket.status}
+                </Badge>
+              </div>
 
-            <div className="mt-4 space-y-4">
-              {fields.length === 0 && (
-                <div className="text-sm text-neutral-500 dark:text-neutral-400">
-                  This version has no mapped fields yet. Open the Builder and add fields.
+              <div className="mt-4 space-y-4">
+                {fields.length === 0 && (
+                  <div className="text-sm text-neutral-500 dark:text-neutral-400">
+                    This version has no mapped fields yet. Open the Builder and add fields.
+                  </div>
+                )}
+
+                {fields.map((f) => (
+                  <FieldInput
+                    key={f.id}
+                    field={f}
+                    value={ticket.values[f.key]}
+                    employees={employees}
+                    creatorName={ticket.assignedTo}
+                    signature={ticket.signature}
+                    onChange={(val) => {
+                      updateTicket(ticket.id, { values: { ...ticket.values, [f.key]: val } })
+                    }}
+                    onSignature={(sig) => updateTicket(ticket.id, { signature: { signer: signatureSigner, dataUrl: sig } })}
+                    onSigner={(name) => updateTicket(ticket.id, { signature: { signer: name, dataUrl: ticket.signature?.dataUrl } })}
+                  />
+                ))}
+              </div>
+            </CardBody>
+          </Card>
+
+          <Card>
+            <CardBody>
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-sm font-semibold">Live PDF Overlay</div>
+                  <div className="text-xs text-neutral-500 dark:text-neutral-400">Fields are pinned to the PDF as you type.</div>
                 </div>
-              )}
-
-              {fields.map((f) => (
-                <FieldInput
-                  key={f.id}
-                  field={f}
-                  value={ticket.values[f.key]}
-                  employees={employees}
-                  creatorName={ticket.assignedTo}
-                  signature={ticket.signature}
-                  onChange={(val) => {
-                    updateTicket(ticket.id, { values: { ...ticket.values, [f.key]: val } })
-                  }}
-                  onSignature={(sig) => updateTicket(ticket.id, { signature: { signer: signatureSigner, dataUrl: sig } })}
-                  onSigner={(name) => updateTicket(ticket.id, { signature: { signer: name, dataUrl: ticket.signature?.dataUrl } })}
-                />
-              ))}
-            </div>
-          </CardBody>
-        </Card>
+                {!renderPdfUrl && <Badge tone="warning">No PDF</Badge>}
+              </div>
+              <div className="mt-3">
+                {renderPdfUrl ? (
+                  <RenderedPdfPreview
+                    pdfUrl={renderPdfUrl}
+                    fields={version.fields}
+                    ticket={ticket}
+                  />
+                ) : (
+                  <div className="text-sm text-neutral-500 dark:text-neutral-400">
+                    Upload a PDF in the Builder to enable the overlay preview.
+                  </div>
+                )}
+              </div>
+            </CardBody>
+          </Card>
+        </div>
 
         <div className="flex flex-col gap-4">
           <Card>
