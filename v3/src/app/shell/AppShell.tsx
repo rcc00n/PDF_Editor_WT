@@ -1,6 +1,6 @@
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useEffect, useState } from 'react'
-import { LayoutGrid, PencilRuler, Smartphone, ClipboardCheck, Moon, Sun, Globe, Wifi, WifiOff, Command, Shield, User, Users, ChevronLeft, ChevronRight, ChevronDown, LogOut, Sparkles } from 'lucide-react'
+import { LayoutGrid, FileText, PencilRuler, Smartphone, RefreshCw, ClipboardCheck, Moon, Sun, Globe, Wifi, WifiOff, Command, Shield, User, Users, ChevronLeft, ChevronRight, ChevronDown, LogOut, Sparkles } from 'lucide-react'
 import { useAppStore } from '@/shared/state/useAppStore'
 import { cn } from '@/shared/ui/cn'
 import Modal from '@/shared/ui/Modal'
@@ -9,7 +9,9 @@ import Badge from '@/shared/ui/Badge'
 
 const nav = [
   { to: '/dashboard', label: 'Dashboard', icon: LayoutGrid },
-  { to: '/field', label: 'Completed Forms', icon: Smartphone },
+  { to: '/forms', label: 'Forms', icon: FileText },
+  { to: '/field', label: 'Field App', icon: Smartphone },
+  { to: '/queue', label: 'Sync Queue', icon: RefreshCw },
   { to: '/review', label: 'Review', icon: ClipboardCheck }
 ]
 
@@ -26,6 +28,7 @@ export default function AppShell() {
   const online = useAppStore(s => s.online)
   const forcedOffline = useAppStore(s => s.forcedOffline)
   const setForcedOffline = useAppStore(s => s.setForcedOffline)
+  const queueCount = useAppStore(s => s.queue.filter(q => q.status === 'pending' || q.status === 'in_progress').length)
   const lastSyncSuccess = useAppStore(s => s.lastSyncSuccess)
 
   const location = useLocation()
@@ -38,7 +41,6 @@ export default function AppShell() {
   const navItems = isAdmin
     ? [...nav, { to: '/employees', label: 'Employees', icon: User }, { to: '/groups', label: 'Groups', icon: Users }]
     : nav
-  const mobileCols = navItems.length >= 6 ? 'grid-cols-6' : navItems.length === 5 ? 'grid-cols-5' : navItems.length === 4 ? 'grid-cols-4' : 'grid-cols-3'
   const [profileOpen, setProfileOpen] = useState(false)
   const profileLabel = user?.email || (isAdmin ? 'Admin' : 'Worker')
 
@@ -149,6 +151,7 @@ export default function AppShell() {
               </div>
               <div className="text-xs text-neutral-500 dark:text-neutral-400 truncate">
                 {online ? (lastSyncSuccess ? `Last sync ${formatTime(lastSyncSuccess)}` : 'Online') : 'Offline'}
+                {queueCount ? ` · Queue ${queueCount}` : ''}
               </div>
             </div>
 
@@ -243,7 +246,7 @@ export default function AppShell() {
       </Modal>
 
       <nav className="fixed bottom-0 left-0 right-0 z-40 md:hidden border-t border-neutral-200 dark:border-neutral-800 bg-white/95 dark:bg-neutral-950/95 backdrop-blur">
-        <div className={cn('grid gap-1 px-2 py-2', mobileCols)}>
+        <div className={cn('grid gap-1 px-2 py-2', navItems.length > 5 ? 'grid-cols-6' : 'grid-cols-5')}>
           {navItems.map((item) => {
             const Icon = item.icon
             return (
@@ -272,9 +275,10 @@ export default function AppShell() {
 
 function titleForPath(path: string) {
   if (path.startsWith('/dashboard')) return 'Dashboard'
-  if (path.startsWith('/forms')) return 'Form Templates'
+  if (path.startsWith('/forms')) return 'Forms'
   if (path.startsWith('/builder')) return 'Form Builder'
-  if (path.startsWith('/field')) return 'Completed Forms'
+  if (path.startsWith('/field')) return 'Field App'
+  if (path.startsWith('/queue')) return 'Sync Queue'
   if (path.startsWith('/review')) return 'Admin Review & Export'
   if (path.startsWith('/employees')) return 'Employees'
   if (path.startsWith('/groups')) return 'Groups'

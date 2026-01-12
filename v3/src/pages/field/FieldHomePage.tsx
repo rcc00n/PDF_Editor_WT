@@ -5,7 +5,7 @@ import { Card, CardBody, CardHeader, CardSub, CardTitle } from '@/shared/ui/Card
 import Badge from '@/shared/ui/Badge'
 import { useAppStore } from '@/shared/state/useAppStore'
 import { dateTimeShort } from '@/shared/lib/format'
-import { Plus } from 'lucide-react'
+import { Plus, ListChecks } from 'lucide-react'
 import Modal from '@/shared/ui/Modal'
 import Input from '@/shared/ui/Input'
 import Select from '@/shared/ui/Select'
@@ -15,6 +15,8 @@ import { extractRig, filterTickets, groupTicketsByForm } from '@/shared/lib/tick
 export default function FieldHomePage() {
   const nav = useNavigate()
   const tickets = useAppStore(s => s.tickets)
+  const queue = useAppStore(s => s.queue)
+  const lastSync = useAppStore(s => s.lastSyncSuccess)
   const forms = useAppStore(s => s.forms)
   const groups = useAppStore(s => s.groups)
   const employees = useAppStore(s => s.employees)
@@ -75,6 +77,9 @@ export default function FieldHomePage() {
   }, [availableForms, formId])
   const canCreate = Boolean(activeVersions.v)
 
+  const queuedTickets = queue.filter(q => q.status === 'pending' || q.status === 'in_progress').length
+  const needsRetry = queue.filter(q => q.status === 'failed').length
+
   const filteredTickets = useMemo(
     () => filterTickets(tickets, { from: fromDate, to: toDate, rig: rigQuery }),
     [tickets, fromDate, toDate, rigQuery]
@@ -88,10 +93,13 @@ export default function FieldHomePage() {
   return (
     <div className="pb-10">
       <SectionHeader
-        title="Completed Forms"
-        subtitle="Offline mode, drafts, and submissions."
+        title="Field App"
+        subtitle="Offline mode, drafts, and queued submits."
         right={
           <>
+            <Button variant="secondary" onClick={() => nav('/queue')}>
+              <ListChecks size={16} /> View Queue
+            </Button>
             <Button variant="secondary" onClick={() => { setOpen(true) }}>
               <Plus size={16} /> New Ticket
             </Button>
@@ -100,11 +108,11 @@ export default function FieldHomePage() {
       />
 
       <div className="px-4 mt-4 sm:px-6 sm:mt-6 grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Daily Completed Forms</CardTitle>
-              <CardSub>Tap a form to open it</CardSub>
-            </CardHeader>
+        <Card>
+          <CardHeader>
+            <CardTitle>Daily Field Tickets</CardTitle>
+            <CardSub>Tap a ticket to open the form</CardSub>
+          </CardHeader>
           <CardBody>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               <div>
@@ -162,6 +170,26 @@ export default function FieldHomePage() {
         <div className="flex flex-col gap-4">
           <Card>
             <CardHeader>
+              <CardTitle>Offline Queue Status</CardTitle>
+              <CardSub>Sync happens automatically when online</CardSub>
+            </CardHeader>
+            <CardBody>
+              <div className="flex items-center justify-between">
+                <div className="text-sm">Queued tickets</div>
+                <Badge tone={queuedTickets ? 'warning' : 'neutral'}>{queuedTickets}</Badge>
+              </div>
+              <div className="mt-2 flex items-center justify-between">
+                <div className="text-sm">Requires retry</div>
+                <Badge tone={needsRetry ? 'danger' : 'neutral'}>{needsRetry}</Badge>
+              </div>
+              <div className="mt-3 text-xs text-neutral-500 dark:text-neutral-400">
+                Last success: {lastSync ? dateTimeShort(lastSync) : '—'}
+              </div>
+            </CardBody>
+          </Card>
+
+          <Card>
+            <CardHeader>
               <CardTitle>Device</CardTitle>
               <CardSub>Touch-friendly UI</CardSub>
             </CardHeader>
@@ -178,10 +206,10 @@ export default function FieldHomePage() {
       <Modal open={open} onClose={() => setOpen(false)} title="Create ticket">
         <div className="space-y-3">
           <div>
-            <div className="text-xs text-neutral-500 dark:text-neutral-400 mb-1">Form Template</div>
+            <div className="text-xs text-neutral-500 dark:text-neutral-400 mb-1">Form</div>
             {availableForms.length === 0 ? (
               <div className="text-sm text-neutral-500 dark:text-neutral-400">
-                No form templates assigned to your group yet.
+                No forms assigned to your group yet.
               </div>
             ) : (
               <Select value={formId} onChange={(e) => setFormId(e.target.value)}>
