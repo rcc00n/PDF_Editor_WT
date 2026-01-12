@@ -38,9 +38,19 @@ export default function FieldHomePage() {
     if (!employee) return forms
     const allowed = new Set<string>()
     for (const g of groups) {
-      if (g.employeeIds.includes(employee.id)) {
-        for (const id of g.formIds) allowed.add(id)
+      const excludedEmployees = g.excludedEmployeeIds ?? []
+      const includesEmployee = g.includeAllEmployees
+        ? !excludedEmployees.includes(employee.id)
+        : g.employeeIds.includes(employee.id)
+      if (!includesEmployee) continue
+      if (g.includeAllForms) {
+        const excludedForms = new Set(g.excludedFormIds ?? [])
+        for (const f of forms) {
+          if (!excludedForms.has(f.id)) allowed.add(f.id)
+        }
+        continue
       }
+      for (const id of g.formIds) allowed.add(id)
     }
     if (!allowed.size) return []
     return forms.filter((f) => allowed.has(f.id))
