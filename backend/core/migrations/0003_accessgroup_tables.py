@@ -18,7 +18,7 @@ def ensure_accessgroup_tables(apps, schema_editor):
 
 class Migration(migrations.Migration):
     dependencies = [
-        ('core', '0001_initial'),
+        ('core', '0002_accessgroup_all_except'),
     ]
 
     operations = [

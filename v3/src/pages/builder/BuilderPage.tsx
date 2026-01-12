@@ -278,7 +278,7 @@ export default function BuilderPage() {
                       className={cn(
                         'rf-focus rounded-2xl border px-3 py-2 text-sm font-medium',
                         activeToolId === t.id
-                          ? 'border-neutral-900 bg-neutral-900 text-white dark:border-white dark:bg-white dark:text-neutral-900'
+                          ? 'border-[var(--rf-accent)] bg-[var(--rf-accent)] text-[var(--rf-accent-contrast)]'
                           : 'border-neutral-200 hover:bg-neutral-50 dark:border-neutral-800 dark:hover:bg-neutral-900'
                       )}
                       draggable
@@ -405,7 +405,7 @@ export default function BuilderPage() {
         </div>
 
         {/* Properties */}
-        <Card>
+        <Card className="xl:sticky xl:top-6">
           <CardBody>
             <div className="flex items-center justify-between gap-2">
               <div className="text-sm font-semibold">Field Properties</div>
@@ -484,6 +484,7 @@ function PageCanvas({
             page={pageIndex}
             refreshKey={stageWidthKey}
             onMeta={onMeta}
+            className="min-h-[260px]"
           />
         ) : (
           <div

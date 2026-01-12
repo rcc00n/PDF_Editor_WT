@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import SectionHeader from '@/shared/ui/SectionHeader'
 import { Card, CardBody } from '@/shared/ui/Card'
 import Badge from '@/shared/ui/Badge'
@@ -13,6 +13,7 @@ import { Filter } from 'lucide-react'
 type FilterKey = 'all' | 'pending' | 'approved' | 'needs_attention'
 
 export default function ReviewPage() {
+  const nav = useNavigate()
   const tickets = useAppStore(s => s.tickets)
   const forms = useAppStore(s => s.forms)
   const [filter, setFilter] = useState<FilterKey>('all')
@@ -104,7 +105,19 @@ export default function ReviewPage() {
                       </thead>
                       <tbody>
                         {group.tickets.map((t) => (
-                          <tr key={t.id} className="border-t border-neutral-200 dark:border-neutral-800">
+                          <tr
+                            key={t.id}
+                            className="border-t border-neutral-200 dark:border-neutral-800 cursor-pointer transition-colors hover:bg-neutral-50/70 focus-within:bg-neutral-50/70 dark:hover:bg-neutral-900/70 dark:focus-within:bg-neutral-900/70"
+                            role="button"
+                            tabIndex={0}
+                            onClick={() => nav(`/review/${t.id}`)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault()
+                                nav(`/review/${t.id}`)
+                              }
+                            }}
+                          >
                             <td className="py-3">
                               <div className="font-medium">{t.id} · {t.title}</div>
                               <div className="text-xs text-neutral-500 dark:text-neutral-400 hidden sm:block">{dateTimeShort(t.assignedAt)}</div>
@@ -131,7 +144,11 @@ export default function ReviewPage() {
                               </Badge>
                             </td>
                             <td className="py-3 text-right">
-                              <Link className="rf-focus rounded-xl px-2 py-1 hover:bg-neutral-100 dark:hover:bg-neutral-900" to={`/review/${t.id}`}>
+                              <Link
+                                className="rf-focus rounded-xl px-2 py-1 hover:bg-neutral-100 dark:hover:bg-neutral-900"
+                                to={`/review/${t.id}`}
+                                onClick={(e) => e.stopPropagation()}
+                              >
                                 Open →
                               </Link>
                             </td>
