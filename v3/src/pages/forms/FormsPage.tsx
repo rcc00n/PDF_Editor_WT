@@ -181,9 +181,28 @@ export default function FormsPage() {
                 </thead>
                 <tbody>
                   {filteredRows.map(({ f, v }) => (
-                    <tr key={f.id} className="border-t border-neutral-200 dark:border-neutral-800">
+                    <tr
+                      key={f.id}
+                      className="border-t border-neutral-200 dark:border-neutral-800 cursor-pointer transition-colors hover:bg-neutral-50/70 focus-within:bg-neutral-50/70 dark:hover:bg-neutral-900/70 dark:focus-within:bg-neutral-900/70"
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => nav(`/builder/${f.id}`)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault()
+                          nav(`/builder/${f.id}`)
+                        }
+                      }}
+                    >
                       <td className="py-3">
-                        <div className="font-medium">{f.name}</div>
+                        <Link
+                          to={`/builder/${f.id}`}
+                          className="rf-focus inline-flex items-center font-medium hover:underline"
+                          title="Open in builder"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          {f.name}
+                        </Link>
                         {f.subtitle && <div className="text-xs text-neutral-500 dark:text-neutral-400">{f.subtitle}</div>}
                         <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-neutral-500 dark:text-neutral-400 sm:hidden">
                           <span>{v.version}</span>
@@ -210,7 +229,8 @@ export default function FormsPage() {
                             variant="secondary"
                             className="w-full sm:w-auto"
                             disabled={!canEdit}
-                            onClick={async () => {
+                            onClick={async (e) => {
+                              e.stopPropagation()
                               if (!canEdit) return
                               try {
                                 const newV = await createVersion(f.id)
@@ -228,7 +248,8 @@ export default function FormsPage() {
                             variant="secondary"
                             className="w-full sm:w-auto"
                             disabled={!canEdit}
-                            onClick={() => {
+                            onClick={(e) => {
+                              e.stopPropagation()
                               if (!canEdit) return
                               nav(`/builder/${f.id}`)
                             }}
@@ -240,7 +261,10 @@ export default function FormsPage() {
                             size="sm"
                             variant="secondary"
                             className="w-full sm:w-auto"
-                            onClick={() => openHistory(f.id)}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              openHistory(f.id)
+                            }}
                             title="Version history"
                           >
                             <History size={16} /> History
@@ -249,7 +273,10 @@ export default function FormsPage() {
                             size="sm"
                             variant="secondary"
                             className="w-full sm:w-auto"
-                            onClick={() => openRendered(f.id)}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              openRendered(f.id)
+                            }}
                             title="View rendered PDF"
                           >
                             <Eye size={16} /> View PDF
@@ -259,7 +286,8 @@ export default function FormsPage() {
                             variant="secondary"
                             className="w-full sm:w-auto"
                             disabled={!canEdit}
-                            onClick={() => {
+                            onClick={(e) => {
+                              e.stopPropagation()
                               if (!canEdit) return
                               openAssign(f.id)
                             }}
@@ -272,7 +300,8 @@ export default function FormsPage() {
                             variant="ghost"
                             className="w-full sm:w-auto"
                             disabled={!canEdit}
-                            onClick={async () => {
+                            onClick={async (e) => {
+                              e.stopPropagation()
                               if (!canEdit) return
                               try {
                                 await archiveForm(f.id)

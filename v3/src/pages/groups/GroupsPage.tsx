@@ -319,7 +319,19 @@ export default function GroupsPage() {
                       allLabel: 'forms'
                     })
                     return (
-                      <tr key={g.id} className="border-t border-neutral-200 dark:border-neutral-800">
+                      <tr
+                        key={g.id}
+                        className="border-t border-neutral-200 dark:border-neutral-800 cursor-pointer transition-colors hover:bg-neutral-50/70 focus-within:bg-neutral-50/70 dark:hover:bg-neutral-900/70 dark:focus-within:bg-neutral-900/70"
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => openEdit(g)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault()
+                            openEdit(g)
+                          }
+                        }}
+                      >
                         <td className="py-3">
                           <div className="font-medium">{g.name}</div>
                           {g.description && (
@@ -352,13 +364,21 @@ export default function GroupsPage() {
                         </td>
                         <td className="py-3 text-right">
                           <div className="flex justify-end gap-2">
-                            <Button size="sm" variant="secondary" onClick={() => openEdit(g)}>
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                openEdit(g)
+                              }}
+                            >
                               <Pencil size={16} /> Edit
                             </Button>
                             <Button
                               size="sm"
                               variant="ghost"
-                              onClick={async () => {
+                              onClick={async (e) => {
+                                e.stopPropagation()
                                 if (!window.confirm(`Delete group "${g.name}"?`)) return
                                 try {
                                   await deleteGroup(g.id)

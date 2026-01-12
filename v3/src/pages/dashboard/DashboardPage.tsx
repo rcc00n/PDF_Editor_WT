@@ -64,20 +64,24 @@ export default function DashboardPage() {
     let inProgress = 0
     let failed = 0
     let syncedToday = 0
-    for (const t of dailyTickets) {
+    for (const t of scopedTickets) {
       if (t.status === 'pending' || t.status === 'queued' || t.status === 'in_progress') pending += 1
       if (t.status === 'in_progress') inProgress += 1
       if (t.status === 'error') failed += 1
+    }
+    for (const t of dailyTickets) {
       if (t.status === 'synced') syncedToday += 1
     }
     return { pending, inProgress, failed, syncedToday }
-  }, [dailyTickets])
+  }, [dailyTickets, scopedTickets])
 
   const pendingTickets = dailyTickets.filter(t => t.status === 'pending' || t.status === 'queued' || t.status === 'in_progress')
   const syncedTickets = dailyTickets.filter(t => t.status === 'synced')
   const pendingVisible = dailyOpen ? pendingTickets : pendingTickets.slice(0, 2)
   const syncedVisible = dailyOpen ? syncedTickets : syncedTickets.slice(0, 2)
   const formsVisible = formsOpen ? availableForms : availableForms.slice(0, 15)
+  const pendingReview = tickets.filter((t) => t.status === 'synced' && t.approvalState !== 'approved').slice(0, 6)
+  const attentionTickets = tickets.filter((t) => t.status === 'error' || t.status === 'queued' || t.status === 'pending').slice(0, 6)
 
   return (
     <div className="pb-10">
@@ -214,6 +218,78 @@ export default function DashboardPage() {
         </Card>
       </div>
 
+      <div className="px-4 mt-4 sm:px-6 sm:mt-6 grid grid-cols-1 xl:grid-cols-2 gap-4">
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <CardTitle>Pending Review</CardTitle>
+                <CardSub>{pendingReview.length} awaiting approval</CardSub>
+              </div>
+              <Button variant="secondary" size="sm" onClick={() => nav('/review')}>
+                Open Review
+              </Button>
+            </div>
+          </CardHeader>
+          <CardBody>
+            {pendingReview.length === 0 ? (
+              <div className="text-sm text-neutral-500 dark:text-neutral-400">No tickets waiting for approval.</div>
+            ) : (
+              <div className="flex flex-col gap-2">
+                {pendingReview.map((t) => (
+                  <Link key={t.id} to={`/review/${t.id}`} className="rf-focus rounded-2xl border border-neutral-200 dark:border-neutral-800 p-3 hover:bg-neutral-50 dark:hover:bg-neutral-900">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="font-medium truncate">{t.id} — {t.title}</div>
+                        <div className="text-xs text-neutral-500 dark:text-neutral-400 truncate">
+                          {t.assignedTo} · {dateTimeShort(t.assignedAt)} · Rig: {extractRig(t) || '—'}
+                        </div>
+                      </div>
+                      <Badge tone="warning">pending</Badge>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </CardBody>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <CardTitle>Needs Attention</CardTitle>
+                <CardSub>Errors and queued submissions</CardSub>
+              </div>
+              <Button variant="secondary" size="sm" onClick={() => nav('/field')}>
+                View Forms
+              </Button>
+            </div>
+          </CardHeader>
+          <CardBody>
+            {attentionTickets.length === 0 ? (
+              <div className="text-sm text-neutral-500 dark:text-neutral-400">Nothing needs attention.</div>
+            ) : (
+              <div className="flex flex-col gap-2">
+                {attentionTickets.map((t) => (
+                  <Link key={t.id} to={`/field/ticket/${t.id}`} className="rf-focus rounded-2xl border border-neutral-200 dark:border-neutral-800 p-3 hover:bg-neutral-50 dark:hover:bg-neutral-900">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="font-medium truncate">{t.id} — {t.title}</div>
+                        <div className="text-xs text-neutral-500 dark:text-neutral-400 truncate">
+                          {t.assignedTo} · {dateTimeShort(t.assignedAt)}
+                        </div>
+                      </div>
+                      <Badge tone={t.status === 'error' ? 'danger' : 'warning'}>{t.status}</Badge>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </CardBody>
+        </Card>
+      </div>
+
       <div className="px-4 mt-4 sm:px-6 sm:mt-6">
         <Card>
           <CardHeader>
@@ -251,9 +327,27 @@ export default function DashboardPage() {
                   {formsVisible.map((f) => {
                     const v = f.versions.find(v => v.status === 'active') ?? f.versions[0]
                     return (
-                      <tr key={f.id} className="border-t border-neutral-200 dark:border-neutral-800">
+                      <tr
+                        key={f.id}
+                        className="border-t border-neutral-200 dark:border-neutral-800 cursor-pointer transition-colors hover:bg-neutral-50/70 focus-within:bg-neutral-50/70 dark:hover:bg-neutral-900/70 dark:focus-within:bg-neutral-900/70"
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => nav(`/builder/${f.id}`)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault()
+                            nav(`/builder/${f.id}`)
+                          }
+                        }}
+                      >
                         <td className="py-2">
-                          <div className="font-medium">{f.name}</div>
+                          <Link
+                            className="rf-focus font-medium hover:underline"
+                            to={`/builder/${f.id}`}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {f.name}
+                          </Link>
                           <div className="text-xs text-neutral-500 dark:text-neutral-400">{f.subtitle}</div>
                           <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-neutral-500 dark:text-neutral-400 sm:hidden">
                             <span>{v.version}</span>
@@ -267,7 +361,11 @@ export default function DashboardPage() {
                           </div>
                           <div className="mt-2 sm:hidden">
                             {canEdit ? (
-                              <Link className="rf-focus inline-flex items-center gap-2 rounded-xl px-2 py-1 hover:bg-neutral-100 dark:hover:bg-neutral-900" to={`/builder/${f.id}`}>
+                              <Link
+                                className="rf-focus inline-flex items-center gap-2 rounded-xl px-2 py-1 hover:bg-neutral-100 dark:hover:bg-neutral-900"
+                                to={`/builder/${f.id}`}
+                                onClick={(e) => e.stopPropagation()}
+                              >
                                 Open <ArrowRight size={14} />
                               </Link>
                             ) : (
@@ -284,7 +382,11 @@ export default function DashboardPage() {
                         <td className="py-2 hidden sm:table-cell">{v.fieldCount}</td>
                         <td className="py-2 text-right hidden sm:table-cell">
                           {canEdit ? (
-                            <Link className="rf-focus inline-flex items-center gap-2 rounded-xl px-2 py-1 hover:bg-neutral-100 dark:hover:bg-neutral-900" to={`/builder/${f.id}`}>
+                            <Link
+                              className="rf-focus inline-flex items-center gap-2 rounded-xl px-2 py-1 hover:bg-neutral-100 dark:hover:bg-neutral-900"
+                              to={`/builder/${f.id}`}
+                              onClick={(e) => e.stopPropagation()}
+                            >
                               Open <ArrowRight size={14} />
                             </Link>
                           ) : (
