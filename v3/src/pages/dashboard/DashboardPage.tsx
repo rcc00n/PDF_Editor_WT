@@ -64,14 +64,16 @@ export default function DashboardPage() {
     let inProgress = 0
     let failed = 0
     let syncedToday = 0
-    for (const t of dailyTickets) {
+    for (const t of scopedTickets) {
       if (t.status === 'pending' || t.status === 'queued' || t.status === 'in_progress') pending += 1
       if (t.status === 'in_progress') inProgress += 1
       if (t.status === 'error') failed += 1
+    }
+    for (const t of dailyTickets) {
       if (t.status === 'synced') syncedToday += 1
     }
     return { pending, inProgress, failed, syncedToday }
-  }, [dailyTickets])
+  }, [dailyTickets, scopedTickets])
 
   const pendingTickets = dailyTickets.filter(t => t.status === 'pending' || t.status === 'queued' || t.status === 'in_progress')
   const syncedTickets = dailyTickets.filter(t => t.status === 'synced')
