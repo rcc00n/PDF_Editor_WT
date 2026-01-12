@@ -7,14 +7,16 @@ import Badge from '@/shared/ui/Badge'
 import Input from '@/shared/ui/Input'
 import Textarea from '@/shared/ui/Textarea'
 import Modal from '@/shared/ui/Modal'
+import Select from '@/shared/ui/Select'
 import { useAppStore } from '@/shared/state/useAppStore'
-import type { Employee, Field } from '@/entities/types'
+import type { Employee, Field, SignatureRole } from '@/entities/types'
 import { dateTimeShort } from '@/shared/lib/format'
 import { downloadDataUrl } from '@/shared/lib/download'
 import { exportRenderedFormPdf } from '@/features/export/exporters'
 import RenderedPdfPreview from '@/features/pdf/RenderedPdfPreview'
 import SignaturePad from '@/features/field/SignaturePad'
 import { resolveMaxLength } from '@/shared/lib/fieldLimits'
+import { signatureRoleLabel, signatureRoles } from '@/shared/lib/signatureRoles'
 import { ArrowLeft, Save, Send, ImagePlus, FileDown, Eye } from 'lucide-react'
 
 const DEFAULT_FONT_SIZE = 12
@@ -30,6 +32,8 @@ export default function FieldTicketPage() {
   const saveDraft = useAppStore(s => s.saveDraft)
   const submitTicket = useAppStore(s => s.submitTicket)
   const apiEnabled = useAppStore(s => s.apiEnabled)
+  const user = useAppStore(s => s.user)
+  const role = useAppStore(s => s.role)
   const uploadAttachment = useAppStore(s => s.uploadAttachment)
   const pushToast = useAppStore(s => s.pushToast)
   const attachmentInputRef = useRef<HTMLInputElement | null>(null)
@@ -56,6 +60,31 @@ export default function FieldTicketPage() {
 
   const { form, version, fields } = ctx
   const renderPdfUrl = version.pdf?.dataUrl ?? version.pdf?.url
+  const fallbackRole: SignatureRole = user?.role === 'admin' || role === 'admin' ? 'admin' : 'employee'
+  const signatureRole = (ticket.signatureRole ?? fallbackRole) as SignatureRole
+  const signatureRoleMeta = signatureRoles.find((role) => role.value === signatureRole)
+  const signatureSigner = resolveSignatureSigner(signatureRole, ticket.signature?.signer, ticket.assignedTo, user?.email)
+
+  useEffect(() => {
+    if (!ticket.signatureRole) {
+      updateTicket(ticket.id, { signatureRole: signatureRole })
+    }
+  }, [signatureRole, ticket.id, ticket.signatureRole, updateTicket])
+
+  const updateSignatureRole = (nextRole: SignatureRole) => {
+    const currentSigner = ticket.signature?.signer ?? ''
+    const nextSigner = defaultSignerForRole(nextRole, ticket.assignedTo, user?.email)
+    const shouldAutofill = !currentSigner.trim() || isAutoSigner(currentSigner, ticket.assignedTo, user?.email)
+    updateTicket(ticket.id, {
+      signatureRole: nextRole,
+      signature: { signer: shouldAutofill ? nextSigner : currentSigner, dataUrl: ticket.signature?.dataUrl }
+    })
+  }
+
+  const handleSubmit = async () => {
+    await submitTicket(ticket.id)
+    nav(`/field/submitted/${ticket.id}`)
+  }
 
   return (
     <div className="pb-10">
@@ -78,7 +107,7 @@ export default function FieldTicketPage() {
             >
               <Eye size={16} /> View Rendered PDF
             </Button>
-            <Button onClick={() => void submitTicket(ticket.id)}>
+            <Button onClick={() => void handleSubmit()}>
               <Send size={16} /> Submit (Queued)
             </Button>
           </>
@@ -113,7 +142,7 @@ export default function FieldTicketPage() {
                   onChange={(val) => {
                     updateTicket(ticket.id, { values: { ...ticket.values, [f.key]: val } })
                   }}
-                  onSignature={(sig) => updateTicket(ticket.id, { signature: { signer: ticket.signature?.signer ?? ticket.assignedTo, dataUrl: sig } })}
+                  onSignature={(sig) => updateTicket(ticket.id, { signature: { signer: signatureSigner, dataUrl: sig } })}
                   onSigner={(name) => updateTicket(ticket.id, { signature: { signer: name, dataUrl: ticket.signature?.dataUrl } })}
                 />
               ))}
@@ -203,12 +232,28 @@ export default function FieldTicketPage() {
               <div className="text-sm font-semibold">Signature</div>
               <div className="mt-3 space-y-2">
                 <div>
+                  <div className="text-xs text-neutral-500 dark:text-neutral-400 mb-1">Signer role</div>
+                  <Select value={signatureRole} onChange={(e) => updateSignatureRole(e.target.value as SignatureRole)}>
+                    {signatureRoles.map((role) => (
+                      <option key={role.value} value={role.value}>{role.label}</option>
+                    ))}
+                  </Select>
+                  {signatureRoleMeta?.helper && (
+                    <div className="text-[11px] text-neutral-500 dark:text-neutral-400 mt-1">
+                      {signatureRoleMeta.helper}
+                    </div>
+                  )}
+                </div>
+                <div>
                   <div className="text-xs text-neutral-500 dark:text-neutral-400 mb-1">Signer</div>
-                  <Input value={ticket.signature?.signer ?? ticket.assignedTo} onChange={(e) => updateTicket(ticket.id, { signature: { signer: e.target.value, dataUrl: ticket.signature?.dataUrl } })} />
+                  <Input value={signatureSigner} onChange={(e) => updateTicket(ticket.id, { signature: { signer: e.target.value, dataUrl: ticket.signature?.dataUrl } })} />
+                  <div className="text-[11px] text-neutral-500 dark:text-neutral-400 mt-1">
+                    Displayed as {signatureRoleLabel(signatureRole)}.
+                  </div>
                 </div>
                 <SignaturePad
                   value={ticket.signature?.dataUrl ?? ticket.signature?.url}
-                  onChange={(sig) => updateTicket(ticket.id, { signature: { signer: ticket.signature?.signer ?? ticket.assignedTo, dataUrl: sig } })}
+                  onChange={(sig) => updateTicket(ticket.id, { signature: { signer: signatureSigner, dataUrl: sig } })}
                 />
               </div>
             </CardBody>
@@ -268,6 +313,26 @@ function attachmentSrc(attachment: { url?: string; dataUrl?: string }) {
   return attachment.url || attachment.dataUrl || ''
 }
 
+function defaultSignerForRole(role: SignatureRole, assignedTo: string, userEmail?: string) {
+  if (role === 'employee') return assignedTo
+  if (role === 'admin') return userEmail || 'Admin'
+  return ''
+}
+
+function isAutoSigner(name: string, assignedTo: string, userEmail?: string) {
+  const trimmed = name.trim()
+  if (!trimmed) return true
+  if (trimmed === assignedTo) return true
+  if (userEmail && trimmed === userEmail) return true
+  if (trimmed === 'Admin') return true
+  return false
+}
+
+function resolveSignatureSigner(role: SignatureRole, signer: string | undefined, assignedTo: string, userEmail?: string) {
+  if (signer && signer.trim()) return signer
+  return defaultSignerForRole(role, assignedTo, userEmail)
+}
+
 function FieldInput({
   field,
   value,
@@ -296,7 +361,7 @@ function FieldInput({
   const autoNote = field.autoValue === 'today' && field.type === 'date'
     ? "Auto-filled with today's date."
     : field.autoValue === 'creator' && field.type === 'text'
-      ? 'Auto-filled with assigned user.'
+      ? 'Auto-filled with assigned employee.'
       : ''
   const options = (field.options ?? []).map((opt) => opt.trim()).filter(Boolean)
   const maxLength = resolveMaxLength(field)

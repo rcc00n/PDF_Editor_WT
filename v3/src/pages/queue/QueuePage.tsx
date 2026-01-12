@@ -5,10 +5,12 @@ import Button from '@/shared/ui/Button'
 import { Card, CardBody, CardHeader, CardSub, CardTitle } from '@/shared/ui/Card'
 import Badge from '@/shared/ui/Badge'
 import Input from '@/shared/ui/Input'
+import Select from '@/shared/ui/Select'
 import { useAppStore } from '@/shared/state/useAppStore'
 import { dateTimeShort, timeHHMM } from '@/shared/lib/format'
 import { extractRig, filterTickets, groupTicketsByForm } from '@/shared/lib/ticketFilters'
 import { RefreshCw, RotateCcw, ShieldAlert } from 'lucide-react'
+import type { TicketStatus } from '@/entities/types'
 
 export default function QueuePage() {
   const queue = useAppStore(s => s.queue)
@@ -19,6 +21,7 @@ export default function QueuePage() {
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
   const [rigQuery, setRigQuery] = useState('')
+  const [statusFilter, setStatusFilter] = useState<TicketStatus | 'all'>('all')
 
   const stats = useMemo(() => ({
     pending: queue.filter(q => q.status === 'pending').length,
@@ -27,8 +30,8 @@ export default function QueuePage() {
   }), [queue])
 
   const filtered = useMemo(
-    () => filterTickets(tickets, { from: fromDate, to: toDate, rig: rigQuery }),
-    [tickets, fromDate, toDate, rigQuery]
+    () => filterTickets(tickets, { from: fromDate, to: toDate, rig: rigQuery, status: statusFilter }),
+    [tickets, fromDate, toDate, rigQuery, statusFilter]
   )
 
   const grouped = useMemo(() => groupTicketsByForm(filtered, forms), [filtered, forms])
@@ -57,7 +60,7 @@ export default function QueuePage() {
             <CardSub>Grouped by form</CardSub>
           </CardHeader>
           <CardBody>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <div>
                 <div className="text-xs text-neutral-500 dark:text-neutral-400 mb-1">From</div>
                 <Input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
@@ -69,6 +72,17 @@ export default function QueuePage() {
               <div>
                 <div className="text-xs text-neutral-500 dark:text-neutral-400 mb-1">Rig</div>
                 <Input placeholder="Search rig" value={rigQuery} onChange={(e) => setRigQuery(e.target.value)} />
+              </div>
+              <div>
+                <div className="text-xs text-neutral-500 dark:text-neutral-400 mb-1">Status</div>
+                <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as TicketStatus | 'all')}>
+                  <option value="all">All statuses</option>
+                  <option value="pending">Pending</option>
+                  <option value="in_progress">In progress</option>
+                  <option value="queued">Queued</option>
+                  <option value="synced">Synced</option>
+                  <option value="error">Error</option>
+                </Select>
               </div>
             </div>
 

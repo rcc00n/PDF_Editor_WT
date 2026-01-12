@@ -11,6 +11,7 @@ import Input from '@/shared/ui/Input'
 import Select from '@/shared/ui/Select'
 import { useEffect, useMemo, useState } from 'react'
 import { extractRig, filterTickets, groupTicketsByForm } from '@/shared/lib/ticketFilters'
+import type { TicketStatus } from '@/entities/types'
 
 export default function FieldHomePage() {
   const nav = useNavigate()
@@ -32,6 +33,23 @@ export default function FieldHomePage() {
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
   const [rigQuery, setRigQuery] = useState('')
+  const [statusFilter, setStatusFilter] = useState<TicketStatus | 'all'>('all')
+
+  const activeEmployees = useMemo(() => employees.filter((e) => e.active), [employees])
+  const currentEmployee = useMemo(() => {
+    const email = user?.email?.trim().toLowerCase()
+    if (!email) return null
+    return employees.find((e) => (e.email ?? '').trim().toLowerCase() === email) ?? null
+  }, [employees, user?.email])
+  const defaultAssignee = currentEmployee?.name ?? activeEmployees[0]?.name ?? 'Technician'
+
+  useEffect(() => {
+    if (!assignedTo || assignedTo === 'Technician') {
+      if (defaultAssignee && assignedTo !== defaultAssignee) {
+        setAssignedTo(defaultAssignee)
+      }
+    }
+  }, [assignedTo, defaultAssignee])
 
   const availableForms = useMemo(() => {
     if (role === 'admin') return forms
@@ -81,8 +99,8 @@ export default function FieldHomePage() {
   const needsRetry = queue.filter(q => q.status === 'failed').length
 
   const filteredTickets = useMemo(
-    () => filterTickets(tickets, { from: fromDate, to: toDate, rig: rigQuery }),
-    [tickets, fromDate, toDate, rigQuery]
+    () => filterTickets(scopedTickets, { from: fromDate, to: toDate, rig: rigQuery, status: statusFilter }),
+    [scopedTickets, fromDate, toDate, rigQuery, statusFilter]
   )
 
   const groupedTickets = useMemo(
@@ -114,7 +132,7 @@ export default function FieldHomePage() {
             <CardSub>Tap a ticket to open the form</CardSub>
           </CardHeader>
           <CardBody>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <div>
                 <div className="text-xs text-neutral-500 dark:text-neutral-400 mb-1">From</div>
                 <Input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
@@ -126,6 +144,17 @@ export default function FieldHomePage() {
               <div>
                 <div className="text-xs text-neutral-500 dark:text-neutral-400 mb-1">Rig</div>
                 <Input placeholder="Search rig" value={rigQuery} onChange={(e) => setRigQuery(e.target.value)} />
+              </div>
+              <div>
+                <div className="text-xs text-neutral-500 dark:text-neutral-400 mb-1">Status</div>
+                <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as TicketStatus | 'all')}>
+                  <option value="all">All statuses</option>
+                  <option value="pending">Pending</option>
+                  <option value="in_progress">In progress</option>
+                  <option value="queued">Queued</option>
+                  <option value="synced">Synced</option>
+                  <option value="error">Error</option>
+                </Select>
               </div>
             </div>
 
@@ -225,7 +254,17 @@ export default function FieldHomePage() {
           </div>
           <div>
             <div className="text-xs text-neutral-500 dark:text-neutral-400 mb-1">Assigned to</div>
-            <Input value={assignedTo} onChange={(e) => setAssignedTo(e.target.value)} />
+            {activeEmployees.length ? (
+              <Select value={assignedTo} onChange={(e) => setAssignedTo(e.target.value)}>
+                {activeEmployees.map((e) => (
+                  <option key={e.id} value={e.name}>
+                    {e.name}{e.role ? ` · ${e.role}` : ''}
+                  </option>
+                ))}
+              </Select>
+            ) : (
+              <Input value={assignedTo} onChange={(e) => setAssignedTo(e.target.value)} />
+            )}
           </div>
           <div className="flex justify-end gap-2">
             <Button variant="secondary" onClick={() => setOpen(false)}>Cancel</Button>

@@ -9,6 +9,7 @@ import FieldTicketPage from './pages/field/FieldTicketPage'
 import QueuePage from './pages/queue/QueuePage'
 import ReviewPage from './pages/review/ReviewPage'
 import ReviewTicketPage from './pages/review/ReviewTicketPage'
+import ReviewApprovedPage from './pages/review/ReviewApprovedPage'
 import EmployeesPage from './pages/employees/EmployeesPage'
 import GroupsPage from './pages/groups/GroupsPage'
 import LoginPage from './pages/auth/LoginPage'
@@ -75,6 +76,7 @@ export default function App() {
           <Route path="/queue" element={<QueuePage />} />
           <Route path="/review" element={<ReviewPage />} />
           <Route path="/review/:ticketId" element={<ReviewTicketPage />} />
+          <Route path="/review/approved/:ticketId" element={<ReviewApprovedPage />} />
           <Route path="/employees" element={<EmployeesPage />} />
           <Route path="/groups" element={<GroupsPage />} />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />

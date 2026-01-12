@@ -32,8 +32,9 @@ export default function AppShell() {
   const location = useLocation()
   const navigate = useNavigate()
 
-  const nextTheme = theme === 'dark' ? 'light' : theme === 'light' ? 'planet' : 'dark'
-  const ThemeIcon = nextTheme === 'light' ? Sun : nextTheme === 'dark' ? Moon : Globe
+  const nextTheme = theme === 'light' ? 'planet' : 'light'
+  const ThemeIcon = nextTheme === 'light' ? Sun : Globe
+  const nextThemeLabel = nextTheme === 'light' ? 'light' : 'color'
   const isAdmin = role === 'admin'
   const RoleIcon = isAdmin ? Shield : User
   const navItems = isAdmin
@@ -61,13 +62,13 @@ export default function AppShell() {
     <div className="h-full flex">
       <aside
         className={cn(
-          'hidden md:flex md:flex-col shrink-0 border-r border-neutral-200 dark:border-neutral-800 bg-white/80 dark:bg-neutral-950/70 backdrop-blur',
+          'hidden md:flex md:flex-col shrink-0 border-r border-neutral-200 dark:border-neutral-800 bg-white/95 dark:bg-neutral-950/85',
           'md:w-[240px]'
         )}
       >
         <div
           className={cn(
-            'h-16 flex items-center border-b border-neutral-200 dark:border-neutral-800 px-3 md:px-4 gap-3'
+            'h-16 flex items-center border-b border-neutral-200 dark:border-neutral-800 px-4 md:px-5 gap-3'
           )}
         >
           <div className="h-10 w-10 rounded-2xl border border-neutral-200 dark:border-neutral-800 overflow-hidden">
@@ -92,7 +93,7 @@ export default function AppShell() {
                 aria-label={item.label}
                 className={({ isActive }) =>
                   cn(
-                    'rf-focus flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-medium transition',
+                    'rf-focus flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-medium',
                     'hover:bg-neutral-100 dark:hover:bg-neutral-900',
                     isActive && 'bg-neutral-100 dark:bg-neutral-900'
                   )
@@ -125,8 +126,8 @@ export default function AppShell() {
       </aside>
 
       <div className="flex-1 min-w-0 flex flex-col">
-        <header className="h-16 shrink-0 border-b border-neutral-200 dark:border-neutral-800 bg-white/70 dark:bg-neutral-950/60 backdrop-blur">
-          <div className="h-full px-4 flex items-center justify-between gap-3">
+        <header className="h-16 shrink-0 border-b border-neutral-200 dark:border-neutral-800 bg-white/95 dark:bg-neutral-950/85">
+          <div className="h-full px-5 sm:px-6 flex items-center justify-between gap-3">
             <div className="min-w-0">
               <div className="text-sm font-semibold truncate">
                 {titleForPath(location.pathname)}
@@ -150,7 +151,7 @@ export default function AppShell() {
 
               <button
                 className={cn(
-                  'rf-focus rounded-2xl border px-3 py-2 text-sm font-medium transition',
+                  'rf-focus rounded-2xl border px-3 py-2 text-sm font-medium',
                   online ? 'border-neutral-200 dark:border-neutral-800' : 'border-amber-300/60 dark:border-amber-400/30',
                   'hover:bg-neutral-50 dark:hover:bg-neutral-900'
                 )}
@@ -178,7 +179,7 @@ export default function AppShell() {
               <button
                 className="rf-focus rounded-2xl border border-neutral-200 dark:border-neutral-800 px-3 py-2 text-sm hover:bg-neutral-50 dark:hover:bg-neutral-900"
                 onClick={toggleTheme}
-                title={`Switch to ${nextTheme} theme`}
+                title={`Switch to ${nextThemeLabel} theme`}
               >
                 <ThemeIcon size={16} />
               </button>
@@ -237,7 +238,7 @@ export default function AppShell() {
                 to={item.to}
                 className={({ isActive }) =>
                   cn(
-                    'rf-focus flex flex-col items-center justify-center gap-1 rounded-2xl px-2 py-2 text-[10px] font-medium leading-tight transition',
+                    'rf-focus flex flex-col items-center justify-center gap-1 rounded-2xl px-2 py-2 text-[10px] font-medium leading-tight',
                     isActive
                       ? 'bg-neutral-100 text-neutral-900 dark:bg-neutral-900 dark:text-white'
                       : 'text-neutral-500 dark:text-neutral-400'

@@ -9,6 +9,7 @@ import { useAppStore } from '@/shared/state/useAppStore'
 import { dateTimeShort } from '@/shared/lib/format'
 import { exportRenderedFormPdf, exportTicketPdf } from '@/features/export/exporters'
 import RenderedPdfPreview from '@/features/pdf/RenderedPdfPreview'
+import { signatureRoleLabel } from '@/shared/lib/signatureRoles'
 import { ArrowLeft, FileDown, CheckCircle2, Eye } from 'lucide-react'
 
 export default function ReviewTicketPage() {
@@ -42,6 +43,15 @@ export default function ReviewTicketPage() {
   const { form, version } = ctx
   const renderPdfUrl = version.pdf?.dataUrl ?? version.pdf?.url
 
+  const handleApprove = async () => {
+    try {
+      await approveTicket(ticket.id)
+      nav(`/review/approved/${ticket.id}`)
+    } catch (err: any) {
+      pushToast({ title: 'Approval failed', message: err?.message || 'Unable to approve ticket', variant: 'danger' })
+    }
+  }
+
   return (
     <div className="pb-10">
       <SectionHeader
@@ -64,7 +74,7 @@ export default function ReviewTicketPage() {
               <Eye size={16} /> View Rendered PDF
             </Button>
             <Button
-              onClick={() => void approveTicket(ticket.id)}
+              onClick={() => void handleApprove()}
               disabled={ticket.approvalState === 'approved'}
             >
               <CheckCircle2 size={16} /> Approve & Archive
@@ -105,6 +115,9 @@ export default function ReviewTicketPage() {
               <div className="mt-4 rounded-2xl border border-neutral-200 dark:border-neutral-800 p-3">
                 <div className="text-xs text-neutral-500 dark:text-neutral-400">Signature</div>
                 <div className="mt-1 font-medium">{ticket.signature?.signer ?? '—'}</div>
+                <div className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
+                  {signatureRoleLabel(ticket.signatureRole ?? 'employee')}
+                </div>
                 {signatureSrc(ticket.signature) && (
                   <img src={signatureSrc(ticket.signature)} alt="signature" className="mt-2 h-[80px] w-auto rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white" />
                 )}
@@ -179,7 +192,7 @@ export default function ReviewTicketPage() {
                 </Badge>
               </div>
               <div className="mt-3">
-                <Button onClick={() => void approveTicket(ticket.id)} disabled={ticket.approvalState === 'approved'}>
+                <Button onClick={() => void handleApprove()} disabled={ticket.approvalState === 'approved'}>
                   <CheckCircle2 size={16} /> Approve & Archive
                 </Button>
               </div>
