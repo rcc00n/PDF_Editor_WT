@@ -309,9 +309,25 @@ export default function DashboardPage() {
                   {formsVisible.map((f) => {
                     const v = f.versions.find(v => v.status === 'active') ?? f.versions[0]
                     return (
-                      <tr key={f.id} className="border-t border-neutral-200 dark:border-neutral-800">
+                      <tr
+                        key={f.id}
+                        className="border-t border-neutral-200 dark:border-neutral-800 cursor-pointer transition-colors hover:bg-neutral-50/70 focus-within:bg-neutral-50/70 dark:hover:bg-neutral-900/70 dark:focus-within:bg-neutral-900/70"
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => nav(`/builder/${f.id}`)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault()
+                            nav(`/builder/${f.id}`)
+                          }
+                        }}
+                      >
                         <td className="py-2">
-                          <Link className="rf-focus font-medium hover:underline" to={`/builder/${f.id}`}>
+                          <Link
+                            className="rf-focus font-medium hover:underline"
+                            to={`/builder/${f.id}`}
+                            onClick={(e) => e.stopPropagation()}
+                          >
                             {f.name}
                           </Link>
                           <div className="text-xs text-neutral-500 dark:text-neutral-400">{f.subtitle}</div>
@@ -327,7 +343,11 @@ export default function DashboardPage() {
                           </div>
                           <div className="mt-2 sm:hidden">
                             {canEdit ? (
-                              <Link className="rf-focus inline-flex items-center gap-2 rounded-xl px-2 py-1 hover:bg-neutral-100 dark:hover:bg-neutral-900" to={`/builder/${f.id}`}>
+                              <Link
+                                className="rf-focus inline-flex items-center gap-2 rounded-xl px-2 py-1 hover:bg-neutral-100 dark:hover:bg-neutral-900"
+                                to={`/builder/${f.id}`}
+                                onClick={(e) => e.stopPropagation()}
+                              >
                                 Open <ArrowRight size={14} />
                               </Link>
                             ) : (
@@ -344,7 +364,11 @@ export default function DashboardPage() {
                         <td className="py-2 hidden sm:table-cell">{v.fieldCount}</td>
                         <td className="py-2 text-right hidden sm:table-cell">
                           {canEdit ? (
-                            <Link className="rf-focus inline-flex items-center gap-2 rounded-xl px-2 py-1 hover:bg-neutral-100 dark:hover:bg-neutral-900" to={`/builder/${f.id}`}>
+                            <Link
+                              className="rf-focus inline-flex items-center gap-2 rounded-xl px-2 py-1 hover:bg-neutral-100 dark:hover:bg-neutral-900"
+                              to={`/builder/${f.id}`}
+                              onClick={(e) => e.stopPropagation()}
+                            >
                               Open <ArrowRight size={14} />
                             </Link>
                           ) : (
