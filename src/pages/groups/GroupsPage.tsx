@@ -410,7 +410,7 @@ export default function GroupsPage() {
                 <button
                   type="button"
                   className={cn(
-                    'rf-focus rounded-xl border px-2 py-1 text-xs font-medium transition',
+                    'rf-focus rounded-xl border px-2 py-1 text-xs font-medium',
                     form.includeAllEmployees
                       ? 'border-neutral-200 text-neutral-700 hover:bg-neutral-50 dark:border-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-900'
                       : 'border-[var(--rf-accent)] bg-[var(--rf-accent)] text-[var(--rf-accent-contrast)]'
@@ -422,7 +422,7 @@ export default function GroupsPage() {
                 <button
                   type="button"
                   className={cn(
-                    'rf-focus rounded-xl border px-2 py-1 text-xs font-medium transition',
+                    'rf-focus rounded-xl border px-2 py-1 text-xs font-medium',
                     form.includeAllEmployees
                       ? 'border-[var(--rf-accent)] bg-[var(--rf-accent)] text-[var(--rf-accent-contrast)]'
                       : 'border-neutral-200 text-neutral-700 hover:bg-neutral-50 dark:border-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-900'
@@ -480,7 +480,7 @@ export default function GroupsPage() {
                 <button
                   type="button"
                   className={cn(
-                    'rf-focus rounded-xl border px-2 py-1 text-xs font-medium transition',
+                    'rf-focus rounded-xl border px-2 py-1 text-xs font-medium',
                     form.includeAllForms
                       ? 'border-neutral-200 text-neutral-700 hover:bg-neutral-50 dark:border-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-900'
                       : 'border-[var(--rf-accent)] bg-[var(--rf-accent)] text-[var(--rf-accent-contrast)]'
@@ -492,7 +492,7 @@ export default function GroupsPage() {
                 <button
                   type="button"
                   className={cn(
-                    'rf-focus rounded-xl border px-2 py-1 text-xs font-medium transition',
+                    'rf-focus rounded-xl border px-2 py-1 text-xs font-medium',
                     form.includeAllForms
                       ? 'border-[var(--rf-accent)] bg-[var(--rf-accent)] text-[var(--rf-accent-contrast)]'
                       : 'border-neutral-200 text-neutral-700 hover:bg-neutral-50 dark:border-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-900'

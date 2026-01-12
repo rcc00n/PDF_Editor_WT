@@ -6,6 +6,7 @@ import Button from '@/shared/ui/Button'
 import Badge from '@/shared/ui/Badge'
 import { useAppStore } from '@/shared/state/useAppStore'
 import { dateTimeShort } from '@/shared/lib/format'
+import { resolveAvailableForms } from '@/shared/lib/access'
 import { Plus, ArrowRight, ChevronDown } from 'lucide-react'
 import { cn } from '@/shared/ui/cn'
 import type { TicketStatus } from '@/entities/types'
@@ -13,7 +14,10 @@ import type { TicketStatus } from '@/entities/types'
 export default function DashboardPage() {
   const nav = useNavigate()
   const forms = useAppStore(s => s.forms)
+  const groups = useAppStore(s => s.groups)
   const role = useAppStore(s => s.role)
+  const employees = useAppStore(s => s.employees)
+  const user = useAppStore(s => s.user)
   const createForm = useAppStore(s => s.createForm)
   const pushToast = useAppStore(s => s.pushToast)
   const tickets = useAppStore(s => s.tickets)
@@ -21,17 +25,38 @@ export default function DashboardPage() {
   const [dailyOpen, setDailyOpen] = useState(false)
   const [formsOpen, setFormsOpen] = useState(false)
 
+  const currentEmployee = useMemo(() => {
+    const email = user?.email?.trim().toLowerCase()
+    if (!email) return null
+    return employees.find((e) => (e.email ?? '').trim().toLowerCase() === email) ?? null
+  }, [employees, user?.email])
+
+  const availableForms = useMemo(() => {
+    return resolveAvailableForms({ forms, groups, employees, role, userEmail: user?.email })
+  }, [employees, forms, groups, role, user?.email])
+
+  const scopedTickets = useMemo(() => {
+    if (role === 'admin') return tickets
+    const matched = currentEmployee?.name?.trim().toLowerCase()
+    const email = user?.email?.trim().toLowerCase()
+    if (!matched && !email) return tickets
+    return tickets.filter((t) => {
+      const assigned = t.assignedTo.trim().toLowerCase()
+      return (matched && assigned === matched) || (email && assigned === email)
+    })
+  }, [currentEmployee?.name, role, tickets, user?.email])
+
   const dailyTickets = useMemo(() => {
     const now = new Date()
     const sameDay = (iso: string) => {
       const d = new Date(iso)
       return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate()
     }
-    return tickets
+    return scopedTickets
       .filter(t => sameDay(t.assignedAt))
       .slice()
       .sort((a, b) => b.assignedAt.localeCompare(a.assignedAt))
-  }, [tickets])
+  }, [scopedTickets])
 
   const stats = useMemo(() => {
     let pending = 0
@@ -51,13 +76,19 @@ export default function DashboardPage() {
   const syncedTickets = dailyTickets.filter(t => t.status === 'synced')
   const pendingVisible = dailyOpen ? pendingTickets : pendingTickets.slice(0, 2)
   const syncedVisible = dailyOpen ? syncedTickets : syncedTickets.slice(0, 2)
-  const formsVisible = formsOpen ? forms : forms.slice(0, 15)
+  const formsVisible = formsOpen ? availableForms : availableForms.slice(0, 15)
 
   return (
     <div className="pb-10">
       <SectionHeader
         title="Dashboard"
-        subtitle="Immediate visibility into form templates and completed forms."
+        subtitle={
+          role === 'admin'
+            ? 'Immediate visibility into form templates and completed forms.'
+            : currentEmployee?.name
+              ? `Tickets assigned to ${currentEmployee.name}.`
+              : 'Assigned field work and completed forms.'
+        }
         right={
           <>
             <Button
@@ -104,7 +135,7 @@ export default function DashboardPage() {
                 aria-expanded={dailyOpen}
                 title={dailyOpen ? 'Collapse lists' : 'Expand lists'}
               >
-                <ChevronDown size={18} className={cn('transition', dailyOpen && 'rotate-180')} />
+                  <ChevronDown size={18} className={cn(dailyOpen && 'rotate-180')} />
               </button>
             </div>
           </CardHeader>
@@ -179,7 +210,7 @@ export default function DashboardPage() {
                   aria-expanded={formsOpen}
                   title={formsOpen ? 'Collapse list' : 'Expand list'}
                 >
-                  <ChevronDown size={18} className={cn('transition', formsOpen && 'rotate-180')} />
+                  <ChevronDown size={18} className={cn(formsOpen && 'rotate-180')} />
                 </button>
                 <Button variant="secondary" onClick={() => nav('/forms')}>Manage Templates</Button>
               </div>
@@ -246,6 +277,13 @@ export default function DashboardPage() {
                       </tr>
                     )
                   })}
+                  {formsVisible.length === 0 && (
+                    <tr>
+                      <td className="py-6 text-center text-sm text-neutral-500 dark:text-neutral-400" colSpan={5}>
+                        {role === 'admin' ? 'No templates yet' : 'No templates assigned yet'}
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>

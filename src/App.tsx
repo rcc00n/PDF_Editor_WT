@@ -6,8 +6,10 @@ import FormsPage from './pages/forms/FormsPage'
 import BuilderPage from './pages/builder/BuilderPage'
 import FieldHomePage from './pages/field/FieldHomePage'
 import FieldTicketPage from './pages/field/FieldTicketPage'
+import FieldSubmittedPage from './pages/field/FieldSubmittedPage'
 import ReviewPage from './pages/review/ReviewPage'
 import ReviewTicketPage from './pages/review/ReviewTicketPage'
+import ReviewApprovedPage from './pages/review/ReviewApprovedPage'
 import EmployeesPage from './pages/employees/EmployeesPage'
 import GroupsPage from './pages/groups/GroupsPage'
 import LoginPage from './pages/auth/LoginPage'
@@ -71,8 +73,10 @@ export default function App() {
           <Route path="/builder/:formId" element={<BuilderPage />} />
           <Route path="/field" element={<FieldHomePage />} />
           <Route path="/field/ticket/:ticketId" element={<FieldTicketPage />} />
+          <Route path="/field/submitted/:ticketId" element={<FieldSubmittedPage />} />
           <Route path="/review" element={<ReviewPage />} />
           <Route path="/review/:ticketId" element={<ReviewTicketPage />} />
+          <Route path="/review/approved/:ticketId" element={<ReviewApprovedPage />} />
           <Route path="/employees" element={<EmployeesPage />} />
           <Route path="/groups" element={<GroupsPage />} />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
@@ -83,7 +87,7 @@ export default function App() {
       <ToastHost />
       {!online && (
         <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50">
-          <div className="px-3 py-2 rounded-full text-xs font-medium border border-neutral-200 bg-white/90 backdrop-blur dark:border-neutral-800 dark:bg-neutral-900/80">
+          <div className="px-4 py-2 rounded-full text-xs font-medium border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
             Offline: changes are saved locally and will sync when you're online
           </div>
         </div>

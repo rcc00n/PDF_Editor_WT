@@ -14,8 +14,8 @@ export default function Button(
     <button
       {...rest}
       className={cn(
-        'rf-focus inline-flex items-center justify-center gap-2 rounded-2xl font-medium transition disabled:opacity-50 disabled:cursor-not-allowed',
-        size === 'sm' ? 'h-9 px-3 text-sm' : 'h-10 px-4 text-sm',
+        'rf-focus inline-flex items-center justify-center gap-2 rounded-2xl font-medium disabled:opacity-50 disabled:cursor-not-allowed',
+        size === 'sm' ? 'h-9 px-3 text-sm' : 'h-11 px-5 text-sm',
         variant === 'primary' &&
           'bg-[var(--rf-accent)] text-[var(--rf-accent-contrast)] hover:bg-[var(--rf-accent-hover)]',
         variant === 'secondary' &&

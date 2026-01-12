@@ -6,7 +6,7 @@ import { clamp } from '@/shared/lib/math'
 import { API_ENABLED } from '@/shared/api/config'
 import { apiFetch, apiJson, clearStoredTokens, getStoredAccessToken, getStoredRefreshToken, storeTokens } from '@/shared/api/client'
 
-export type Theme = 'light' | 'dark' | 'planet'
+export type Theme = 'light' | 'planet'
 export type UserRole = 'admin' | 'worker'
 export type AuthStatus = 'unknown' | 'authenticated' | 'unauthenticated'
 
@@ -50,7 +50,8 @@ const safeStorage = {
 }
 
 function normalizeTheme(value: string | null): Theme {
-  if (value === 'light' || value === 'dark' || value === 'planet') return value
+  if (value === 'light' || value === 'planet') return value
+  if (value === 'dark') return 'planet'
   return 'planet'
 }
 
@@ -65,7 +66,7 @@ function getStoredTheme(): Theme {
 function applyTheme(theme: Theme) {
   if (typeof document === 'undefined') return
   const root = document.documentElement
-  const isDark = theme === 'dark' || theme === 'planet'
+  const isDark = theme === 'planet'
   root.classList.toggle('dark', isDark)
   root.classList.toggle('theme-planet', theme === 'planet')
 }
@@ -182,7 +183,7 @@ export const useAppStore = create<State>()(
       },
       toggleTheme: () => {
         const current = get().theme
-        const next: Theme = current === 'dark' ? 'light' : current === 'light' ? 'planet' : 'dark'
+        const next: Theme = current === 'light' ? 'planet' : 'light'
         get().setTheme(next)
       },
       role: 'admin',
@@ -524,7 +525,8 @@ export const useAppStore = create<State>()(
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ formId, versionId, title, assignedTo })
           })
-          set((s) => ({ tickets: upsertById(s.tickets, ticket) }))
+          const nextTicket = { ...ticket, signatureRole: ticket.signatureRole ?? 'employee' }
+          set((s) => ({ tickets: upsertById(s.tickets, nextTicket) }))
           get().addActivity('Ticket created', `${ticket.id} · ${ticket.title}`)
           return ticket.id
         }
@@ -540,6 +542,7 @@ export const useAppStore = create<State>()(
           approvalState: 'pending',
           values: {},
           attachments: [],
+          signatureRole: 'employee',
           updatedAt: nowIso()
         }
         set((s) => ({ tickets: [t, ...s.tickets] }))

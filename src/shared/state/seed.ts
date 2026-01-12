@@ -90,6 +90,7 @@ export function seedIfEmpty() {
       // demo placeholder
     ],
     signature: { signer: 'Jordan Miles' },
+    signatureRole: 'employee',
     updatedAt: nowIso()
   }
 
