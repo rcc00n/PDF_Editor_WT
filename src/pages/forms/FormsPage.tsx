@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import SectionHeader from '@/shared/ui/SectionHeader'
 import Button from '@/shared/ui/Button'
 import { Card, CardBody } from '@/shared/ui/Card'
@@ -137,14 +137,14 @@ export default function FormsPage() {
   return (
     <div className="pb-10">
       <SectionHeader
-        title="Form Templates"
+        title="Forms"
         subtitle="Templates, versions, and publish flow."
         right={
           <>
             <div className="w-full sm:w-64">
               <Input
                 type="search"
-                placeholder="Search templates"
+                placeholder="Search forms"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
               />
@@ -152,14 +152,14 @@ export default function FormsPage() {
             <Button
               variant="secondary"
               disabled={!canEdit}
-              title={canEdit ? 'Create new template' : 'Admins only'}
+              title={canEdit ? 'Create new form' : 'Admins only'}
               onClick={() => {
                 if (!canEdit) return
                 setName('')
                 setOpen(true)
               }}
             >
-              <Plus size={16} /> New Template
+              <Plus size={16} /> New Form
             </Button>
           </>
         }
@@ -172,7 +172,7 @@ export default function FormsPage() {
               <table className="w-full text-sm">
                 <thead className="text-xs text-neutral-500 dark:text-neutral-400">
                   <tr className="text-left">
-                    <th className="py-2">Template</th>
+                    <th className="py-2">Form</th>
                     <th className="py-2 hidden sm:table-cell">Current version</th>
                     <th className="py-2 hidden sm:table-cell">Status</th>
                     <th className="py-2 hidden sm:table-cell">Fields</th>
@@ -321,7 +321,7 @@ export default function FormsPage() {
                   {filteredRows.length === 0 && (
                     <tr>
                       <td className="py-10 text-center text-sm text-neutral-500 dark:text-neutral-400" colSpan={5}>
-                        {query.trim() ? 'No templates match that search' : 'No templates yet'}
+                        {query.trim() ? 'No forms match that search' : 'No forms yet'}
                       </td>
                     </tr>
                   )}
@@ -332,25 +332,25 @@ export default function FormsPage() {
         </Card>
       </div>
 
-      <Modal open={open} onClose={() => setOpen(false)} title="Create new template">
+      <Modal open={open} onClose={() => setOpen(false)} title="Create new form">
         <div className="space-y-3">
           <div className="text-sm text-neutral-500 dark:text-neutral-400">
             You can rename it later. In the Builder you will add the PDF and fields.
           </div>
-          <Input placeholder="Template name" value={name} onChange={(e) => setName(e.target.value)} />
+          <Input placeholder="Form name" value={name} onChange={(e) => setName(e.target.value)} />
           <div className="flex justify-end gap-2">
             <Button variant="secondary" onClick={() => setOpen(false)}>Cancel</Button>
             <Button
               disabled={!canEdit}
-              title={canEdit ? 'Create template' : 'Admins only'}
+              title={canEdit ? 'Create form' : 'Admins only'}
               onClick={async () => {
                 if (!canEdit) return
                 try {
-                  const id = await createForm((name || 'New Template').trim())
+                  const id = await createForm((name || 'New Form').trim())
                   setOpen(false)
                   nav(`/builder/${id}`)
                 } catch (err: any) {
-                  pushToast({ title: 'Create failed', message: err?.message || 'Unable to create template', variant: 'danger' })
+                  pushToast({ title: 'Create failed', message: err?.message || 'Unable to create form', variant: 'danger' })
                 }
               }}
             >
