@@ -4,7 +4,7 @@ import Modal from './Modal'
 import Input from './Input'
 import Kbd from './Kbd'
 import { useAppStore } from '@/shared/state/useAppStore'
-import { Search, Plus, LayoutGrid, FileText, Smartphone, RefreshCw, ClipboardCheck, Moon, Sun, Globe, WifiOff, Wifi, Shield, User, LogOut, Users } from 'lucide-react'
+import { Search, Plus, LayoutGrid, FileText, Smartphone, ClipboardCheck, Moon, Sun, Globe, WifiOff, Wifi, Shield, User, LogOut, Users } from 'lucide-react'
 
 type Action = {
   id: string
@@ -52,9 +52,8 @@ export default function CommandPalette() {
   const actions: Action[] = useMemo(() => {
     const base: Action[] = [
       { id: 'dash', title: 'Dashboard', subtitle: 'Overview and activity', icon: LayoutGrid, run: () => nav('/dashboard') },
-      { id: 'forms', title: 'Forms', subtitle: 'Templates and versions', icon: FileText, run: () => nav('/forms') },
-      { id: 'field', title: 'Field App', subtitle: 'Offline tickets', icon: Smartphone, run: () => nav('/field') },
-      { id: 'queue', title: 'Sync Queue', subtitle: 'Pending / failed mutations', icon: RefreshCw, run: () => nav('/queue') },
+      { id: 'forms', title: 'Form Templates', subtitle: 'Templates and versions', icon: FileText, run: () => nav('/forms') },
+      { id: 'field', title: 'Completed Forms', subtitle: 'Offline drafts and submissions', icon: Smartphone, run: () => nav('/field') },
       { id: 'review', title: 'Admin Review', subtitle: 'Preview and export', icon: ClipboardCheck, run: () => nav('/review') },
       { id: 'theme', title: `Switch to ${nextTheme}`, icon: ThemeIcon, run: () => toggleTheme(), keywords: 'theme dark light planet' },
       { id: 'offline', title: forcedOffline ? 'Disable offline simulation' : 'Enable offline simulation', icon: forcedOffline ? Wifi : WifiOff, run: () => setForcedOffline(!forcedOffline), keywords: 'offline online network' }
@@ -74,14 +73,14 @@ export default function CommandPalette() {
     if (isAdmin) {
       base.splice(apiEnabled ? 5 : 6, 0, {
         id: 'new',
-        title: 'Create new form',
+        title: 'Create new template',
         subtitle: 'Start a template from scratch',
         icon: Plus,
         run: async () => {
-          const id = await createForm('New Form')
+          const id = await createForm('New Template')
           nav(`/builder/${id}`)
         },
-        keywords: 'create new form template builder'
+        keywords: 'create new template builder'
       })
       base.splice(apiEnabled ? 6 : 7, 0, {
         id: 'employees',
@@ -97,7 +96,7 @@ export default function CommandPalette() {
         subtitle: 'Access group assignments',
         icon: Users,
         run: () => nav('/groups'),
-        keywords: 'groups access forms permissions'
+        keywords: 'groups access templates permissions'
       })
     }
 
