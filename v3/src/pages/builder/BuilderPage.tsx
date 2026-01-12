@@ -270,31 +270,8 @@ export default function BuilderPage() {
                       </button>
                     ))}
                   </div>
-                )}
-                <div className={cn('grid grid-cols-2 gap-2', section.title ? 'mt-2' : '')}>
-                  {section.tools.map((t) => (
-                    <button
-                      key={t.id}
-                      className={cn(
-                        'rf-focus rounded-2xl border px-3 py-2 text-sm font-medium',
-                        activeToolId === t.id
-                          ? 'border-[var(--rf-accent)] bg-[var(--rf-accent)] text-[var(--rf-accent-contrast)]'
-                          : 'border-neutral-200 hover:bg-neutral-50 dark:border-neutral-800 dark:hover:bg-neutral-900'
-                      )}
-                      draggable
-                      title={t.description ?? t.label}
-                      onDragStart={(e) => {
-                        e.dataTransfer.setData('application/x-rf-tool', t.id)
-                        e.dataTransfer.effectAllowed = 'copy'
-                      }}
-                      onClick={() => setActiveToolId((prev) => (prev === t.id ? null : t.id))}
-                    >
-                      {t.label}
-                    </button>
-                  ))}
                 </div>
-              </div>
-            ))}
+              ))}
 
             <div className="mt-4 flex items-center justify-between">
               <div className="text-xs text-neutral-500 dark:text-neutral-400">Status</div>
