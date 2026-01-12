@@ -5,6 +5,7 @@ import PdfPageCanvas from '@/features/pdf/PdfPageCanvas'
 import Modal from '@/shared/ui/Modal'
 
 const DEFAULT_FONT_SIZE = 12
+type SignatureValue = { signer?: string; dataUrl?: string; url?: string }
 
 type Props = {
   pdfUrl?: string
@@ -101,8 +102,9 @@ export default function RenderedPdfPreview({ pdfUrl, fields, ticket }: Props) {
 function RenderedField({ field, ticket }: { field: Field; ticket: Ticket }) {
   const fontSize = field.fontSize ?? DEFAULT_FONT_SIZE
   const value = ticket.values[field.key]
-  const signatureSrc = ticket.signature?.dataUrl ?? ticket.signature?.url
-  const signer = ticket.signature?.signer ?? ''
+  const fieldSignature = signatureFromValue(value) ?? ticket.signature ?? null
+  const signatureSrc = fieldSignature?.dataUrl ?? fieldSignature?.url
+  const signer = fieldSignature?.signer ?? ''
 
   const style = {
     left: `${field.x * 100}%`,
@@ -161,4 +163,10 @@ function RenderedField({ field, ticket }: { field: Field; ticket: Ticket }) {
       {text}
     </div>
   )
+}
+
+function signatureFromValue(value: any): SignatureValue | null {
+  if (!value || typeof value !== 'object') return null
+  if (!('signer' in value) && !('dataUrl' in value) && !('url' in value)) return null
+  return value as SignatureValue
 }

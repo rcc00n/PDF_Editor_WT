@@ -5,7 +5,6 @@ import Button from '@/shared/ui/Button'
 import { Card, CardBody } from '@/shared/ui/Card'
 import Badge from '@/shared/ui/Badge'
 import Input from '@/shared/ui/Input'
-import Textarea from '@/shared/ui/Textarea'
 import Modal from '@/shared/ui/Modal'
 import { useAppStore } from '@/shared/state/useAppStore'
 import type { Employee, Field } from '@/entities/types'
@@ -13,6 +12,7 @@ import { dateTimeShort } from '@/shared/lib/format'
 import { downloadDataUrl } from '@/shared/lib/download'
 import { exportRenderedFormPdf } from '@/features/export/exporters'
 import RenderedPdfPreview from '@/features/pdf/RenderedPdfPreview'
+import PdfPageCanvas from '@/features/pdf/PdfPageCanvas'
 import SignaturePad from '@/features/field/SignaturePad'
 import { resolveMaxLength } from '@/shared/lib/fieldLimits'
 import { ArrowLeft, Save, Send, ImagePlus, FileDown, Eye } from 'lucide-react'
@@ -34,6 +34,11 @@ export default function FieldTicketPage() {
   const pushToast = useAppStore(s => s.pushToast)
   const attachmentInputRef = useRef<HTMLInputElement | null>(null)
   const [renderOpen, setRenderOpen] = useState(false)
+  const [numPages, setNumPages] = useState(1)
+  const [signatureField, setSignatureField] = useState<Field | null>(null)
+  const [signatureDraft, setSignatureDraft] = useState<string | undefined>(undefined)
+  const [signatureSigner, setSignatureSigner] = useState('')
+  const [signatureApplyAll, setSignatureApplyAll] = useState(true)
 
   const ctx = useMemo(() => {
     if (!ticket) return null
@@ -56,6 +61,41 @@ export default function FieldTicketPage() {
 
   const { form, version, fields } = ctx
   const renderPdfUrl = version.pdf?.dataUrl ?? version.pdf?.url
+  const canvas = version.canvas ?? { width: 210, height: 297 }
+  const signatureFields = useMemo(() => fields.filter((f) => f.type === 'signature'), [fields])
+  const pageList = renderPdfUrl ? Array.from({ length: Math.max(1, numPages) }, (_, i) => i + 1) : [1]
+
+  const openSignatureModal = (field: Field) => {
+    const existing = signatureFromValue(ticket.values[field.key]) ?? ticket.signature ?? null
+    setSignatureField(field)
+    setSignatureSigner((existing?.signer || ticket.assignedTo || '').trim())
+    setSignatureDraft(existing?.dataUrl || existing?.url)
+    setSignatureApplyAll(true)
+  }
+
+  const closeSignatureModal = () => {
+    setSignatureField(null)
+    setSignatureDraft(undefined)
+    setSignatureSigner('')
+    setSignatureApplyAll(true)
+  }
+
+  const saveSignature = () => {
+    if (!signatureField) return
+    const signer = (signatureSigner || ticket.assignedTo || '').trim()
+    const signatureValue = buildSignatureValue(signatureDraft, signer)
+    const nextValues = { ...ticket.values }
+    if (signatureApplyAll) {
+      for (const f of signatureFields) {
+        nextValues[f.key] = signatureValue
+      }
+    } else {
+      nextValues[signatureField.key] = signatureValue
+    }
+    const patch = signatureApplyAll ? { values: nextValues, signature: signatureValue } : { values: nextValues }
+    updateTicket(ticket.id, patch)
+    closeSignatureModal()
+  }
 
   return (
     <div className="pb-10">
@@ -89,34 +129,72 @@ export default function FieldTicketPage() {
         <Card>
           <CardBody>
             <div className="flex items-center justify-between gap-3">
-              <div className="text-sm font-semibold">Fields</div>
+              <div className="text-sm font-semibold">Fill on PDF</div>
               <Badge tone={ticket.status === 'synced' ? 'success' : ticket.status === 'error' ? 'danger' : ticket.status === 'queued' ? 'warning' : 'neutral'}>
                 {ticket.status}
               </Badge>
             </div>
 
-            <div className="mt-4 space-y-4">
+            <div className="mt-3 space-y-6">
               {fields.length === 0 && (
                 <div className="text-sm text-neutral-500 dark:text-neutral-400">
                   This version has no mapped fields yet. Open the Builder and add fields.
                 </div>
               )}
 
-              {fields.map((f) => (
-                <FieldInput
-                  key={f.id}
-                  field={f}
-                  value={ticket.values[f.key]}
-                  employees={employees}
-                  creatorName={ticket.assignedTo}
-                  signature={ticket.signature}
-                  onChange={(val) => {
-                    updateTicket(ticket.id, { values: { ...ticket.values, [f.key]: val } })
-                  }}
-                  onSignature={(sig) => updateTicket(ticket.id, { signature: { signer: ticket.signature?.signer ?? ticket.assignedTo, dataUrl: sig } })}
-                  onSigner={(name) => updateTicket(ticket.id, { signature: { signer: name, dataUrl: ticket.signature?.dataUrl } })}
-                />
-              ))}
+              {pageList.map((pageIndex) => {
+                const pageFields = fields.filter((f) => f.page === pageIndex)
+                return (
+                  <div key={pageIndex} className="space-y-2">
+                    {pageList.length > 1 && (
+                      <div className="text-xs text-neutral-500 dark:text-neutral-400">Page {pageIndex}</div>
+                    )}
+                    <div className="relative">
+                      {renderPdfUrl ? (
+                        <PdfPageCanvas
+                          dataUrl={renderPdfUrl}
+                          page={pageIndex}
+                          onMeta={pageIndex === 1 ? (meta) => setNumPages(meta.numPages) : undefined}
+                        />
+                      ) : (
+                        <div
+                          className="w-full rounded-2xl border border-dashed border-neutral-300 dark:border-neutral-700 bg-white/70 dark:bg-neutral-950/40 flex items-center justify-center p-6 text-center"
+                          style={{ aspectRatio: `${canvas.width} / ${canvas.height}` }}
+                        >
+                          <div className="pointer-events-none">
+                            <div className="text-sm font-medium">Upload a PDF to lock the layout</div>
+                            <div className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
+                              You can still place fields on this blank page.
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="absolute inset-0">
+                        {pageFields.map((f) => (
+                          <OverlayField
+                            key={f.id}
+                            field={f}
+                            value={ticket.values[f.key]}
+                            employees={employees}
+                            creatorName={ticket.assignedTo}
+                            signature={signatureFromValue(ticket.values[f.key]) ?? ticket.signature ?? null}
+                            onChange={(val) => {
+                              updateTicket(ticket.id, { values: { ...ticket.values, [f.key]: val } })
+                            }}
+                            onOpenSignature={() => openSignatureModal(f)}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+
+            <div className="mt-3 text-xs text-neutral-500 dark:text-neutral-400 flex justify-between gap-3">
+              <div>{renderPdfUrl ? 'Tap fields to edit' : 'PDF not uploaded yet'}</div>
+              <div>{renderPdfUrl ? version.pdf?.name ?? 'PDF' : 'No PDF'}</div>
             </div>
           </CardBody>
         </Card>
@@ -198,22 +276,6 @@ export default function FieldTicketPage() {
             </CardBody>
           </Card>
 
-          <Card>
-            <CardBody>
-              <div className="text-sm font-semibold">Signature</div>
-              <div className="mt-3 space-y-2">
-                <div>
-                  <div className="text-xs text-neutral-500 dark:text-neutral-400 mb-1">Signer</div>
-                  <Input value={ticket.signature?.signer ?? ticket.assignedTo} onChange={(e) => updateTicket(ticket.id, { signature: { signer: e.target.value, dataUrl: ticket.signature?.dataUrl } })} />
-                </div>
-                <SignaturePad
-                  value={ticket.signature?.dataUrl ?? ticket.signature?.url}
-                  onChange={(sig) => updateTicket(ticket.id, { signature: { signer: ticket.signature?.signer ?? ticket.assignedTo, dataUrl: sig } })}
-                />
-              </div>
-            </CardBody>
-          </Card>
-
           {ticket.lastError && (
             <Card>
               <CardBody>
@@ -260,6 +322,36 @@ export default function FieldTicketPage() {
           </div>
         )}
       </Modal>
+
+      <Modal
+        open={Boolean(signatureField)}
+        onClose={closeSignatureModal}
+        title={signatureField ? `Signature · ${signatureField.label}` : 'Signature'}
+        className="max-w-3xl"
+      >
+        <div className="space-y-4">
+          <div>
+            <div className="text-xs text-neutral-500 dark:text-neutral-400 mb-1">Signer</div>
+            <Input value={signatureSigner} onChange={(e) => setSignatureSigner(e.target.value)} />
+          </div>
+          {signatureFields.length > 1 && (
+            <div className="flex items-center gap-2 text-sm">
+              <input
+                id="signature-apply-all"
+                type="checkbox"
+                checked={signatureApplyAll}
+                onChange={(e) => setSignatureApplyAll(e.target.checked)}
+              />
+              <label htmlFor="signature-apply-all">Apply this signature to all signature fields</label>
+            </div>
+          )}
+          <SignaturePad value={signatureDraft} onChange={setSignatureDraft} />
+          <div className="flex justify-end gap-2">
+            <Button variant="secondary" onClick={closeSignatureModal}>Cancel</Button>
+            <Button onClick={saveSignature}>Save signature</Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   )
 }
@@ -268,38 +360,29 @@ function attachmentSrc(attachment: { url?: string; dataUrl?: string }) {
   return attachment.url || attachment.dataUrl || ''
 }
 
-function FieldInput({
+type SignatureValue = { signer: string; dataUrl?: string; url?: string }
+
+function OverlayField({
   field,
   value,
   employees,
   creatorName,
   signature,
   onChange,
-  onSignature,
-  onSigner
+  onOpenSignature
 }: {
   field: Field
   value: any
   employees: Employee[]
   creatorName: string
-  signature?: { signer: string; dataUrl?: string }
+  signature: SignatureValue | null
   onChange: (v: any) => void
-  onSignature: (dataUrl?: string) => void
-  onSigner: (name: string) => void
+  onOpenSignature: () => void
 }) {
-  const hint = field.hint
-  const help = field.helpText
-  const [search, setSearch] = useState('')
-  const [expanded, setExpanded] = useState(false)
   const fontSize = field.fontSize ?? DEFAULT_FONT_SIZE
   const readOnly = field.readOnly === true
-  const autoNote = field.autoValue === 'today' && field.type === 'date'
-    ? "Auto-filled with today's date."
-    : field.autoValue === 'creator' && field.type === 'text'
-      ? 'Auto-filled with assigned user.'
-      : ''
-  const options = (field.options ?? []).map((opt) => opt.trim()).filter(Boolean)
   const maxLength = resolveMaxLength(field)
+  const options = (field.options ?? []).map((opt) => opt.trim()).filter(Boolean)
 
   useEffect(() => {
     if (!field.autoValue) return
@@ -314,231 +397,191 @@ function FieldInput({
     }
   }, [creatorName, field.autoValue, field.type, onChange, value])
 
-  if (field.type === 'checkbox') {
-    return (
-      <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 p-3">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <div className="font-medium">{field.label}{field.required ? ' *' : ''}</div>
-            {help && <div className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">{help}</div>}
-          </div>
-          <input type="checkbox" className="h-5 w-5" checked={!!value} onChange={(e) => onChange(e.target.checked)} disabled={readOnly} />
-        </div>
-      </div>
-    )
-  }
+  const wrapperStyle = {
+    left: `${field.x * 100}%`,
+    top: `${field.y * 100}%`,
+    width: `${field.w * 100}%`,
+    height: `${field.h * 100}%`,
+    minWidth: '24px',
+    minHeight: '24px'
+  } as const
+
+  const inputClass =
+    'rf-focus h-full w-full rounded-md border border-neutral-300 bg-white/90 px-1 text-[12px] leading-tight placeholder:text-neutral-400 dark:border-neutral-700 dark:bg-neutral-950/80'
 
   if (field.type === 'signature') {
+    const src = signature?.dataUrl || signature?.url || ''
     return (
-      <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 p-3">
-        <div className="font-medium">{field.label}{field.required ? ' *' : ''}</div>
-        <div className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">Use the Signature panel on the right.</div>
+      <div className="absolute" style={wrapperStyle}>
+        <button
+          type="button"
+          className="rf-focus relative h-full w-full rounded-md border border-dashed border-neutral-400/70 bg-white/80 text-[10px] text-neutral-600 dark:border-neutral-600/60 dark:bg-neutral-950/70 dark:text-neutral-300"
+          onClick={onOpenSignature}
+          disabled={readOnly}
+          title={field.label}
+        >
+          <span className="absolute left-1 top-1 rounded-md bg-white/80 px-1 py-0.5 text-[9px] text-neutral-700 dark:bg-neutral-950/70 dark:text-neutral-300">
+            {field.label}
+          </span>
+          {src ? (
+            <img src={src} alt="signature" className="h-full w-full object-contain" />
+          ) : (
+            <span className="px-1">Tap to sign</span>
+          )}
+        </button>
       </div>
     )
   }
 
   if (field.type === 'photo') {
     return (
-      <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 p-3">
-        <div className="font-medium">{field.label}{field.required ? ' *' : ''}</div>
-        <div className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">Use the Photo Attachments panel on the right.</div>
+      <div className="absolute" style={wrapperStyle}>
+        <div
+          className="h-full w-full rounded-md border border-dashed border-neutral-300/80 bg-white/70 px-1 text-[10px] text-neutral-500 flex items-center justify-center dark:border-neutral-700/70 dark:bg-neutral-950/60 dark:text-neutral-400"
+          title={field.label}
+        >
+          {field.label}
+        </div>
       </div>
     )
   }
 
-  if (field.type === 'select') {
+  if (field.type === 'checkbox') {
     return (
-      <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 p-3">
-        <div className="font-medium">{field.label}{field.required ? ' *' : ''}</div>
-        {help && <div className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">{help}</div>}
-        <div className="mt-2">
-          <select
-            className="rf-focus h-10 w-full rounded-2xl border border-neutral-200 bg-white px-3 text-sm dark:border-neutral-800 dark:bg-neutral-950"
-            value={value ?? ''}
-            onChange={(e) => onChange(e.target.value)}
-            disabled={readOnly || options.length === 0}
-            style={{ fontSize }}
-          >
-            <option value="">{options.length ? 'Select option' : 'No options'}</option>
-            {options.map((opt) => (
-              <option key={opt} value={opt}>{opt}</option>
-            ))}
-          </select>
-        </div>
-        {options.length === 0 && (
-          <div className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">Add options in the Builder.</div>
-        )}
-        {hint && <div className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">{hint}</div>}
+      <div className="absolute flex items-center justify-center" style={wrapperStyle} title={field.label}>
+        <input
+          type="checkbox"
+          className="h-4 w-4"
+          checked={!!value}
+          onChange={(e) => onChange(e.target.checked)}
+          disabled={readOnly}
+        />
       </div>
     )
   }
 
-  if (field.type === 'radio') {
+  if (field.type === 'select' || field.type === 'radio') {
     return (
-      <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 p-3">
-        <div className="font-medium">{field.label}{field.required ? ' *' : ''}</div>
-        {help && <div className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">{help}</div>}
-        <div className="mt-2 space-y-2" style={{ fontSize }}>
-          {options.length === 0 ? (
-            <div className="text-xs text-neutral-500 dark:text-neutral-400">Add options in the Builder.</div>
-          ) : (
-            options.map((opt) => (
-              <label key={opt} className="flex items-center gap-2 text-sm">
-                <input
-                  type="radio"
-                  name={`radio_${field.id}`}
-                  value={opt}
-                  checked={value === opt}
-                  onChange={(e) => onChange(e.target.value)}
-                  disabled={readOnly}
-                />
-                <span>{opt}</span>
-              </label>
-            ))
-          )}
-        </div>
-        {hint && <div className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">{hint}</div>}
+      <div className="absolute" style={wrapperStyle} title={field.label}>
+        <select
+          className={inputClass}
+          value={value ?? ''}
+          onChange={(e) => onChange(e.target.value)}
+          disabled={readOnly || options.length === 0}
+          style={{ fontSize }}
+        >
+          <option value="">{options.length ? 'Select' : 'No options'}</option>
+          {options.map((opt) => (
+            <option key={opt} value={opt}>{opt}</option>
+          ))}
+        </select>
       </div>
     )
   }
 
   if (field.type === 'employee') {
-    const q = search.trim().toLowerCase()
-    const filtered = employees.filter((e) => e.active).filter((e) => {
-      const hay = `${e.name} ${e.email ?? ''} ${e.role ?? ''}`.toLowerCase()
-      return hay.includes(q)
-    })
-    const selected = employees.find((e) => e.name === value)
-    let visible = expanded ? filtered : filtered.slice(0, 8)
-    if (selected && !visible.some((e) => e.id === selected.id)) {
-      visible = [...visible, selected]
-    }
+    const activeEmployees = employees.filter((e) => e.active)
     return (
-      <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 p-3">
-        <div className="font-medium">{field.label}{field.required ? ' *' : ''}</div>
-        {help && <div className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">{help}</div>}
-        <div className="mt-2 space-y-2">
-          <Input
-            placeholder="Search employees..."
-            value={search}
-            onChange={(e) => {
-              setSearch(e.target.value)
-              setExpanded(false)
-            }}
-            style={{ fontSize }}
-            disabled={readOnly}
-          />
-          <select
-            className="rf-focus h-10 w-full rounded-2xl border border-neutral-200 bg-white px-3 text-sm dark:border-neutral-800 dark:bg-neutral-950"
-            value={value ?? ''}
-            onChange={(e) => onChange(e.target.value)}
-            style={{ fontSize }}
-            disabled={readOnly}
-          >
-            <option value="">Select employee</option>
-            {visible.map((e) => (
-              <option key={e.id} value={e.name}>
-                {e.name}{e.role ? ` · ${e.role}` : ''}
-              </option>
-            ))}
-          </select>
-          {filtered.length === 0 && (
-            <div className="text-xs text-neutral-500 dark:text-neutral-400">No matching employees</div>
-          )}
-          {filtered.length > 8 && (
-            <button
-              type="button"
-              className="rf-focus text-xs text-neutral-600 dark:text-neutral-300 underline"
-              onClick={() => setExpanded((s) => !s)}
-            >
-              {expanded ? 'Show less' : 'Show more'}
-            </button>
-          )}
-        </div>
-        {hint && <div className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">{hint}</div>}
+      <div className="absolute" style={wrapperStyle} title={field.label}>
+        <select
+          className={inputClass}
+          value={value ?? ''}
+          onChange={(e) => onChange(e.target.value)}
+          disabled={readOnly}
+          style={{ fontSize }}
+        >
+          <option value="">Select</option>
+          {activeEmployees.map((e) => (
+            <option key={e.id} value={e.name}>
+              {e.name}{e.role ? ` · ${e.role}` : ''}
+            </option>
+          ))}
+        </select>
       </div>
     )
   }
-
-  const common = (
-    <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 p-3">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="font-medium">{field.label}{field.required ? ' *' : ''}</div>
-          {help && <div className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">{help}</div>}
-        </div>
-      </div>
-
-      <div className="mt-2">
-        {field.type === 'date' ? (
-          <Input
-            type="date"
-            value={value ?? ''}
-            onChange={(e) => onChange(e.target.value)}
-            style={{ fontSize }}
-            readOnly={readOnly}
-          />
-        ) : field.type === 'numeric' ? (
-          <Input
-            type="number"
-            value={value ?? ''}
-            onChange={(e) => {
-              const raw = e.target.value
-              const trimmed = maxLength ? raw.slice(0, maxLength) : raw
-              onChange(trimmed === '' ? '' : Number(trimmed))
-            }}
-            style={{ fontSize }}
-            readOnly={readOnly}
-            maxLength={maxLength}
-          />
-        ) : (
-          <Input
-            value={value ?? ''}
-            onChange={(e) => onChange(e.target.value)}
-            style={{ fontSize }}
-            readOnly={readOnly}
-            maxLength={maxLength}
-          />
-        )}
-      </div>
-
-      {hint && <div className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">{hint}</div>}
-      {autoNote && <div className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">{autoNote}{readOnly ? '' : ' (editable)'}</div>}
-      {field.type === 'numeric' && field.validation.kind === 'range' && value !== '' && value != null && (
-        <RangeHint value={Number(value)} min={field.validation.min} max={field.validation.max} />
-      )}
-    </div>
-  )
 
   if (field.key === 'notes') {
     return (
-      <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 p-3">
-        <div className="font-medium">{field.label}{field.required ? ' *' : ''}</div>
-        <div className="mt-2">
-          <Textarea
-            value={value ?? ''}
-            onChange={(e) => onChange(e.target.value)}
-            style={{ fontSize }}
-            readOnly={readOnly}
-            maxLength={maxLength}
-          />
-        </div>
-        {hint && <div className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">{hint}</div>}
-        {autoNote && <div className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">{autoNote}{readOnly ? '' : ' (editable)'}</div>}
+      <div className="absolute" style={wrapperStyle} title={field.label}>
+        <textarea
+          className={`${inputClass} resize-none`}
+          value={value ?? ''}
+          onChange={(e) => onChange(e.target.value)}
+          readOnly={readOnly}
+          maxLength={maxLength}
+          style={{ fontSize }}
+        />
       </div>
     )
   }
 
-  return common
-}
+  if (field.type === 'date') {
+    return (
+      <div className="absolute" style={wrapperStyle} title={field.label}>
+        <input
+          type="date"
+          className={inputClass}
+          value={value ?? ''}
+          onChange={(e) => onChange(e.target.value)}
+          readOnly={readOnly}
+          style={{ fontSize }}
+        />
+      </div>
+    )
+  }
 
-function RangeHint({ value, min, max }: { value: number; min: number; max: number }) {
-  const ok = value >= min && value <= max
+  if (field.type === 'numeric') {
+    return (
+      <div className="absolute" style={wrapperStyle} title={field.label}>
+        <input
+          type="number"
+          className={inputClass}
+          value={value ?? ''}
+          onChange={(e) => {
+            const raw = e.target.value
+            const trimmed = maxLength ? raw.slice(0, maxLength) : raw
+            onChange(trimmed === '' ? '' : Number(trimmed))
+          }}
+          readOnly={readOnly}
+          style={{ fontSize }}
+        />
+      </div>
+    )
+  }
+
   return (
-    <div className={ok ? 'text-xs text-emerald-600 dark:text-emerald-300 mt-1' : 'text-xs text-amber-600 dark:text-amber-300 mt-1'}>
-      {ok ? 'Within allowed range.' : `Out of range (${min}–${max}).`}
+    <div className="absolute" style={wrapperStyle} title={field.label}>
+      <input
+        className={inputClass}
+        value={value ?? ''}
+        onChange={(e) => onChange(e.target.value)}
+        readOnly={readOnly}
+        maxLength={maxLength}
+        style={{ fontSize }}
+      />
     </div>
   )
+}
+
+function signatureFromValue(value: any): SignatureValue | null {
+  if (!value || typeof value !== 'object') return null
+  const signer = typeof value.signer === 'string' ? value.signer : ''
+  const dataUrl = typeof value.dataUrl === 'string' ? value.dataUrl : undefined
+  const url = typeof value.url === 'string' ? value.url : undefined
+  if (!signer && !dataUrl && !url) return null
+  return { signer, dataUrl, url }
+}
+
+function buildSignatureValue(src: string | undefined, signer: string): SignatureValue {
+  const next: SignatureValue = { signer }
+  if (!src) return next
+  if (src.startsWith('data:')) {
+    next.dataUrl = src
+  } else {
+    next.url = src
+  }
+  return next
 }
 
 function localIsoDate() {

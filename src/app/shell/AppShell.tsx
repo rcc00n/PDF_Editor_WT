@@ -1,6 +1,6 @@
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useEffect, useState } from 'react'
-import { LayoutGrid, PencilRuler, Smartphone, ClipboardCheck, Moon, Sun, Globe, Wifi, WifiOff, Command, Shield, User, Users, ChevronLeft, ChevronRight, ChevronDown, LogOut, Sparkles } from 'lucide-react'
+import { LayoutGrid, PencilRuler, Smartphone, Moon, Sun, Globe, Wifi, WifiOff, Command, Shield, User, Users, ChevronDown, LogOut, Sparkles } from 'lucide-react'
 import { useAppStore } from '@/shared/state/useAppStore'
 import { cn } from '@/shared/ui/cn'
 import Modal from '@/shared/ui/Modal'
@@ -9,8 +9,7 @@ import Badge from '@/shared/ui/Badge'
 
 const nav = [
   { to: '/dashboard', label: 'Dashboard', icon: LayoutGrid },
-  { to: '/field', label: 'Completed Forms', icon: Smartphone },
-  { to: '/review', label: 'Review', icon: ClipboardCheck }
+  { to: '/field', label: 'Completed Forms', icon: Smartphone }
 ]
 
 export default function AppShell() {

@@ -36,6 +36,11 @@ export default function FormsPage() {
 
   const canEdit = role === 'admin'
 
+  const isInteractive = (target: EventTarget | null) => {
+    if (!(target instanceof HTMLElement)) return false
+    return Boolean(target.closest('a, button, input, select, textarea'))
+  }
+
   const rows = useMemo(
     () => forms.map(f => ({ f, v: f.versions.find(v => v.status === 'active') ?? f.versions[0] })),
     [forms]
@@ -162,7 +167,22 @@ export default function FormsPage() {
                 </thead>
                 <tbody>
                   {filteredRows.map(({ f, v }) => (
-                    <tr key={f.id} className="border-t border-neutral-200 dark:border-neutral-800">
+                    <tr
+                      key={f.id}
+                      className="border-t border-neutral-200 dark:border-neutral-800 cursor-pointer hover:bg-neutral-50 dark:hover:bg-neutral-900"
+                      role="button"
+                      tabIndex={0}
+                      onClick={(e) => {
+                        if (isInteractive(e.target)) return
+                        nav(`/builder/${f.id}`)
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault()
+                          nav(`/builder/${f.id}`)
+                        }
+                      }}
+                    >
                       <td className="py-3">
                         <Link
                           to={`/builder/${f.id}`}
