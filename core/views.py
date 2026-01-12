@@ -9,8 +9,8 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.parsers import JSONParser, MultiPartParser, FormParser
-from .models import FormTemplate, FormVersion, Ticket, Attachment, Employee, uid
-from .serializers import FormTemplateSerializer, TicketSerializer, TicketUpdateSerializer, EmployeeSerializer
+from .models import FormTemplate, FormVersion, Ticket, Attachment, Employee, AccessGroup, uid
+from .serializers import FormTemplateSerializer, TicketSerializer, TicketUpdateSerializer, EmployeeSerializer, AccessGroupSerializer
 from .permissions import is_admin
 
 
@@ -47,6 +47,47 @@ def data_url_to_content(data_url: str, fallback_name: str):
     return filename, ContentFile(base64.b64decode(b64), name=filename), mime
 
 
+def employee_for_user(user):
+    if not user or not user.is_authenticated:
+        return None
+    email = (user.email or user.username or '').strip()
+    if not email:
+        return None
+    return Employee.objects.filter(email__iexact=email).first()
+
+
+def group_includes_employee(group, employee_id: str) -> bool:
+    if group.include_all_employees:
+        excluded = {e.id for e in group.excluded_employees.all()}
+        return employee_id not in excluded
+    return employee_id in {e.id for e in group.employees.all()}
+
+
+def group_allowed_form_ids(group, all_form_ids):
+    if group.include_all_forms:
+        excluded = {f.id for f in group.excluded_forms.all()}
+        return set(all_form_ids) - excluded
+    return {f.id for f in group.forms.all()}
+
+
+def allowed_form_ids_for_employee(employee, forms_qs=None):
+    all_forms_qs = forms_qs or FormTemplate.objects.all()
+    all_form_ids = set(all_forms_qs.values_list('id', flat=True))
+    if not all_form_ids:
+        return set()
+    groups = AccessGroup.objects.prefetch_related('employees', 'excluded_employees', 'forms', 'excluded_forms').all()
+    allowed = set()
+    for group in groups:
+        if group_includes_employee(group, employee.id):
+            allowed.update(group_allowed_form_ids(group, all_form_ids))
+    return allowed
+
+
+def employee_has_form_access(employee, form) -> bool:
+    allowed_ids = allowed_form_ids_for_employee(employee, FormTemplate.objects.filter(id=form.id))
+    return form.id in allowed_ids
+
+
 class HealthView(APIView):
     permission_classes = [AllowAny]
 
@@ -64,6 +105,14 @@ class MeView(APIView):
 class FormListCreateView(APIView):
     def get(self, request):
         forms = FormTemplate.objects.prefetch_related('versions').all()
+        if not is_admin(request.user):
+            employee = employee_for_user(request.user)
+            if not employee:
+                return Response([])
+            allowed_ids = allowed_form_ids_for_employee(employee, forms)
+            if not allowed_ids:
+                return Response([])
+            forms = forms.filter(id__in=allowed_ids)
         return Response(FormTemplateSerializer(forms, many=True, context={'request': request}).data)
 
     def post(self, request):
@@ -185,6 +234,14 @@ class FormVersionFieldDeleteView(APIView):
 class TicketListCreateView(APIView):
     def get(self, request):
         tickets = Ticket.objects.select_related('form', 'version').prefetch_related('attachments').all()
+        if not is_admin(request.user):
+            employee = employee_for_user(request.user)
+            if not employee:
+                return Response([])
+            allowed_ids = allowed_form_ids_for_employee(employee)
+            if not allowed_ids:
+                return Response([])
+            tickets = tickets.filter(form_id__in=allowed_ids)
         return Response(TicketSerializer(tickets, many=True, context={'request': request}).data)
 
     def post(self, request):
@@ -195,6 +252,12 @@ class TicketListCreateView(APIView):
         if not form_id or not version_id:
             return Response({'detail': 'formId and versionId required'}, status=status.HTTP_400_BAD_REQUEST)
         form = get_object_or_404(FormTemplate, pk=form_id)
+        if not is_admin(request.user):
+            employee = employee_for_user(request.user)
+            if not employee:
+                return Response({'detail': 'Employee profile required'}, status=status.HTTP_403_FORBIDDEN)
+            if not employee_has_form_access(employee, form):
+                return Response({'detail': 'No access to form'}, status=status.HTTP_403_FORBIDDEN)
         version = get_object_or_404(FormVersion, pk=version_id, form=form)
         ticket = Ticket.objects.create(
             title=title,
@@ -322,4 +385,44 @@ class EmployeeDetailView(APIView):
             return Response({'detail': 'Admin only'}, status=status.HTTP_403_FORBIDDEN)
         employee = get_object_or_404(Employee, pk=employee_id)
         employee.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class AccessGroupListCreateView(APIView):
+    def get(self, request):
+        if not is_admin(request.user):
+            return Response({'detail': 'Admin only'}, status=status.HTTP_403_FORBIDDEN)
+        groups = AccessGroup.objects.prefetch_related('employees', 'forms').all()
+        return Response(AccessGroupSerializer(groups, many=True).data)
+
+    def post(self, request):
+        if not is_admin(request.user):
+            return Response({'detail': 'Admin only'}, status=status.HTTP_403_FORBIDDEN)
+        serializer = AccessGroupSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        group = serializer.save()
+        return Response(AccessGroupSerializer(group).data, status=status.HTTP_201_CREATED)
+
+
+class AccessGroupDetailView(APIView):
+    def get(self, request, group_id):
+        if not is_admin(request.user):
+            return Response({'detail': 'Admin only'}, status=status.HTTP_403_FORBIDDEN)
+        group = get_object_or_404(AccessGroup, pk=group_id)
+        return Response(AccessGroupSerializer(group).data)
+
+    def patch(self, request, group_id):
+        if not is_admin(request.user):
+            return Response({'detail': 'Admin only'}, status=status.HTTP_403_FORBIDDEN)
+        group = get_object_or_404(AccessGroup, pk=group_id)
+        serializer = AccessGroupSerializer(group, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        group = serializer.save()
+        return Response(AccessGroupSerializer(group).data)
+
+    def delete(self, request, group_id):
+        if not is_admin(request.user):
+            return Response({'detail': 'Admin only'}, status=status.HTTP_403_FORBIDDEN)
+        group = get_object_or_404(AccessGroup, pk=group_id)
+        group.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)

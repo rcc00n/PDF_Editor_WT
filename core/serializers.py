@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.utils import timezone
-from .models import FormTemplate, FormVersion, Ticket, Attachment, Employee
+from .models import FormTemplate, FormVersion, Ticket, Attachment, Employee, AccessGroup
 
 
 def build_file_url(request, file_field):
@@ -115,3 +115,16 @@ class EmployeeSerializer(serializers.ModelSerializer):
     class Meta:
         model = Employee
         fields = ['id', 'name', 'email', 'role', 'phone', 'active']
+
+
+class AccessGroupSerializer(serializers.ModelSerializer):
+    employeeIds = serializers.PrimaryKeyRelatedField(source='employees', many=True, queryset=Employee.objects.all(), required=False)
+    formIds = serializers.PrimaryKeyRelatedField(source='forms', many=True, queryset=FormTemplate.objects.all(), required=False)
+    includeAllEmployees = serializers.BooleanField(source='include_all_employees', required=False)
+    includeAllForms = serializers.BooleanField(source='include_all_forms', required=False)
+    excludedEmployeeIds = serializers.PrimaryKeyRelatedField(source='excluded_employees', many=True, queryset=Employee.objects.all(), required=False)
+    excludedFormIds = serializers.PrimaryKeyRelatedField(source='excluded_forms', many=True, queryset=FormTemplate.objects.all(), required=False)
+
+    class Meta:
+        model = AccessGroup
+        fields = ['id', 'name', 'description', 'includeAllEmployees', 'includeAllForms', 'employeeIds', 'formIds', 'excludedEmployeeIds', 'excludedFormIds']
