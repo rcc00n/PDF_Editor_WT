@@ -10,6 +10,7 @@ import { Card, CardBody } from '@/shared/ui/Card'
 import { useAppStore } from '@/shared/state/useAppStore'
 import type { Field, FieldType, Validation } from '@/entities/types'
 import { uid } from '@/shared/lib/ids'
+import { suggestedMaxLength, supportsFieldMaxLength } from '@/shared/lib/fieldLimits'
 import { useElementSize } from '@/shared/hooks/useElementSize'
 import PdfPageCanvas from '@/features/pdf/PdfPageCanvas'
 import { cn } from '@/shared/ui/cn'
@@ -105,10 +106,6 @@ export default function BuilderPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [page, setPage] = useState(1)
   const [numPages, setNumPages] = useState(1)
-  const [propertiesOpen, setPropertiesOpen] = useState(() => {
-    if (typeof window === 'undefined') return true
-    return window.innerWidth >= 1400
-  })
   const [canvasFocus, setCanvasFocus] = useState(false)
 
   const selected = useMemo(() => version?.fields.find(f => f.id === selectedId) ?? null, [version, selectedId])
@@ -117,7 +114,7 @@ export default function BuilderPage() {
   const { ref: stageRef, size } = useElementSize<HTMLDivElement>()
   const stageWidthKey = Math.round(size.width)
   const grid = getGridStep(size)
-  const showProperties = propertiesOpen && !canvasFocus
+  const showProperties = !canvasFocus
 
   useEffect(() => {
     if (!canvasFocus) return
@@ -263,7 +260,7 @@ export default function BuilderPage() {
       <div
         className={cn(
           'px-4 mt-4 sm:px-6 sm:mt-6 grid gap-4 items-start',
-          canvasFocus ? 'grid-cols-1' : propertiesOpen ? 'grid-cols-1 xl:grid-cols-[260px_1fr_320px]' : 'grid-cols-1 xl:grid-cols-[260px_1fr]'
+          canvasFocus ? 'grid-cols-1' : 'grid-cols-1 xl:grid-cols-[260px_1fr_320px]'
         )}
       >
         {/* Tool Palette */}
@@ -396,20 +393,6 @@ export default function BuilderPage() {
                 <div className="hidden sm:block h-5 w-px bg-neutral-200 dark:bg-neutral-800" aria-hidden="true" />
                 <button
                   className={cn(
-                    'rf-focus rounded-xl border px-2 py-1 text-xs font-medium transition',
-                    propertiesOpen
-                      ? 'border-neutral-900 bg-neutral-900 text-white dark:border-white dark:bg-white dark:text-neutral-900'
-                      : 'border-neutral-200 text-neutral-700 hover:bg-neutral-50 dark:border-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-900'
-                  )}
-                  onClick={() => setPropertiesOpen((prev) => !prev)}
-                  aria-pressed={propertiesOpen}
-                  title={propertiesOpen ? 'Hide properties panel' : 'Show properties panel'}
-                >
-                  <span className="sm:hidden">Props</span>
-                  <span className="hidden sm:inline">Properties</span>
-                </button>
-                <button
-                  className={cn(
                     'rf-focus rounded-xl border px-2 py-1 text-xs font-medium transition flex items-center gap-2',
                     canvasFocus
                       ? 'border-blue-500 bg-blue-500/10 text-blue-700 dark:border-blue-300 dark:text-blue-200'
@@ -481,6 +464,10 @@ export default function BuilderPage() {
                         onMove={(nx, ny) => handleUpsertField({ ...f, x: nx, y: ny })}
                         onResize={(nw, nh) => handleUpsertField({ ...f, w: nw, h: nh })}
                         onDuplicate={() => handleDuplicateField(f)}
+                        onDelete={() => {
+                          handleDeleteField(f.id)
+                          setSelectedId(null)
+                        }}
                       />
                     ))}
                   </div>
@@ -491,7 +478,7 @@ export default function BuilderPage() {
                     key={canvasFocus ? 'focus' : 'normal'}
                     dataUrl={pdf.dataUrl ?? pdf.url}
                     page={page}
-                    refreshKey={`${propertiesOpen}-${stageWidthKey}`}
+                    refreshKey={`${stageWidthKey}`}
                     onMeta={(m) => setNumPages(m.numPages)}
                   />
 
@@ -536,6 +523,10 @@ export default function BuilderPage() {
                         onMove={(nx, ny) => handleUpsertField({ ...f, x: nx, y: ny })}
                         onResize={(nw, nh) => handleUpsertField({ ...f, w: nw, h: nh })}
                         onDuplicate={() => handleDuplicateField(f)}
+                        onDelete={() => {
+                          handleDeleteField(f.id)
+                          setSelectedId(null)
+                        }}
                       />
                     ))}
                   </div>
@@ -565,13 +556,6 @@ export default function BuilderPage() {
               <div className="flex items-center justify-between gap-2">
                 <div className="text-sm font-semibold">Field Properties</div>
                 <div className="flex items-center gap-2">
-                  <button
-                    className="rf-focus rounded-xl border border-neutral-200 px-2 py-1 text-xs font-medium text-neutral-700 hover:bg-neutral-50 dark:border-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-900"
-                    onClick={() => setPropertiesOpen(false)}
-                    title="Hide properties panel"
-                  >
-                    Hide
-                  </button>
                   {selected && (
                     <button
                       className="rf-focus rounded-xl p-2 hover:bg-neutral-100 dark:hover:bg-neutral-900"
@@ -609,6 +593,8 @@ function FieldEditor({ field, onChange }: { field: Field; onChange: (f: Field) =
   const supportsFontSize = field.type === 'text' || field.type === 'numeric' || field.type === 'date' || field.type === 'employee' || field.type === 'select' || field.type === 'radio'
   const supportsOptions = field.type === 'select' || field.type === 'radio'
   const supportsAutoValue = field.type === 'text' || field.type === 'date'
+  const supportsMaxLength = supportsFieldMaxLength(field)
+  const suggestedLength = supportsMaxLength ? suggestedMaxLength(field) : undefined
   const optionText = supportsOptions ? (field.options ?? []).join('\n') : ''
 
   return (
@@ -696,51 +682,36 @@ function FieldEditor({ field, onChange }: { field: Field; onChange: (f: Field) =
         )}
       </div>
 
-      <div className="space-y-3 border-t border-neutral-200/80 pt-4 dark:border-neutral-800/80">
-        <div className="text-[11px] font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Validation</div>
-        <div>
-          <div className="text-xs text-neutral-500 dark:text-neutral-400 mb-1">Validation</div>
-          {field.type === 'numeric' ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              <Input
-                type="number"
-                placeholder="min"
-                value={field.validation.kind === 'range' ? field.validation.min : 0}
-                onChange={(e) =>
-                  onChange({
-                    ...field,
-                    validation: { kind: 'range', min: Number(e.target.value || 0), max: field.validation.kind === 'range' ? field.validation.max : 300 }
-                  })
+      {supportsMaxLength && (
+        <div className="space-y-3 border-t border-neutral-200/80 pt-4 dark:border-neutral-800/80">
+          <div className="text-[11px] font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Limits</div>
+          <div>
+            <div className="text-xs text-neutral-500 dark:text-neutral-400 mb-1">Max characters</div>
+            <Input
+              type="number"
+              min={1}
+              placeholder={suggestedLength ? String(suggestedLength) : ''}
+              value={field.maxLength ?? ''}
+              onChange={(e) => {
+                const raw = e.target.value
+                if (!raw) {
+                  onChange({ ...field, maxLength: undefined })
+                  return
                 }
-              />
-              <Input
-                type="number"
-                placeholder="max"
-                value={field.validation.kind === 'range' ? field.validation.max : 300}
-                onChange={(e) =>
-                  onChange({
-                    ...field,
-                    validation: { kind: 'range', min: field.validation.kind === 'range' ? field.validation.min : 0, max: Number(e.target.value || 0) }
-                  })
-                }
-              />
+                const parsed = Math.max(1, Math.round(Number(raw)))
+                onChange({ ...field, maxLength: Number.isFinite(parsed) ? parsed : undefined })
+              }}
+            />
+            <div className="text-[11px] text-neutral-500 dark:text-neutral-400 mt-1">
+              {field.maxLength
+                ? 'Custom limit set.'
+                : suggestedLength
+                  ? `Auto: ${suggestedLength} based on size.`
+                  : 'Auto limit based on size.'}
             </div>
-          ) : (
-            <Select
-              value={field.validation.kind}
-              onChange={(e) =>
-                onChange({
-                  ...field,
-                  validation: e.target.value === 'none' ? { kind: 'none' } : { kind: 'regex', pattern: '' }
-                })
-              }
-            >
-              <option value="none">None</option>
-              <option value="regex">Regex</option>
-            </Select>
-          )}
+          </div>
         </div>
-      </div>
+      )}
 
       {supportsOptions && (
         <div className="space-y-3 border-t border-neutral-200/80 pt-4 dark:border-neutral-800/80">
@@ -842,7 +813,8 @@ function FieldBox({
   onSelect,
   onMove,
   onResize,
-  onDuplicate
+  onDuplicate,
+  onDelete
 }: {
   field: Field
   selected: boolean
@@ -851,6 +823,7 @@ function FieldBox({
   onMove: (x: number, y: number) => void
   onResize: (w: number, h: number) => void
   onDuplicate: () => void
+  onDelete: () => void
 }) {
   const [drag, setDrag] = useState<null | { ox: number; oy: number; pid: number }>(null)
   const [resize, setResize] = useState<null | { startX: number; startY: number; w: number; h: number; pid: number }>(null)
@@ -869,7 +842,7 @@ function FieldBox({
     <div
       data-field="1"
       className={cn(
-        'absolute rounded-xl border text-[11px] flex items-center justify-center select-none cursor-move',
+        'group absolute rounded-xl border text-[11px] flex items-center justify-center select-none cursor-move',
         selected
           ? 'border-blue-500 bg-blue-50 text-blue-900 shadow-sm dark:border-blue-300 dark:bg-blue-100 dark:text-blue-950'
           : 'border-neutral-300 bg-white/80 text-neutral-900 dark:border-neutral-700 dark:bg-neutral-900/60 dark:text-neutral-100'
@@ -925,6 +898,26 @@ function FieldBox({
       }}
     >
       <span className="px-2 truncate">{field.label}</span>
+      <button
+        type="button"
+        className={cn(
+          'rf-focus absolute -right-2 -top-2 inline-flex h-6 w-6 items-center justify-center rounded-full border border-white shadow-sm transition',
+          selected
+            ? 'bg-blue-500 text-white'
+            : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200 dark:bg-neutral-900 dark:text-neutral-200 dark:hover:bg-neutral-800',
+          selected
+            ? 'opacity-100 pointer-events-auto'
+            : 'opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto'
+        )}
+        title="Delete field"
+        onPointerDown={(e) => e.stopPropagation()}
+        onClick={(e) => {
+          e.stopPropagation()
+          onDelete()
+        }}
+      >
+        <Trash2 size={12} />
+      </button>
       {canResize && (
         <div
           className={cn(

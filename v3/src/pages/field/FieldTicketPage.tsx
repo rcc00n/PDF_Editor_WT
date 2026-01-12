@@ -14,6 +14,7 @@ import { downloadDataUrl } from '@/shared/lib/download'
 import { exportRenderedFormPdf } from '@/features/export/exporters'
 import RenderedPdfPreview from '@/features/pdf/RenderedPdfPreview'
 import SignaturePad from '@/features/field/SignaturePad'
+import { resolveMaxLength } from '@/shared/lib/fieldLimits'
 import { ArrowLeft, Save, Send, ImagePlus, FileDown, Eye } from 'lucide-react'
 
 const DEFAULT_FONT_SIZE = 12
@@ -298,6 +299,7 @@ function FieldInput({
       ? 'Auto-filled with assigned user.'
       : ''
   const options = (field.options ?? []).map((opt) => opt.trim()).filter(Boolean)
+  const maxLength = resolveMaxLength(field)
 
   useEffect(() => {
     if (!field.autoValue) return
@@ -469,17 +471,34 @@ function FieldInput({
 
       <div className="mt-2">
         {field.type === 'date' ? (
-          <Input type="date" value={value ?? ''} onChange={(e) => onChange(e.target.value)} style={{ fontSize }} readOnly={readOnly} />
+          <Input
+            type="date"
+            value={value ?? ''}
+            onChange={(e) => onChange(e.target.value)}
+            style={{ fontSize }}
+            readOnly={readOnly}
+          />
         ) : field.type === 'numeric' ? (
           <Input
             type="number"
             value={value ?? ''}
-            onChange={(e) => onChange(e.target.value === '' ? '' : Number(e.target.value))}
+            onChange={(e) => {
+              const raw = e.target.value
+              const trimmed = maxLength ? raw.slice(0, maxLength) : raw
+              onChange(trimmed === '' ? '' : Number(trimmed))
+            }}
             style={{ fontSize }}
             readOnly={readOnly}
+            maxLength={maxLength}
           />
         ) : (
-          <Input value={value ?? ''} onChange={(e) => onChange(e.target.value)} style={{ fontSize }} readOnly={readOnly} />
+          <Input
+            value={value ?? ''}
+            onChange={(e) => onChange(e.target.value)}
+            style={{ fontSize }}
+            readOnly={readOnly}
+            maxLength={maxLength}
+          />
         )}
       </div>
 
@@ -496,7 +515,13 @@ function FieldInput({
       <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 p-3">
         <div className="font-medium">{field.label}{field.required ? ' *' : ''}</div>
         <div className="mt-2">
-          <Textarea value={value ?? ''} onChange={(e) => onChange(e.target.value)} style={{ fontSize }} readOnly={readOnly} />
+          <Textarea
+            value={value ?? ''}
+            onChange={(e) => onChange(e.target.value)}
+            style={{ fontSize }}
+            readOnly={readOnly}
+            maxLength={maxLength}
+          />
         </div>
         {hint && <div className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">{hint}</div>}
         {autoNote && <div className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">{autoNote}{readOnly ? '' : ' (editable)'}</div>}
