@@ -1,3 +1,4 @@
+import { forwardRef } from 'react'
 import type { PropsWithChildren } from 'react'
 import { cn } from './cn'
 
@@ -18,9 +19,17 @@ export function CardHeader({ className, children }: PropsWithChildren<{ classNam
   return <div className={cn('px-4 pt-4', className)}>{children}</div>
 }
 
-export function CardBody({ className, children }: PropsWithChildren<{ className?: string }>) {
-  return <div className={cn('px-4 pb-4', className)}>{children}</div>
-}
+export const CardBody = forwardRef<HTMLDivElement, PropsWithChildren<{ className?: string }>>(
+  ({ className, children }, ref) => {
+    return (
+      <div ref={ref} className={cn('px-4 pb-4', className)}>
+        {children}
+      </div>
+    )
+  }
+)
+
+CardBody.displayName = 'CardBody'
 
 export function CardTitle({ className, children }: PropsWithChildren<{ className?: string }>) {
   return <div className={cn('font-semibold', className)}>{children}</div>
