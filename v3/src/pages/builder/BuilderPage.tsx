@@ -114,10 +114,29 @@ export default function BuilderPage() {
 
   useEffect(() => {
     if (!canvasFocus) return
-    const prev = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
+    const body = document.body
+    const docEl = document.documentElement
+    const scrollY = window.scrollY
+    const prevStyles = {
+      overflow: body.style.overflow,
+      position: body.style.position,
+      top: body.style.top,
+      width: body.style.width,
+      paddingRight: body.style.paddingRight
+    }
+    const scrollbarWidth = window.innerWidth - docEl.clientWidth
+    body.style.overflow = 'hidden'
+    body.style.position = 'fixed'
+    body.style.top = `-${scrollY}px`
+    body.style.width = '100%'
+    if (scrollbarWidth > 0) body.style.paddingRight = `${scrollbarWidth}px`
     return () => {
-      document.body.style.overflow = prev
+      body.style.overflow = prevStyles.overflow
+      body.style.position = prevStyles.position
+      body.style.top = prevStyles.top
+      body.style.width = prevStyles.width
+      body.style.paddingRight = prevStyles.paddingRight
+      window.scrollTo(0, scrollY)
     }
   }, [canvasFocus])
 
