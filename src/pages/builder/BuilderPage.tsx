@@ -106,17 +106,44 @@ export default function BuilderPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [numPages, setNumPages] = useState(1)
   const [canvasFocus, setCanvasFocus] = useState(false)
+  const canvasCardRef = useRef<HTMLDivElement | null>(null)
+  const canvasBodyRef = useRef<HTMLDivElement | null>(null)
+  const fullscreenStateRef = useRef<{
+    scrollY: number
+    cardOffsetY: number
+    returnScrollY?: number
+  } | null>(null)
 
   const selected = useMemo(() => version?.fields.find(f => f.id === selectedId) ?? null, [version, selectedId])
   const activeTool = activeToolId ? TOOL_BY_ID[activeToolId] : null
 
   const showProperties = !canvasFocus
 
+  const enterFullScreen = () => {
+    if (canvasFocus) return
+    const scrollY = window.scrollY
+    const rect = canvasCardRef.current?.getBoundingClientRect()
+    const cardOffsetY = rect ? rect.top + scrollY : scrollY
+    fullscreenStateRef.current = { scrollY, cardOffsetY }
+    setCanvasFocus(true)
+  }
+
+  const exitFullScreen = () => {
+    if (!canvasFocus) return
+    const scrollY = fullscreenStateRef.current?.scrollY ?? window.scrollY
+    const cardOffsetY = fullscreenStateRef.current?.cardOffsetY ?? scrollY
+    const scrollTop = canvasBodyRef.current?.scrollTop ?? 0
+    const bodyTop = canvasBodyRef.current?.getBoundingClientRect().top ?? 0
+    const returnScrollY = Math.max(0, cardOffsetY + scrollTop - bodyTop)
+    fullscreenStateRef.current = { scrollY, cardOffsetY, returnScrollY }
+    setCanvasFocus(false)
+  }
+
   useEffect(() => {
     if (!canvasFocus) return
     const body = document.body
     const docEl = document.documentElement
-    const scrollY = window.scrollY
+    const scrollY = fullscreenStateRef.current?.scrollY ?? window.scrollY
     const prevStyles = {
       overflow: body.style.overflow,
       position: body.style.position,
@@ -136,14 +163,16 @@ export default function BuilderPage() {
       body.style.top = prevStyles.top
       body.style.width = prevStyles.width
       body.style.paddingRight = prevStyles.paddingRight
-      window.scrollTo(0, scrollY)
+      const target = fullscreenStateRef.current?.returnScrollY ?? fullscreenStateRef.current?.scrollY ?? scrollY
+      window.scrollTo(0, Math.max(0, target))
+      fullscreenStateRef.current = null
     }
   }, [canvasFocus])
 
   useEffect(() => {
     if (!canvasFocus) return
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setCanvasFocus(false)
+      if (e.key === 'Escape') exitFullScreen()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -212,7 +241,7 @@ export default function BuilderPage() {
       {canvasFocus && (
         <div
           className="fixed inset-0 z-40 bg-neutral-950/60 backdrop-blur-sm"
-          onClick={() => setCanvasFocus(false)}
+          onClick={exitFullScreen}
           aria-hidden="true"
         />
       )}
@@ -380,12 +409,13 @@ export default function BuilderPage() {
         )}
 
         {/* Canvas */}
-        <Card
-          className={cn(
-            canvasFocus && 'fixed inset-4 z-50 flex flex-col shadow-2xl border-neutral-200/80 dark:border-neutral-700/80'
-          )}
-        >
-          <CardBody className={cn(canvasFocus && 'flex-1 min-h-0 overflow-auto')}>
+        <div ref={canvasCardRef}>
+          <Card
+            className={cn(
+              canvasFocus && 'fixed inset-4 z-50 flex flex-col shadow-2xl border-neutral-200/80 dark:border-neutral-700/80'
+            )}
+          >
+            <CardBody ref={canvasBodyRef} className={cn(canvasFocus && 'flex-1 min-h-0 overflow-auto')}>
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="text-sm font-semibold">PDF Canvas</div>
               <div className="flex flex-wrap items-center gap-2">
@@ -400,7 +430,7 @@ export default function BuilderPage() {
                       ? 'border-blue-500 bg-blue-500/10 text-blue-700 dark:border-blue-300 dark:text-blue-200'
                       : 'border-neutral-200 text-neutral-700 hover:bg-neutral-50 dark:border-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-900'
                   )}
-                  onClick={() => setCanvasFocus((prev) => !prev)}
+                  onClick={() => (canvasFocus ? exitFullScreen() : enterFullScreen())}
                   aria-pressed={canvasFocus}
                   title={canvasFocus ? 'Exit full screen' : 'Full screen canvas'}
                 >
@@ -442,8 +472,9 @@ export default function BuilderPage() {
               </div>
               <div>{pdf ? pdf.name : 'No PDF'}</div>
             </div>
-          </CardBody>
-        </Card>
+            </CardBody>
+          </Card>
+        </div>
 
         {/* Properties */}
         {showProperties && (
