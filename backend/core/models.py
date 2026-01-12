@@ -7,6 +7,7 @@ from django.utils import timezone
 
 
 def uid(prefix: str) -> str:
+    """Generate a prefixed unique identifier."""
     return f"{prefix}_{uuid.uuid4().hex[:10]}"
 
 
