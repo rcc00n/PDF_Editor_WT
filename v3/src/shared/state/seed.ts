@@ -144,15 +144,23 @@ export function seedIfEmpty() {
       id: uid('grp'),
       name: 'Field Ops',
       description: 'Daily inspections and field tickets.',
+      includeAllEmployees: false,
+      includeAllForms: false,
       employeeIds: [empJordan, empLuis],
-      formIds: [form1Id, form2Id]
+      formIds: [form1Id, form2Id],
+      excludedEmployeeIds: [],
+      excludedFormIds: []
     },
     {
       id: uid('grp'),
       name: 'Supervisors',
       description: 'Oversight and approvals.',
+      includeAllEmployees: false,
+      includeAllForms: false,
       employeeIds: [empQuinn, empSasha],
-      formIds: [form1Id, form3Id, form4Id]
+      formIds: [form1Id, form3Id, form4Id],
+      excludedEmployeeIds: [],
+      excludedFormIds: []
     }
   ]
 
