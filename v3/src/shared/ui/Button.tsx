@@ -17,9 +17,9 @@ export default function Button(
         'rf-focus inline-flex items-center justify-center gap-2 rounded-2xl font-medium disabled:opacity-50 disabled:cursor-not-allowed',
         size === 'sm' ? 'h-9 px-3 text-sm' : 'h-11 px-5 text-sm',
         variant === 'primary' &&
-          'bg-[var(--rf-accent)] text-[var(--rf-accent-contrast)] hover:bg-[var(--rf-accent-hover)]',
+          'bg-neutral-900 text-white hover:bg-neutral-800 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-100',
         variant === 'secondary' &&
-          'border border-neutral-200 bg-white text-neutral-900 hover:bg-neutral-50 dark:border-neutral-700 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-50',
+          'border border-neutral-200 bg-white hover:bg-neutral-50 dark:border-neutral-800 dark:bg-neutral-950 dark:hover:bg-neutral-900',
         variant === 'ghost' &&
           'hover:bg-neutral-100 dark:hover:bg-neutral-900',
         variant === 'danger' &&
