@@ -19,6 +19,7 @@ export default function ReviewPage() {
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
   const [rigQuery, setRigQuery] = useState('')
+  const [query, setQuery] = useState('')
 
   const statusFiltered = useMemo(() => {
     return tickets.filter(t => {
@@ -31,8 +32,8 @@ export default function ReviewPage() {
   }, [tickets, filter])
 
   const filtered = useMemo(
-    () => filterTickets(statusFiltered, { from: fromDate, to: toDate, rig: rigQuery }),
-    [statusFiltered, fromDate, toDate, rigQuery]
+    () => filterTickets(statusFiltered, { from: fromDate, to: toDate, rig: rigQuery, query }),
+    [statusFiltered, fromDate, toDate, rigQuery, query]
   )
 
   const grouped = useMemo(() => groupTicketsByForm(filtered, forms), [filtered, forms])
@@ -63,7 +64,7 @@ export default function ReviewPage() {
       <div className="px-4 mt-4 sm:px-6 sm:mt-6">
         <Card>
           <CardBody>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <div>
                 <div className="text-xs text-neutral-500 dark:text-neutral-400 mb-1">From</div>
                 <Input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
@@ -75,6 +76,10 @@ export default function ReviewPage() {
               <div>
                 <div className="text-xs text-neutral-500 dark:text-neutral-400 mb-1">Rig</div>
                 <Input placeholder="Search rig" value={rigQuery} onChange={(e) => setRigQuery(e.target.value)} />
+              </div>
+              <div>
+                <div className="text-xs text-neutral-500 dark:text-neutral-400 mb-1">Ticket or assignee</div>
+                <Input placeholder="Search tickets" value={query} onChange={(e) => setQuery(e.target.value)} />
               </div>
             </div>
 

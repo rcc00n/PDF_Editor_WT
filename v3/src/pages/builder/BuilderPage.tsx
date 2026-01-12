@@ -253,7 +253,7 @@ export default function BuilderPage() {
                       <button
                         key={t.id}
                         className={cn(
-                          'rf-focus rounded-2xl border px-3 py-2 text-sm font-medium transition',
+                          'rf-focus rounded-2xl border px-3 py-2 text-sm font-medium',
                           activeToolId === t.id
                             ? 'border-[var(--rf-accent)] bg-[var(--rf-accent)] text-[var(--rf-accent-contrast)]'
                             : 'border-neutral-200 hover:bg-neutral-50 dark:border-neutral-800 dark:hover:bg-neutral-900'
@@ -276,7 +276,7 @@ export default function BuilderPage() {
                     <button
                       key={t.id}
                       className={cn(
-                        'rf-focus rounded-2xl border px-3 py-2 text-sm font-medium transition',
+                        'rf-focus rounded-2xl border px-3 py-2 text-sm font-medium',
                         activeToolId === t.id
                           ? 'border-neutral-900 bg-neutral-900 text-white dark:border-white dark:bg-white dark:text-neutral-900'
                           : 'border-neutral-200 hover:bg-neutral-50 dark:border-neutral-800 dark:hover:bg-neutral-900'
@@ -866,7 +866,7 @@ function FieldBox({
       <button
         type="button"
         className={cn(
-          'rf-focus absolute -right-2 -top-2 inline-flex h-6 w-6 items-center justify-center rounded-full border border-white shadow-sm transition',
+          'rf-focus absolute -right-2 -top-2 inline-flex h-6 w-6 items-center justify-center rounded-full border border-white shadow-sm',
           selected
             ? 'bg-blue-500 text-white'
             : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200 dark:bg-neutral-900 dark:text-neutral-200 dark:hover:bg-neutral-800',

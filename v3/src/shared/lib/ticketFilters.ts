@@ -1,9 +1,11 @@
-import type { FormTemplate, Ticket } from '@/entities/types'
+import type { FormTemplate, Ticket, TicketStatus } from '@/entities/types'
 
 type TicketFilter = {
   from?: string
   to?: string
   rig?: string
+  status?: TicketStatus | 'all'
+  query?: string
 }
 
 export function extractRig(ticket: Ticket) {
@@ -22,7 +24,10 @@ export function filterTickets(tickets: Ticket[], filter: TicketFilter) {
   const from = filter.from?.trim() || ''
   const to = filter.to?.trim() || ''
   const rigQuery = filter.rig?.trim().toLowerCase() || ''
+  const status = filter.status && filter.status !== 'all' ? filter.status : ''
+  const query = filter.query?.trim().toLowerCase() || ''
   return tickets.filter((ticket) => {
+    if (status && ticket.status !== status) return false
     const day = toLocalYmd(ticket.assignedAt)
     if (from && day && day < from) return false
     if (to && day && day > to) return false
@@ -30,6 +35,11 @@ export function filterTickets(tickets: Ticket[], filter: TicketFilter) {
       const rig = extractRig(ticket)
       const hay = `${rig} ${ticket.title}`.toLowerCase()
       if (!hay.includes(rigQuery)) return false
+    }
+    if (query) {
+      const rig = extractRig(ticket)
+      const hay = `${ticket.id} ${ticket.title} ${ticket.assignedTo} ${rig}`.toLowerCase()
+      if (!hay.includes(query)) return false
     }
     return true
   })
