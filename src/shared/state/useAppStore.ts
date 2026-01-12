@@ -738,8 +738,12 @@ export const useAppStore = create<State>()(
           id,
           name: payload.name,
           description: payload.description ?? '',
+          includeAllEmployees: payload.includeAllEmployees ?? false,
+          includeAllForms: payload.includeAllForms ?? false,
           employeeIds: payload.employeeIds ?? [],
-          formIds: payload.formIds ?? []
+          formIds: payload.formIds ?? [],
+          excludedEmployeeIds: payload.excludedEmployeeIds ?? [],
+          excludedFormIds: payload.excludedFormIds ?? []
         }
         set((s) => ({ groups: upsertById(s.groups, group) }))
         return id

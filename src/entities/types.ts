@@ -19,6 +19,7 @@ export type Field = {
   hint?: string
   helpText?: string
   fontSize?: number
+  maxLength?: number
   options?: string[]
   autoValue?: 'today' | 'creator'
   readOnly?: boolean
@@ -44,8 +45,12 @@ export type AccessGroup = {
   id: Id
   name: string
   description?: string
+  includeAllEmployees?: boolean
+  includeAllForms?: boolean
   employeeIds: Id[]
   formIds: Id[]
+  excludedEmployeeIds?: Id[]
+  excludedFormIds?: Id[]
 }
 
 export type FormVersion = {
