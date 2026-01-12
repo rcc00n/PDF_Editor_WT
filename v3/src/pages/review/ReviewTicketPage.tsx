@@ -7,9 +7,9 @@ import Badge from '@/shared/ui/Badge'
 import Modal from '@/shared/ui/Modal'
 import { useAppStore } from '@/shared/state/useAppStore'
 import { dateTimeShort } from '@/shared/lib/format'
-import { exportRenderedFormPdf, exportTicketCsv, exportTicketPdf } from '@/features/export/exporters'
+import { exportRenderedFormPdf, exportTicketPdf } from '@/features/export/exporters'
 import RenderedPdfPreview from '@/features/pdf/RenderedPdfPreview'
-import { ArrowLeft, FileDown, FileSpreadsheet, CheckCircle2, Eye } from 'lucide-react'
+import { ArrowLeft, FileDown, CheckCircle2, Eye } from 'lucide-react'
 
 export default function ReviewTicketPage() {
   const { ticketId = '' } = useParams()
@@ -62,9 +62,6 @@ export default function ReviewTicketPage() {
               title={renderPdfUrl ? 'View rendered PDF' : 'No PDF uploaded yet'}
             >
               <Eye size={16} /> View Rendered PDF
-            </Button>
-            <Button variant="secondary" onClick={() => exportTicketCsv(ticket, form, version)}>
-              <FileSpreadsheet size={16} /> Export CSV
             </Button>
             <Button
               onClick={() => void approveTicket(ticket.id)}

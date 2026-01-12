@@ -104,7 +104,6 @@ export default function BuilderPage() {
 
   const [activeToolId, setActiveToolId] = useState<string | null>(DEFAULT_TOOL_ID)
   const [selectedId, setSelectedId] = useState<string | null>(null)
-  const [page, setPage] = useState(1)
   const [numPages, setNumPages] = useState(1)
   const [canvasFocus, setCanvasFocus] = useState(false)
 
@@ -157,7 +156,6 @@ export default function BuilderPage() {
 
   const pdf = version.pdf
   const canvas = version.canvas ?? { width: 210, height: 297 }
-  const fieldsOnPage = version.fields.filter((f) => f.page === page)
 
   const handleUpsertField = (next: Field) => {
     void upsertField(form.id, version.id, next).catch((err) => {
@@ -171,7 +169,7 @@ export default function BuilderPage() {
     })
   }
 
-  const handleDuplicateField = (field: Field) => {
+  const handleDuplicateField = (field: Field, grid: { x: number; y: number }) => {
     const offsetX = grid.x ? grid.x * 2 : 0.02
     const offsetY = grid.y ? grid.y * 2 : 0.02
     const maxX = 1 - field.w
@@ -190,6 +188,8 @@ export default function BuilderPage() {
     handleUpsertField(copy)
     setSelectedId(copy.id)
   }
+
+  const pageList = pdf ? Array.from({ length: Math.max(1, numPages) }, (_, i) => i + 1) : [1]
 
   return (
     <div className="pb-10">
@@ -265,7 +265,7 @@ export default function BuilderPage() {
       >
         {/* Tool Palette */}
         {!canvasFocus && (
-          <Card>
+          <Card className="sticky top-6 self-start">
             <CardBody>
               <div className="text-sm font-semibold">Tool Palette</div>
               <div className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
@@ -373,22 +373,8 @@ export default function BuilderPage() {
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="text-sm font-semibold">PDF Canvas</div>
               <div className="flex flex-wrap items-center gap-2">
-                <div className="flex items-center gap-2">
-                  <button
-                    className="rf-focus rounded-xl px-2 py-1 text-sm hover:bg-neutral-100 dark:hover:bg-neutral-900"
-                    onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  >
-                    ←
-                  </button>
-                  <div className="text-sm">
-                    Page {page} / {numPages}
-                  </div>
-                  <button
-                    className="rf-focus rounded-xl px-2 py-1 text-sm hover:bg-neutral-100 dark:hover:bg-neutral-900"
-                    onClick={() => setPage((p) => Math.min(numPages, p + 1))}
-                  >
-                    →
-                  </button>
+                <div className="text-sm text-neutral-500 dark:text-neutral-400">
+                  {numPages > 1 ? `${numPages} pages` : 'Single page'}
                 </div>
                 <div className="hidden sm:block h-5 w-px bg-neutral-200 dark:bg-neutral-800" aria-hidden="true" />
                 <button
@@ -586,6 +572,111 @@ export default function BuilderPage() {
   )
 }
 
+function PageCanvas({
+  pageIndex,
+  pageCount,
+  pdf,
+  canvas,
+  fields,
+  activeTool,
+  selectedId,
+  onSelect,
+  onUpsert,
+  onDuplicate,
+  onMeta
+}: {
+  pageIndex: number
+  pageCount: number
+  pdf?: { dataUrl?: string; url?: string }
+  canvas: { width: number; height: number }
+  fields: Field[]
+  activeTool: ToolPreset | null
+  selectedId: string | null
+  onSelect: (id: string | null) => void
+  onUpsert: (f: Field) => void
+  onDuplicate: (field: Field, grid: { x: number; y: number }) => void
+  onMeta?: (meta: { numPages: number }) => void
+}) {
+  const { ref, size } = useElementSize<HTMLDivElement>()
+  const stageWidthKey = Math.round(size.width)
+  const grid = getGridStep(size)
+  const fieldsOnPage = useMemo(() => fields.filter((f) => f.page === pageIndex), [fields, pageIndex])
+  const hasPdf = Boolean(pdf?.dataUrl || pdf?.url)
+
+  return (
+    <div className="space-y-2">
+      {pageCount > 1 && (
+        <div className="text-xs text-neutral-500 dark:text-neutral-400">Page {pageIndex}</div>
+      )}
+      <div className="relative" ref={ref}>
+        {hasPdf ? (
+          <PdfPageCanvas
+            dataUrl={pdf?.dataUrl ?? pdf?.url}
+            page={pageIndex}
+            refreshKey={stageWidthKey}
+            onMeta={onMeta}
+          />
+        ) : (
+          <div
+            className="w-full rounded-2xl border border-dashed border-neutral-300 dark:border-neutral-700 bg-white/70 dark:bg-neutral-950/40 flex items-center justify-center p-6 text-center"
+            style={{ aspectRatio: `${canvas.width} / ${canvas.height}` }}
+          >
+            <div className="pointer-events-none">
+              <div className="text-sm font-medium">Upload a PDF to lock the layout</div>
+              <div className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
+                You can still place fields on this blank page.
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div
+          className={cn('absolute inset-0', activeTool ? 'cursor-crosshair' : 'cursor-grab')}
+          onPointerDown={(e) => {
+            if ((e.target as HTMLElement).dataset.field === '1') return
+            if (!activeTool) {
+              onSelect(null)
+              return
+            }
+            const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect()
+            const x = (e.clientX - rect.left) / rect.width
+            const y = (e.clientY - rect.top) / rect.height
+            const f = newField(activeTool, x, y, pageIndex, grid)
+            onUpsert(f)
+            onSelect(f.id)
+          }}
+          onDragOver={(e) => e.preventDefault()}
+          onDrop={(e) => {
+            e.preventDefault()
+            const toolId = e.dataTransfer.getData('application/x-rf-tool')
+            const tool = TOOL_BY_ID[toolId]
+            if (!tool) return
+            const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect()
+            const x = (e.clientX - rect.left) / rect.width
+            const y = (e.clientY - rect.top) / rect.height
+            const f = newField(tool, x, y, pageIndex, grid)
+            onUpsert(f)
+            onSelect(f.id)
+          }}
+        >
+          {fieldsOnPage.map((f) => (
+            <FieldBox
+              key={f.id}
+              field={f}
+              selected={f.id === selectedId}
+              stage={size}
+              onSelect={() => onSelect(f.id)}
+              onMove={(nx, ny) => onUpsert({ ...f, x: nx, y: ny })}
+              onResize={(nw, nh) => onUpsert({ ...f, w: nw, h: nh })}
+              onDuplicate={() => onDuplicate(f, grid)}
+            />
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function FieldEditor({ field, onChange }: { field: Field; onChange: (f: Field) => void | Promise<void> }) {
   const maxW = Math.max(1 - field.x, MIN_FIELD_SIZE)
   const maxH = Math.max(1 - field.y, MIN_FIELD_SIZE)
@@ -614,18 +705,7 @@ function FieldEditor({ field, onChange }: { field: Field; onChange: (f: Field) =
 
         <div>
           <div className="text-xs text-neutral-500 dark:text-neutral-400 mb-1">Type</div>
-          <Select
-            value={field.type}
-            onChange={(e) => {
-              const nextType = e.target.value as FieldType
-              const next = { ...field, type: nextType }
-              if (nextType !== 'text' && nextType !== 'date') {
-                next.autoValue = undefined
-                next.readOnly = false
-              }
-              onChange(next)
-            }}
-          >
+          <Select value={field.type} disabled title="Field type is locked after placement">
             <option value="text">Text</option>
             <option value="numeric">Numeric</option>
             <option value="checkbox">Checkbox</option>
@@ -636,6 +716,7 @@ function FieldEditor({ field, onChange }: { field: Field; onChange: (f: Field) =
             <option value="select">List (dropdown)</option>
             <option value="radio">Radio buttons</option>
           </Select>
+          <div className="text-[11px] text-neutral-500 dark:text-neutral-400 mt-1">Type is locked once placed on the canvas.</div>
         </div>
 
         <div className="flex items-center justify-between">
