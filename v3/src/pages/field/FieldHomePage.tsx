@@ -42,6 +42,16 @@ export default function FieldHomePage() {
     return employees.find((e) => (e.email ?? '').trim().toLowerCase() === email) ?? null
   }, [employees, user?.email])
   const defaultAssignee = currentEmployee?.name ?? activeEmployees[0]?.name ?? 'Technician'
+  const scopedTickets = useMemo(() => {
+    if (role === 'admin') return tickets
+    const matched = currentEmployee?.name?.trim().toLowerCase()
+    const email = user?.email?.trim().toLowerCase()
+    if (!matched && !email) return tickets
+    return tickets.filter((t) => {
+      const assigned = t.assignedTo.trim().toLowerCase()
+      return (matched && assigned === matched) || (email && assigned === email)
+    })
+  }, [currentEmployee?.name, role, tickets, user?.email])
 
   useEffect(() => {
     if (!assignedTo || assignedTo === 'Technician') {

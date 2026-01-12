@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import SectionHeader from '@/shared/ui/SectionHeader'
 import Button from '@/shared/ui/Button'
 import { Card, CardBody } from '@/shared/ui/Card'

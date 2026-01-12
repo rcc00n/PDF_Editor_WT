@@ -6,9 +6,11 @@ import Button from '@/shared/ui/Button'
 import Badge from '@/shared/ui/Badge'
 import { useAppStore } from '@/shared/state/useAppStore'
 import { dateTimeShort, timeHHMM } from '@/shared/lib/format'
+import { resolveAvailableForms } from '@/shared/lib/access'
+import { extractRig } from '@/shared/lib/ticketFilters'
 import { Plus, ArrowRight, ChevronDown } from 'lucide-react'
 import { cn } from '@/shared/ui/cn'
-import type { TicketStatus } from '@/entities/types'
+import type { TicketStatus, FormTemplate } from '@/entities/types'
 
 export default function DashboardPage() {
   const nav = useNavigate()
@@ -79,7 +81,7 @@ export default function DashboardPage() {
   const syncedTickets = dailyTickets.filter(t => t.status === 'synced')
   const pendingVisible = dailyOpen ? pendingTickets : pendingTickets.slice(0, 2)
   const syncedVisible = dailyOpen ? syncedTickets : syncedTickets.slice(0, 2)
-  const formsVisible = formsOpen ? availableForms : availableForms.slice(0, 15)
+  const formsVisible: FormTemplate[] = formsOpen ? availableForms : availableForms.slice(0, 15)
   const pendingReview = tickets.filter((t) => t.status === 'synced' && t.approvalState !== 'approved').slice(0, 6)
   const attentionTickets = tickets.filter((t) => t.status === 'error' || t.status === 'queued' || t.status === 'pending').slice(0, 6)
 

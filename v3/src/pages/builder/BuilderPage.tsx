@@ -105,6 +105,7 @@ export default function BuilderPage() {
   const [activeToolId, setActiveToolId] = useState<string | null>(DEFAULT_TOOL_ID)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [numPages, setNumPages] = useState(1)
+  const canvasFocus = false
 
   const selected = useMemo(() => version?.fields.find(f => f.id === selectedId) ?? null, [version, selectedId])
   const activeTool = activeToolId ? TOOL_BY_ID[activeToolId] : null

@@ -191,7 +191,8 @@ export default function FieldTicketPage() {
         </div>
 
         <div className="flex flex-col gap-4">
-          <Card id="photos-panel">
+          <div id="photos-panel">
+            <Card>
             <CardBody>
               <div className="text-sm font-semibold">Photo Attachments</div>
               <div className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
@@ -265,9 +266,11 @@ export default function FieldTicketPage() {
                 })}
               </div>
             </CardBody>
-          </Card>
+            </Card>
+          </div>
 
-          <Card id="signature-panel">
+          <div id="signature-panel">
+            <Card>
             <CardBody>
               <div className="text-sm font-semibold">Signature</div>
               <div className="mt-3 space-y-2">
@@ -297,7 +300,8 @@ export default function FieldTicketPage() {
                 />
               </div>
             </CardBody>
-          </Card>
+            </Card>
+          </div>
 
           {ticket.lastError && (
             <Card>
