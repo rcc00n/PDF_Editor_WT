@@ -110,9 +110,6 @@ export default function BuilderPage() {
   const selected = useMemo(() => version?.fields.find(f => f.id === selectedId) ?? null, [version, selectedId])
   const activeTool = activeToolId ? TOOL_BY_ID[activeToolId] : null
 
-  const { ref: stageRef, size } = useElementSize<HTMLDivElement>()
-  const stageWidthKey = Math.round(size.width)
-  const grid = getGridStep(size)
   const showProperties = !canvasFocus
 
   useEffect(() => {
@@ -394,130 +391,24 @@ export default function BuilderPage() {
               </div>
             </div>
 
-            <div className="mt-3 relative" ref={stageRef}>
-              {!pdf ? (
-                <div className="relative">
-                  <div
-                    className="w-full rounded-2xl border border-dashed border-neutral-300 dark:border-neutral-700 bg-white/70 dark:bg-neutral-950/40 flex items-center justify-center p-6 text-center"
-                    style={{ aspectRatio: `${canvas.width} / ${canvas.height}` }}
-                  >
-                    <div className="pointer-events-none">
-                      <div className="text-sm font-medium">Upload a PDF to lock the layout</div>
-                      <div className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
-                        You can still place fields on this blank page.
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Overlay */}
-                  <div
-                    className={cn('absolute inset-0', activeTool ? 'cursor-crosshair' : 'cursor-grab')}
-                    onPointerDown={(e) => {
-                      // only add when clicking empty overlay
-                      if ((e.target as HTMLElement).dataset.field === '1') return
-                      if (!activeTool) {
-                        setSelectedId(null)
-                        return
-                      }
-                      const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect()
-                      const x = (e.clientX - rect.left) / rect.width
-                      const y = (e.clientY - rect.top) / rect.height
-                      const f = newField(activeTool, x, y, page, grid)
-                      handleUpsertField(f)
-                      setSelectedId(f.id)
-                    }}
-                    onDragOver={(e) => e.preventDefault()}
-                    onDrop={(e) => {
-                      e.preventDefault()
-                      const toolId = e.dataTransfer.getData('application/x-rf-tool')
-                      const tool = TOOL_BY_ID[toolId]
-                      if (!tool) return
-                      const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect()
-                      const x = (e.clientX - rect.left) / rect.width
-                      const y = (e.clientY - rect.top) / rect.height
-                      const f = newField(tool, x, y, page, grid)
-                      handleUpsertField(f)
-                      setSelectedId(f.id)
-                    }}
-                  >
-                    {fieldsOnPage.map((f) => (
-                      <FieldBox
-                        key={f.id}
-                        field={f}
-                        selected={f.id === selectedId}
-                        stage={size}
-                        onSelect={() => setSelectedId(f.id)}
-                        onMove={(nx, ny) => handleUpsertField({ ...f, x: nx, y: ny })}
-                        onResize={(nw, nh) => handleUpsertField({ ...f, w: nw, h: nh })}
-                        onDuplicate={() => handleDuplicateField(f)}
-                        onDelete={() => {
-                          handleDeleteField(f.id)
-                          setSelectedId(null)
-                        }}
-                      />
-                    ))}
-                  </div>
-                </div>
-              ) : (
-                <div className="relative">
-                  <PdfPageCanvas
-                    key={canvasFocus ? 'focus' : 'normal'}
-                    dataUrl={pdf.dataUrl ?? pdf.url}
-                    page={page}
-                    refreshKey={`${stageWidthKey}`}
-                    onMeta={(m) => setNumPages(m.numPages)}
-                  />
-
-                  {/* Overlay */}
-                  <div
-                    className={cn('absolute inset-0', activeTool ? 'cursor-crosshair' : 'cursor-grab')}
-                    onPointerDown={(e) => {
-                      // only add when clicking empty overlay
-                      if ((e.target as HTMLElement).dataset.field === '1') return
-                      if (!activeTool) {
-                        setSelectedId(null)
-                        return
-                      }
-                      const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect()
-                      const x = (e.clientX - rect.left) / rect.width
-                      const y = (e.clientY - rect.top) / rect.height
-                      const f = newField(activeTool, x, y, page, grid)
-                      handleUpsertField(f)
-                      setSelectedId(f.id)
-                    }}
-                    onDragOver={(e) => e.preventDefault()}
-                    onDrop={(e) => {
-                      e.preventDefault()
-                      const toolId = e.dataTransfer.getData('application/x-rf-tool')
-                      const tool = TOOL_BY_ID[toolId]
-                      if (!tool) return
-                      const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect()
-                      const x = (e.clientX - rect.left) / rect.width
-                      const y = (e.clientY - rect.top) / rect.height
-                      const f = newField(tool, x, y, page, grid)
-                      handleUpsertField(f)
-                      setSelectedId(f.id)
-                    }}
-                  >
-                    {fieldsOnPage.map((f) => (
-                      <FieldBox
-                        key={f.id}
-                        field={f}
-                        selected={f.id === selectedId}
-                        stage={size}
-                        onSelect={() => setSelectedId(f.id)}
-                        onMove={(nx, ny) => handleUpsertField({ ...f, x: nx, y: ny })}
-                        onResize={(nw, nh) => handleUpsertField({ ...f, w: nw, h: nh })}
-                        onDuplicate={() => handleDuplicateField(f)}
-                        onDelete={() => {
-                          handleDeleteField(f.id)
-                          setSelectedId(null)
-                        }}
-                      />
-                    ))}
-                  </div>
-                </div>
-              )}
+            <div className="mt-3 space-y-6">
+              {pageList.map((pageIndex) => (
+                <PageCanvas
+                  key={pageIndex}
+                  pageIndex={pageIndex}
+                  pageCount={pageList.length}
+                  pdf={pdf}
+                  canvas={canvas}
+                  fields={version.fields}
+                  activeTool={activeTool}
+                  selectedId={selectedId}
+                  onSelect={setSelectedId}
+                  onUpsert={handleUpsertField}
+                  onDuplicate={handleDuplicateField}
+                  onDelete={handleDeleteField}
+                  onMeta={pageIndex === 1 ? (m) => setNumPages(m.numPages) : undefined}
+                />
+              ))}
             </div>
 
             <div className="mt-3 text-xs text-neutral-500 dark:text-neutral-400 flex justify-between gap-3">
@@ -583,6 +474,7 @@ function PageCanvas({
   onSelect,
   onUpsert,
   onDuplicate,
+  onDelete,
   onMeta
 }: {
   pageIndex: number
@@ -595,6 +487,7 @@ function PageCanvas({
   onSelect: (id: string | null) => void
   onUpsert: (f: Field) => void
   onDuplicate: (field: Field, grid: { x: number; y: number }) => void
+  onDelete: (fieldId: string) => void
   onMeta?: (meta: { numPages: number }) => void
 }) {
   const { ref, size } = useElementSize<HTMLDivElement>()
@@ -669,6 +562,10 @@ function PageCanvas({
               onMove={(nx, ny) => onUpsert({ ...f, x: nx, y: ny })}
               onResize={(nw, nh) => onUpsert({ ...f, w: nw, h: nh })}
               onDuplicate={() => onDuplicate(f, grid)}
+              onDelete={() => {
+                onDelete(f.id)
+                if (selectedId === f.id) onSelect(null)
+              }}
             />
           ))}
         </div>
