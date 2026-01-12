@@ -117,7 +117,7 @@ export default function BuilderPage() {
           Worker accounts only fill ready forms. Switch to Admin to edit templates.
         </div>
         <div className="mt-3">
-          <Button variant="secondary" onClick={() => nav('/field')}>Go to Completed Forms</Button>
+          <Button variant="secondary" onClick={() => nav('/field')}>Go to Field App</Button>
         </div>
       </div>
     )
@@ -176,7 +176,7 @@ export default function BuilderPage() {
         right={
           <>
             <Button variant="secondary" onClick={() => nav('/field')}>
-              <Eye size={16} /> Preview Completed Forms
+              <Eye size={16} /> Preview Field App
             </Button>
 
             <input
@@ -255,7 +255,7 @@ export default function BuilderPage() {
                         className={cn(
                           'rf-focus rounded-2xl border px-3 py-2 text-sm font-medium',
                           activeToolId === t.id
-                            ? 'border-[var(--rf-accent)] bg-[var(--rf-accent)] text-[var(--rf-accent-contrast)]'
+                            ? 'border-neutral-900 bg-neutral-900 text-white dark:border-white dark:bg-white dark:text-neutral-900'
                             : 'border-neutral-200 hover:bg-neutral-50 dark:border-neutral-800 dark:hover:bg-neutral-900'
                         )}
                         draggable
