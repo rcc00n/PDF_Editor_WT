@@ -234,43 +234,42 @@ export default function BuilderPage() {
         )}
       >
         {/* Tool Palette */}
-        {!canvasFocus && (
-          <Card className="sticky top-6 self-start">
-            <CardBody>
-              <div className="text-sm font-semibold">Tool Palette</div>
-              <div className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
-                Click a tool (or drag it) onto the canvas. Click it again for Hand mode.
-              </div>
-              {TOOL_SECTIONS.map((section, idx) => (
-                <div key={section.title ?? `tools-${idx}`} className={idx === 0 ? 'mt-3' : 'mt-4'}>
-                  {section.title && (
-                    <div className="text-[11px] font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
-                      {section.title}
-                    </div>
-                  )}
-                  <div className={cn('grid grid-cols-2 gap-2', section.title ? 'mt-2' : '')}>
-                    {section.tools.map((t) => (
-                      <button
-                        key={t.id}
-                        className={cn(
-                          'rf-focus rounded-2xl border px-3 py-2 text-sm font-medium transition',
-                          activeToolId === t.id
-                            ? 'border-[var(--rf-accent)] bg-[var(--rf-accent)] text-[var(--rf-accent-contrast)]'
-                            : 'border-neutral-200 hover:bg-neutral-50 dark:border-neutral-800 dark:hover:bg-neutral-900'
-                        )}
-                        draggable
-                        title={t.description ?? t.label}
-                        onDragStart={(e) => {
-                          e.dataTransfer.setData('application/x-rf-tool', t.id)
-                          e.dataTransfer.effectAllowed = 'copy'
-                        }}
-                        onClick={() => setActiveToolId((prev) => (prev === t.id ? null : t.id))}
-                      >
-                        {t.label}
-                      </button>
-                    ))}
+        <Card className="sticky top-6 self-start">
+          <CardBody>
+            <div className="text-sm font-semibold">Tool Palette</div>
+            <div className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
+              Click a tool (or drag it) onto the canvas. Click it again for Hand mode.
+            </div>
+            {TOOL_SECTIONS.map((section, idx) => (
+              <div key={section.title ?? `tools-${idx}`} className={idx === 0 ? 'mt-3' : 'mt-4'}>
+                {section.title && (
+                  <div className="text-[11px] font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
+                    {section.title}
                   </div>
+                )}
+                <div className={cn('grid grid-cols-2 gap-2', section.title ? 'mt-2' : '')}>
+                  {section.tools.map((t) => (
+                    <button
+                      key={t.id}
+                      className={cn(
+                        'rf-focus rounded-2xl border px-3 py-2 text-sm font-medium transition',
+                        activeToolId === t.id
+                          ? 'border-[var(--rf-accent)] bg-[var(--rf-accent)] text-[var(--rf-accent-contrast)]'
+                          : 'border-neutral-200 hover:bg-neutral-50 dark:border-neutral-800 dark:hover:bg-neutral-900'
+                      )}
+                      draggable
+                      title={t.description ?? t.label}
+                      onDragStart={(e) => {
+                        e.dataTransfer.setData('application/x-rf-tool', t.id)
+                        e.dataTransfer.effectAllowed = 'copy'
+                      }}
+                      onClick={() => setActiveToolId((prev) => (prev === t.id ? null : t.id))}
+                    >
+                      {t.label}
+                    </button>
+                  ))}
                 </div>
+              </div>
             ))}
 
             <div className="mt-4 flex items-center justify-between">
@@ -329,9 +328,8 @@ export default function BuilderPage() {
             <div className="mt-3 text-xs text-neutral-500 dark:text-neutral-400">
               Tip: drag fields to reposition, triple-click to duplicate. Hand mode prevents accidental adds.
             </div>
-            </CardBody>
-          </Card>
-        )}
+          </CardBody>
+        </Card>
 
         {/* Canvas */}
         <div>
