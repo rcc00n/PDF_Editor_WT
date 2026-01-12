@@ -10,6 +10,7 @@ import { Card, CardBody } from '@/shared/ui/Card'
 import { useAppStore } from '@/shared/state/useAppStore'
 import type { Field, FieldType, Validation } from '@/entities/types'
 import { uid } from '@/shared/lib/ids'
+import { suggestedMaxLength, supportsFieldMaxLength } from '@/shared/lib/fieldLimits'
 import { useElementSize } from '@/shared/hooks/useElementSize'
 import PdfPageCanvas from '@/features/pdf/PdfPageCanvas'
 import { cn } from '@/shared/ui/cn'
@@ -104,16 +105,15 @@ export default function BuilderPage() {
   const [activeToolId, setActiveToolId] = useState<string | null>(DEFAULT_TOOL_ID)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [numPages, setNumPages] = useState(1)
-  const [propertiesOpen, setPropertiesOpen] = useState(() => {
-    if (typeof window === 'undefined') return true
-    return window.innerWidth >= 1400
-  })
   const [canvasFocus, setCanvasFocus] = useState(false)
 
   const selected = useMemo(() => version?.fields.find(f => f.id === selectedId) ?? null, [version, selectedId])
   const activeTool = activeToolId ? TOOL_BY_ID[activeToolId] : null
 
-  const showProperties = propertiesOpen && !canvasFocus
+  const { ref: stageRef, size } = useElementSize<HTMLDivElement>()
+  const stageWidthKey = Math.round(size.width)
+  const grid = getGridStep(size)
+  const showProperties = !canvasFocus
 
   useEffect(() => {
     if (!canvasFocus) return
@@ -260,7 +260,7 @@ export default function BuilderPage() {
       <div
         className={cn(
           'px-4 mt-4 sm:px-6 sm:mt-6 grid gap-4 items-start',
-          canvasFocus ? 'grid-cols-1' : propertiesOpen ? 'grid-cols-1 xl:grid-cols-[260px_1fr_320px]' : 'grid-cols-1 xl:grid-cols-[260px_1fr]'
+          canvasFocus ? 'grid-cols-1' : 'grid-cols-1 xl:grid-cols-[260px_1fr_320px]'
         )}
       >
         {/* Tool Palette */}
@@ -379,20 +379,6 @@ export default function BuilderPage() {
                 <div className="hidden sm:block h-5 w-px bg-neutral-200 dark:bg-neutral-800" aria-hidden="true" />
                 <button
                   className={cn(
-                    'rf-focus rounded-xl border px-2 py-1 text-xs font-medium transition',
-                    propertiesOpen
-                      ? 'border-neutral-900 bg-neutral-900 text-white dark:border-white dark:bg-white dark:text-neutral-900'
-                      : 'border-neutral-200 text-neutral-700 hover:bg-neutral-50 dark:border-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-900'
-                  )}
-                  onClick={() => setPropertiesOpen((prev) => !prev)}
-                  aria-pressed={propertiesOpen}
-                  title={propertiesOpen ? 'Hide properties panel' : 'Show properties panel'}
-                >
-                  <span className="sm:hidden">Props</span>
-                  <span className="hidden sm:inline">Properties</span>
-                </button>
-                <button
-                  className={cn(
                     'rf-focus rounded-xl border px-2 py-1 text-xs font-medium transition flex items-center gap-2',
                     canvasFocus
                       ? 'border-blue-500 bg-blue-500/10 text-blue-700 dark:border-blue-300 dark:text-blue-200'
@@ -408,23 +394,130 @@ export default function BuilderPage() {
               </div>
             </div>
 
-            <div className="mt-3 space-y-6">
-              {pageList.map((pageIndex) => (
-                <PageCanvas
-                  key={pageIndex}
-                  pageIndex={pageIndex}
-                  pageCount={pageList.length}
-                  pdf={pdf}
-                  canvas={canvas}
-                  fields={version.fields}
-                  activeTool={activeTool}
-                  selectedId={selectedId}
-                  onSelect={setSelectedId}
-                  onUpsert={handleUpsertField}
-                  onDuplicate={handleDuplicateField}
-                  onMeta={pageIndex === 1 ? (m) => setNumPages(m.numPages) : undefined}
-                />
-              ))}
+            <div className="mt-3 relative" ref={stageRef}>
+              {!pdf ? (
+                <div className="relative">
+                  <div
+                    className="w-full rounded-2xl border border-dashed border-neutral-300 dark:border-neutral-700 bg-white/70 dark:bg-neutral-950/40 flex items-center justify-center p-6 text-center"
+                    style={{ aspectRatio: `${canvas.width} / ${canvas.height}` }}
+                  >
+                    <div className="pointer-events-none">
+                      <div className="text-sm font-medium">Upload a PDF to lock the layout</div>
+                      <div className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
+                        You can still place fields on this blank page.
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Overlay */}
+                  <div
+                    className={cn('absolute inset-0', activeTool ? 'cursor-crosshair' : 'cursor-grab')}
+                    onPointerDown={(e) => {
+                      // only add when clicking empty overlay
+                      if ((e.target as HTMLElement).dataset.field === '1') return
+                      if (!activeTool) {
+                        setSelectedId(null)
+                        return
+                      }
+                      const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect()
+                      const x = (e.clientX - rect.left) / rect.width
+                      const y = (e.clientY - rect.top) / rect.height
+                      const f = newField(activeTool, x, y, page, grid)
+                      handleUpsertField(f)
+                      setSelectedId(f.id)
+                    }}
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={(e) => {
+                      e.preventDefault()
+                      const toolId = e.dataTransfer.getData('application/x-rf-tool')
+                      const tool = TOOL_BY_ID[toolId]
+                      if (!tool) return
+                      const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect()
+                      const x = (e.clientX - rect.left) / rect.width
+                      const y = (e.clientY - rect.top) / rect.height
+                      const f = newField(tool, x, y, page, grid)
+                      handleUpsertField(f)
+                      setSelectedId(f.id)
+                    }}
+                  >
+                    {fieldsOnPage.map((f) => (
+                      <FieldBox
+                        key={f.id}
+                        field={f}
+                        selected={f.id === selectedId}
+                        stage={size}
+                        onSelect={() => setSelectedId(f.id)}
+                        onMove={(nx, ny) => handleUpsertField({ ...f, x: nx, y: ny })}
+                        onResize={(nw, nh) => handleUpsertField({ ...f, w: nw, h: nh })}
+                        onDuplicate={() => handleDuplicateField(f)}
+                        onDelete={() => {
+                          handleDeleteField(f.id)
+                          setSelectedId(null)
+                        }}
+                      />
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="relative">
+                  <PdfPageCanvas
+                    key={canvasFocus ? 'focus' : 'normal'}
+                    dataUrl={pdf.dataUrl ?? pdf.url}
+                    page={page}
+                    refreshKey={`${stageWidthKey}`}
+                    onMeta={(m) => setNumPages(m.numPages)}
+                  />
+
+                  {/* Overlay */}
+                  <div
+                    className={cn('absolute inset-0', activeTool ? 'cursor-crosshair' : 'cursor-grab')}
+                    onPointerDown={(e) => {
+                      // only add when clicking empty overlay
+                      if ((e.target as HTMLElement).dataset.field === '1') return
+                      if (!activeTool) {
+                        setSelectedId(null)
+                        return
+                      }
+                      const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect()
+                      const x = (e.clientX - rect.left) / rect.width
+                      const y = (e.clientY - rect.top) / rect.height
+                      const f = newField(activeTool, x, y, page, grid)
+                      handleUpsertField(f)
+                      setSelectedId(f.id)
+                    }}
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={(e) => {
+                      e.preventDefault()
+                      const toolId = e.dataTransfer.getData('application/x-rf-tool')
+                      const tool = TOOL_BY_ID[toolId]
+                      if (!tool) return
+                      const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect()
+                      const x = (e.clientX - rect.left) / rect.width
+                      const y = (e.clientY - rect.top) / rect.height
+                      const f = newField(tool, x, y, page, grid)
+                      handleUpsertField(f)
+                      setSelectedId(f.id)
+                    }}
+                  >
+                    {fieldsOnPage.map((f) => (
+                      <FieldBox
+                        key={f.id}
+                        field={f}
+                        selected={f.id === selectedId}
+                        stage={size}
+                        onSelect={() => setSelectedId(f.id)}
+                        onMove={(nx, ny) => handleUpsertField({ ...f, x: nx, y: ny })}
+                        onResize={(nw, nh) => handleUpsertField({ ...f, w: nw, h: nh })}
+                        onDuplicate={() => handleDuplicateField(f)}
+                        onDelete={() => {
+                          handleDeleteField(f.id)
+                          setSelectedId(null)
+                        }}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="mt-3 text-xs text-neutral-500 dark:text-neutral-400 flex justify-between gap-3">
@@ -449,13 +542,6 @@ export default function BuilderPage() {
               <div className="flex items-center justify-between gap-2">
                 <div className="text-sm font-semibold">Field Properties</div>
                 <div className="flex items-center gap-2">
-                  <button
-                    className="rf-focus rounded-xl border border-neutral-200 px-2 py-1 text-xs font-medium text-neutral-700 hover:bg-neutral-50 dark:border-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-900"
-                    onClick={() => setPropertiesOpen(false)}
-                    title="Hide properties panel"
-                  >
-                    Hide
-                  </button>
                   {selected && (
                     <button
                       className="rf-focus rounded-xl p-2 hover:bg-neutral-100 dark:hover:bg-neutral-900"
@@ -598,6 +684,8 @@ function FieldEditor({ field, onChange }: { field: Field; onChange: (f: Field) =
   const supportsFontSize = field.type === 'text' || field.type === 'numeric' || field.type === 'date' || field.type === 'employee' || field.type === 'select' || field.type === 'radio'
   const supportsOptions = field.type === 'select' || field.type === 'radio'
   const supportsAutoValue = field.type === 'text' || field.type === 'date'
+  const supportsMaxLength = supportsFieldMaxLength(field)
+  const suggestedLength = supportsMaxLength ? suggestedMaxLength(field) : undefined
   const optionText = supportsOptions ? (field.options ?? []).join('\n') : ''
 
   return (
@@ -675,51 +763,36 @@ function FieldEditor({ field, onChange }: { field: Field; onChange: (f: Field) =
         )}
       </div>
 
-      <div className="space-y-3 border-t border-neutral-200/80 pt-4 dark:border-neutral-800/80">
-        <div className="text-[11px] font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Validation</div>
-        <div>
-          <div className="text-xs text-neutral-500 dark:text-neutral-400 mb-1">Validation</div>
-          {field.type === 'numeric' ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              <Input
-                type="number"
-                placeholder="min"
-                value={field.validation.kind === 'range' ? field.validation.min : 0}
-                onChange={(e) =>
-                  onChange({
-                    ...field,
-                    validation: { kind: 'range', min: Number(e.target.value || 0), max: field.validation.kind === 'range' ? field.validation.max : 300 }
-                  })
+      {supportsMaxLength && (
+        <div className="space-y-3 border-t border-neutral-200/80 pt-4 dark:border-neutral-800/80">
+          <div className="text-[11px] font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Limits</div>
+          <div>
+            <div className="text-xs text-neutral-500 dark:text-neutral-400 mb-1">Max characters</div>
+            <Input
+              type="number"
+              min={1}
+              placeholder={suggestedLength ? String(suggestedLength) : ''}
+              value={field.maxLength ?? ''}
+              onChange={(e) => {
+                const raw = e.target.value
+                if (!raw) {
+                  onChange({ ...field, maxLength: undefined })
+                  return
                 }
-              />
-              <Input
-                type="number"
-                placeholder="max"
-                value={field.validation.kind === 'range' ? field.validation.max : 300}
-                onChange={(e) =>
-                  onChange({
-                    ...field,
-                    validation: { kind: 'range', min: field.validation.kind === 'range' ? field.validation.min : 0, max: Number(e.target.value || 0) }
-                  })
-                }
-              />
+                const parsed = Math.max(1, Math.round(Number(raw)))
+                onChange({ ...field, maxLength: Number.isFinite(parsed) ? parsed : undefined })
+              }}
+            />
+            <div className="text-[11px] text-neutral-500 dark:text-neutral-400 mt-1">
+              {field.maxLength
+                ? 'Custom limit set.'
+                : suggestedLength
+                  ? `Auto: ${suggestedLength} based on size.`
+                  : 'Auto limit based on size.'}
             </div>
-          ) : (
-            <Select
-              value={field.validation.kind}
-              onChange={(e) =>
-                onChange({
-                  ...field,
-                  validation: e.target.value === 'none' ? { kind: 'none' } : { kind: 'regex', pattern: '' }
-                })
-              }
-            >
-              <option value="none">None</option>
-              <option value="regex">Regex</option>
-            </Select>
-          )}
+          </div>
         </div>
-      </div>
+      )}
 
       {supportsOptions && (
         <div className="space-y-3 border-t border-neutral-200/80 pt-4 dark:border-neutral-800/80">
@@ -821,7 +894,8 @@ function FieldBox({
   onSelect,
   onMove,
   onResize,
-  onDuplicate
+  onDuplicate,
+  onDelete
 }: {
   field: Field
   selected: boolean
@@ -830,6 +904,7 @@ function FieldBox({
   onMove: (x: number, y: number) => void
   onResize: (w: number, h: number) => void
   onDuplicate: () => void
+  onDelete: () => void
 }) {
   const [drag, setDrag] = useState<null | { ox: number; oy: number; pid: number }>(null)
   const [resize, setResize] = useState<null | { startX: number; startY: number; w: number; h: number; pid: number }>(null)
@@ -848,7 +923,7 @@ function FieldBox({
     <div
       data-field="1"
       className={cn(
-        'absolute rounded-xl border text-[11px] flex items-center justify-center select-none cursor-move',
+        'group absolute rounded-xl border text-[11px] flex items-center justify-center select-none cursor-move',
         selected
           ? 'border-blue-500 bg-blue-50 text-blue-900 shadow-sm dark:border-blue-300 dark:bg-blue-100 dark:text-blue-950'
           : 'border-neutral-300 bg-white/80 text-neutral-900 dark:border-neutral-700 dark:bg-neutral-900/60 dark:text-neutral-100'
@@ -904,6 +979,26 @@ function FieldBox({
       }}
     >
       <span className="px-2 truncate">{field.label}</span>
+      <button
+        type="button"
+        className={cn(
+          'rf-focus absolute -right-2 -top-2 inline-flex h-6 w-6 items-center justify-center rounded-full border border-white shadow-sm transition',
+          selected
+            ? 'bg-blue-500 text-white'
+            : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200 dark:bg-neutral-900 dark:text-neutral-200 dark:hover:bg-neutral-800',
+          selected
+            ? 'opacity-100 pointer-events-auto'
+            : 'opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto'
+        )}
+        title="Delete field"
+        onPointerDown={(e) => e.stopPropagation()}
+        onClick={(e) => {
+          e.stopPropagation()
+          onDelete()
+        }}
+      >
+        <Trash2 size={12} />
+      </button>
       {canResize && (
         <div
           className={cn(

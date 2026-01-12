@@ -7,6 +7,7 @@ import Modal from '@/shared/ui/Modal'
 import { Card, CardBody } from '@/shared/ui/Card'
 import { useAppStore } from '@/shared/state/useAppStore'
 import type { AccessGroup, Id } from '@/entities/types'
+import { cn } from '@/shared/ui/cn'
 import { Plus, Pencil, Trash2 } from 'lucide-react'
 
 const PAGE_SIZE = 12
@@ -30,8 +31,12 @@ export default function GroupsPage() {
   const [form, setForm] = useState({
     name: '',
     description: '',
+    includeAllEmployees: false,
+    includeAllForms: false,
     employeeIds: [] as Id[],
-    formIds: [] as Id[]
+    formIds: [] as Id[],
+    excludedEmployeeIds: [] as Id[],
+    excludedFormIds: [] as Id[]
   })
 
   if (role !== 'admin') {
@@ -58,26 +63,51 @@ export default function GroupsPage() {
 
   const assignedEmployeeIds = useMemo(() => {
     const ids = new Set<Id>()
+    if (!employees.length) return ids
     for (const g of groups) {
+      if (g.includeAllEmployees) {
+        const excluded = new Set(g.excludedEmployeeIds ?? [])
+        for (const e of employees) {
+          if (!excluded.has(e.id)) ids.add(e.id)
+        }
+        continue
+      }
       for (const id of g.employeeIds) ids.add(id)
     }
     return ids
-  }, [groups])
+  }, [employees, groups])
 
   const assignedFormIds = useMemo(() => {
     const ids = new Set<Id>()
+    if (!forms.length) return ids
     for (const g of groups) {
+      if (g.includeAllForms) {
+        const excluded = new Set(g.excludedFormIds ?? [])
+        for (const f of forms) {
+          if (!excluded.has(f.id)) ids.add(f.id)
+        }
+        continue
+      }
       for (const id of g.formIds) ids.add(id)
     }
     return ids
-  }, [groups])
+  }, [forms, groups])
 
   const unassignedEmployees = employees.filter((e) => !assignedEmployeeIds.has(e.id))
   const unassignedForms = forms.filter((f) => !assignedFormIds.has(f.id))
 
   const openCreate = () => {
     setEditing(null)
-    setForm({ name: '', description: '', employeeIds: [], formIds: [] })
+    setForm({
+      name: '',
+      description: '',
+      includeAllEmployees: false,
+      includeAllForms: false,
+      employeeIds: [],
+      formIds: [],
+      excludedEmployeeIds: [],
+      excludedFormIds: []
+    })
     setEmployeeQuery('')
     setFormQuery('')
     setOpen(true)
@@ -88,8 +118,12 @@ export default function GroupsPage() {
     setForm({
       name: group.name,
       description: group.description ?? '',
+      includeAllEmployees: group.includeAllEmployees ?? false,
+      includeAllForms: group.includeAllForms ?? false,
       employeeIds: group.employeeIds.slice(),
-      formIds: group.formIds.slice()
+      formIds: group.formIds.slice(),
+      excludedEmployeeIds: group.excludedEmployeeIds?.slice() ?? [],
+      excludedFormIds: group.excludedFormIds?.slice() ?? []
     })
     setEmployeeQuery('')
     setFormQuery('')
@@ -99,18 +133,34 @@ export default function GroupsPage() {
   const toggleEmployee = (id: Id) => {
     setForm((s) => ({
       ...s,
-      employeeIds: s.employeeIds.includes(id)
-        ? s.employeeIds.filter((x) => x !== id)
-        : [...s.employeeIds, id]
+      ...(s.includeAllEmployees
+        ? {
+          excludedEmployeeIds: s.excludedEmployeeIds.includes(id)
+            ? s.excludedEmployeeIds.filter((x) => x !== id)
+            : [...s.excludedEmployeeIds, id]
+        }
+        : {
+          employeeIds: s.employeeIds.includes(id)
+            ? s.employeeIds.filter((x) => x !== id)
+            : [...s.employeeIds, id]
+        })
     }))
   }
 
   const toggleForm = (id: Id) => {
     setForm((s) => ({
       ...s,
-      formIds: s.formIds.includes(id)
-        ? s.formIds.filter((x) => x !== id)
-        : [...s.formIds, id]
+      ...(s.includeAllForms
+        ? {
+          excludedFormIds: s.excludedFormIds.includes(id)
+            ? s.excludedFormIds.filter((x) => x !== id)
+            : [...s.excludedFormIds, id]
+        }
+        : {
+          formIds: s.formIds.includes(id)
+            ? s.formIds.filter((x) => x !== id)
+            : [...s.formIds, id]
+        })
     }))
   }
 
@@ -132,6 +182,29 @@ export default function GroupsPage() {
     })
   }, [forms, formQuery])
 
+  const employeeOptions = useMemo(
+    () => employees.map((e) => ({ id: e.id, label: e.name })),
+    [employees]
+  )
+
+  const formOptions = useMemo(
+    () => forms.map((f) => ({ id: f.id, label: f.name })),
+    [forms]
+  )
+
+  const employeeIncludedCount = form.includeAllEmployees
+    ? Math.max(0, employees.length - form.excludedEmployeeIds.length)
+    : form.employeeIds.length
+  const formIncludedCount = form.includeAllForms
+    ? Math.max(0, forms.length - form.excludedFormIds.length)
+    : form.formIds.length
+  const employeeBadgeLabel = form.includeAllEmployees
+    ? (form.excludedEmployeeIds.length ? `All except ${form.excludedEmployeeIds.length}` : 'All employees')
+    : `${form.employeeIds.length} selected`
+  const formBadgeLabel = form.includeAllForms
+    ? (form.excludedFormIds.length ? `All except ${form.excludedFormIds.length}` : 'All forms')
+    : `${form.formIds.length} selected`
+
   const handleSave = async () => {
     if (!form.name.trim()) {
       pushToast({ title: 'Name required', message: 'Group name is required.', variant: 'warning' })
@@ -140,8 +213,12 @@ export default function GroupsPage() {
     const payload = {
       name: form.name.trim(),
       description: form.description.trim(),
+      includeAllEmployees: form.includeAllEmployees,
+      includeAllForms: form.includeAllForms,
       employeeIds: form.employeeIds,
-      formIds: form.formIds
+      formIds: form.formIds,
+      excludedEmployeeIds: form.excludedEmployeeIds,
+      excludedFormIds: form.excludedFormIds
     }
     try {
       if (editing) {
@@ -225,8 +302,22 @@ export default function GroupsPage() {
                 </thead>
                 <tbody>
                   {visibleGroups.map((g) => {
-                    const memberNames = lookupNames(g.employeeIds, employees.map((e) => ({ id: e.id, label: e.name })))
-                    const formNames = lookupNames(g.formIds, forms.map((f) => ({ id: f.id, label: f.name })))
+                    const memberSummary = summarizeGroupScope({
+                      includeAll: g.includeAllEmployees,
+                      selectedIds: g.employeeIds,
+                      excludedIds: g.excludedEmployeeIds,
+                      options: employeeOptions,
+                      emptyLabel: 'No members',
+                      allLabel: 'employees'
+                    })
+                    const formSummary = summarizeGroupScope({
+                      includeAll: g.includeAllForms,
+                      selectedIds: g.formIds,
+                      excludedIds: g.excludedFormIds,
+                      options: formOptions,
+                      emptyLabel: 'No forms',
+                      allLabel: 'forms'
+                    })
                     return (
                       <tr key={g.id} className="border-t border-neutral-200 dark:border-neutral-800">
                         <td className="py-3">
@@ -235,27 +326,27 @@ export default function GroupsPage() {
                             <div className="text-xs text-neutral-500 dark:text-neutral-400">{g.description}</div>
                           )}
                           <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-neutral-500 dark:text-neutral-400 sm:hidden">
-                            <Badge tone="neutral">{g.employeeIds.length} members</Badge>
-                            <Badge tone="neutral">{g.formIds.length} forms</Badge>
+                            <Badge tone="neutral">{memberSummary.badge} members</Badge>
+                            <Badge tone="neutral">{formSummary.badge} forms</Badge>
                           </div>
                         </td>
                         <td className="py-3 hidden sm:table-cell">
                           <div className="flex flex-wrap items-center gap-2">
-                            <Badge tone={g.employeeIds.length ? 'success' : 'warning'}>
-                              {g.employeeIds.length}
+                            <Badge tone={memberSummary.count ? 'success' : 'warning'}>
+                              {memberSummary.badge}
                             </Badge>
                             <span className="text-xs text-neutral-500 dark:text-neutral-400">
-                              {memberNames || 'No members'}
+                              {memberSummary.detail}
                             </span>
                           </div>
                         </td>
                         <td className="py-3 hidden sm:table-cell">
                           <div className="flex flex-wrap items-center gap-2">
-                            <Badge tone={g.formIds.length ? 'success' : 'warning'}>
-                              {g.formIds.length}
+                            <Badge tone={formSummary.count ? 'success' : 'warning'}>
+                              {formSummary.badge}
                             </Badge>
                             <span className="text-xs text-neutral-500 dark:text-neutral-400">
-                              {formNames || 'No forms'}
+                              {formSummary.detail}
                             </span>
                           </div>
                         </td>
@@ -313,7 +404,38 @@ export default function GroupsPage() {
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <div className="text-xs text-neutral-500 dark:text-neutral-400">Employees</div>
-                <Badge tone={form.employeeIds.length ? 'success' : 'warning'}>{form.employeeIds.length} selected</Badge>
+                <Badge tone={employeeIncludedCount ? 'success' : 'warning'}>{employeeBadgeLabel}</Badge>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  className={cn(
+                    'rf-focus rounded-xl border px-2 py-1 text-xs font-medium transition',
+                    form.includeAllEmployees
+                      ? 'border-neutral-200 text-neutral-700 hover:bg-neutral-50 dark:border-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-900'
+                      : 'border-neutral-900 bg-neutral-900 text-white dark:border-white dark:bg-white dark:text-neutral-900'
+                  )}
+                  onClick={() => setForm((s) => ({ ...s, includeAllEmployees: false }))}
+                >
+                  Selected only
+                </button>
+                <button
+                  type="button"
+                  className={cn(
+                    'rf-focus rounded-xl border px-2 py-1 text-xs font-medium transition',
+                    form.includeAllEmployees
+                      ? 'border-neutral-900 bg-neutral-900 text-white dark:border-white dark:bg-white dark:text-neutral-900'
+                      : 'border-neutral-200 text-neutral-700 hover:bg-neutral-50 dark:border-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-900'
+                  )}
+                  onClick={() => setForm((s) => ({ ...s, includeAllEmployees: true }))}
+                >
+                  All except...
+                </button>
+              </div>
+              <div className="text-[11px] text-neutral-500 dark:text-neutral-400">
+                {form.includeAllEmployees
+                  ? 'All current and future employees are included unless excluded below.'
+                  : 'Select individual employees to include in this group.'}
               </div>
               <Input
                 placeholder="Search employees"
@@ -332,7 +454,11 @@ export default function GroupsPage() {
                     <input
                       type="checkbox"
                       className="h-4 w-4"
-                      checked={form.employeeIds.includes(e.id)}
+                      checked={
+                        form.includeAllEmployees
+                          ? form.excludedEmployeeIds.includes(e.id)
+                          : form.employeeIds.includes(e.id)
+                      }
                       onChange={() => toggleEmployee(e.id)}
                     />
                   </label>
@@ -348,7 +474,38 @@ export default function GroupsPage() {
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <div className="text-xs text-neutral-500 dark:text-neutral-400">Forms</div>
-                <Badge tone={form.formIds.length ? 'success' : 'warning'}>{form.formIds.length} selected</Badge>
+                <Badge tone={formIncludedCount ? 'success' : 'warning'}>{formBadgeLabel}</Badge>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  className={cn(
+                    'rf-focus rounded-xl border px-2 py-1 text-xs font-medium transition',
+                    form.includeAllForms
+                      ? 'border-neutral-200 text-neutral-700 hover:bg-neutral-50 dark:border-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-900'
+                      : 'border-neutral-900 bg-neutral-900 text-white dark:border-white dark:bg-white dark:text-neutral-900'
+                  )}
+                  onClick={() => setForm((s) => ({ ...s, includeAllForms: false }))}
+                >
+                  Selected only
+                </button>
+                <button
+                  type="button"
+                  className={cn(
+                    'rf-focus rounded-xl border px-2 py-1 text-xs font-medium transition',
+                    form.includeAllForms
+                      ? 'border-neutral-900 bg-neutral-900 text-white dark:border-white dark:bg-white dark:text-neutral-900'
+                      : 'border-neutral-200 text-neutral-700 hover:bg-neutral-50 dark:border-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-900'
+                  )}
+                  onClick={() => setForm((s) => ({ ...s, includeAllForms: true }))}
+                >
+                  All except...
+                </button>
+              </div>
+              <div className="text-[11px] text-neutral-500 dark:text-neutral-400">
+                {form.includeAllForms
+                  ? 'All current and future forms are included unless excluded below.'
+                  : 'Select individual forms to include in this group.'}
               </div>
               <Input
                 placeholder="Search forms"
@@ -365,7 +522,11 @@ export default function GroupsPage() {
                     <input
                       type="checkbox"
                       className="h-4 w-4"
-                      checked={form.formIds.includes(f.id)}
+                      checked={
+                        form.includeAllForms
+                          ? form.excludedFormIds.includes(f.id)
+                          : form.formIds.includes(f.id)
+                      }
                       onChange={() => toggleForm(f.id)}
                     />
                   </label>
@@ -396,4 +557,35 @@ function lookupNames(ids: Id[], options: Array<{ id: Id; label: string }>, limit
   const visible = names.slice(0, limit)
   const rest = names.length - visible.length
   return rest > 0 ? `${visible.join(', ')} +${rest}` : visible.join(', ')
+}
+
+function summarizeGroupScope({
+  includeAll,
+  selectedIds,
+  excludedIds,
+  options,
+  emptyLabel,
+  allLabel
+}: {
+  includeAll?: boolean
+  selectedIds: Id[]
+  excludedIds?: Id[]
+  options: Array<{ id: Id; label: string }>
+  emptyLabel: string
+  allLabel: string
+}) {
+  const excluded = excludedIds ?? []
+  if (includeAll) {
+    const effectiveCount = Math.max(0, options.length - excluded.length)
+    const excludedNames = lookupNames(excluded, options)
+    const detail = excluded.length
+      ? `All except ${excludedNames || excluded.length}`
+      : `All ${allLabel}`
+    const badge = excluded.length ? `All except ${excluded.length}` : 'All'
+    return { count: effectiveCount, detail, badge }
+  }
+  const count = selectedIds.length
+  const detail = lookupNames(selectedIds, options) || emptyLabel
+  const badge = `${count}`
+  return { count, detail, badge }
 }

@@ -155,8 +155,12 @@ class AccessGroup(models.Model):
     id = models.CharField(primary_key=True, max_length=32, default=group_uid, editable=False)
     name = models.CharField(max_length=200)
     description = models.CharField(max_length=255, blank=True)
+    include_all_employees = models.BooleanField(default=False)
+    include_all_forms = models.BooleanField(default=False)
     employees = models.ManyToManyField(Employee, related_name='access_groups', blank=True)
     forms = models.ManyToManyField(FormTemplate, related_name='access_groups', blank=True)
+    excluded_employees = models.ManyToManyField(Employee, related_name='excluded_from_access_groups', blank=True)
+    excluded_forms = models.ManyToManyField(FormTemplate, related_name='excluded_from_access_groups', blank=True)
     created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(auto_now=True)
 

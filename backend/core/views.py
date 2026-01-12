@@ -56,6 +56,38 @@ def employee_for_user(user):
     return Employee.objects.filter(email__iexact=email).first()
 
 
+def group_includes_employee(group, employee_id: str) -> bool:
+    if group.include_all_employees:
+        excluded = {e.id for e in group.excluded_employees.all()}
+        return employee_id not in excluded
+    return employee_id in {e.id for e in group.employees.all()}
+
+
+def group_allowed_form_ids(group, all_form_ids):
+    if group.include_all_forms:
+        excluded = {f.id for f in group.excluded_forms.all()}
+        return set(all_form_ids) - excluded
+    return {f.id for f in group.forms.all()}
+
+
+def allowed_form_ids_for_employee(employee, forms_qs=None):
+    all_forms_qs = forms_qs or FormTemplate.objects.all()
+    all_form_ids = set(all_forms_qs.values_list('id', flat=True))
+    if not all_form_ids:
+        return set()
+    groups = AccessGroup.objects.prefetch_related('employees', 'excluded_employees', 'forms', 'excluded_forms').all()
+    allowed = set()
+    for group in groups:
+        if group_includes_employee(group, employee.id):
+            allowed.update(group_allowed_form_ids(group, all_form_ids))
+    return allowed
+
+
+def employee_has_form_access(employee, form) -> bool:
+    allowed_ids = allowed_form_ids_for_employee(employee, FormTemplate.objects.filter(id=form.id))
+    return form.id in allowed_ids
+
+
 class HealthView(APIView):
     permission_classes = [AllowAny]
 
@@ -77,7 +109,10 @@ class FormListCreateView(APIView):
             employee = employee_for_user(request.user)
             if not employee:
                 return Response([])
-            forms = forms.filter(access_groups__employees=employee).distinct()
+            allowed_ids = allowed_form_ids_for_employee(employee, forms)
+            if not allowed_ids:
+                return Response([])
+            forms = forms.filter(id__in=allowed_ids)
         return Response(FormTemplateSerializer(forms, many=True, context={'request': request}).data)
 
     def post(self, request):
@@ -203,7 +238,10 @@ class TicketListCreateView(APIView):
             employee = employee_for_user(request.user)
             if not employee:
                 return Response([])
-            tickets = tickets.filter(form__access_groups__employees=employee).distinct()
+            allowed_ids = allowed_form_ids_for_employee(employee)
+            if not allowed_ids:
+                return Response([])
+            tickets = tickets.filter(form_id__in=allowed_ids)
         return Response(TicketSerializer(tickets, many=True, context={'request': request}).data)
 
     def post(self, request):
@@ -218,7 +256,7 @@ class TicketListCreateView(APIView):
             employee = employee_for_user(request.user)
             if not employee:
                 return Response({'detail': 'Employee profile required'}, status=status.HTTP_403_FORBIDDEN)
-            if not form.access_groups.filter(employees=employee).exists():
+            if not employee_has_form_access(employee, form):
                 return Response({'detail': 'No access to form'}, status=status.HTTP_403_FORBIDDEN)
         version = get_object_or_404(FormVersion, pk=version_id, form=form)
         ticket = Ticket.objects.create(
