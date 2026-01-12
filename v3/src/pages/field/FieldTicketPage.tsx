@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import SectionHeader from '@/shared/ui/SectionHeader'
 import Button from '@/shared/ui/Button'
@@ -14,6 +14,7 @@ import { downloadDataUrl } from '@/shared/lib/download'
 import { exportRenderedFormPdf } from '@/features/export/exporters'
 import RenderedPdfPreview from '@/features/pdf/RenderedPdfPreview'
 import SignaturePad from '@/features/field/SignaturePad'
+import { resolveMaxLength } from '@/shared/lib/fieldLimits'
 import { ArrowLeft, Save, Send, ImagePlus, FileDown, Eye } from 'lucide-react'
 
 const DEFAULT_FONT_SIZE = 12
@@ -107,6 +108,7 @@ export default function FieldTicketPage() {
                   field={f}
                   value={ticket.values[f.key]}
                   employees={employees}
+                  creatorName={ticket.assignedTo}
                   signature={ticket.signature}
                   onChange={(val) => {
                     updateTicket(ticket.id, { values: { ...ticket.values, [f.key]: val } })
@@ -270,6 +272,7 @@ function FieldInput({
   field,
   value,
   employees,
+  creatorName,
   signature,
   onChange,
   onSignature,
@@ -278,6 +281,7 @@ function FieldInput({
   field: Field
   value: any
   employees: Employee[]
+  creatorName: string
   signature?: { signer: string; dataUrl?: string }
   onChange: (v: any) => void
   onSignature: (dataUrl?: string) => void
@@ -288,6 +292,27 @@ function FieldInput({
   const [search, setSearch] = useState('')
   const [expanded, setExpanded] = useState(false)
   const fontSize = field.fontSize ?? DEFAULT_FONT_SIZE
+  const readOnly = field.readOnly === true
+  const autoNote = field.autoValue === 'today' && field.type === 'date'
+    ? "Auto-filled with today's date."
+    : field.autoValue === 'creator' && field.type === 'text'
+      ? 'Auto-filled with assigned user.'
+      : ''
+  const options = (field.options ?? []).map((opt) => opt.trim()).filter(Boolean)
+  const maxLength = resolveMaxLength(field)
+
+  useEffect(() => {
+    if (!field.autoValue) return
+    if (value !== undefined && value !== null && value !== '') return
+    if (field.autoValue === 'today' && field.type === 'date') {
+      const today = localIsoDate()
+      if (today !== value) onChange(today)
+      return
+    }
+    if (field.autoValue === 'creator' && field.type === 'text' && creatorName) {
+      if (creatorName !== value) onChange(creatorName)
+    }
+  }, [creatorName, field.autoValue, field.type, onChange, value])
 
   if (field.type === 'checkbox') {
     return (
@@ -297,7 +322,7 @@ function FieldInput({
             <div className="font-medium">{field.label}{field.required ? ' *' : ''}</div>
             {help && <div className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">{help}</div>}
           </div>
-          <input type="checkbox" className="h-5 w-5" checked={!!value} onChange={(e) => onChange(e.target.checked)} />
+          <input type="checkbox" className="h-5 w-5" checked={!!value} onChange={(e) => onChange(e.target.checked)} disabled={readOnly} />
         </div>
       </div>
     )
@@ -317,6 +342,62 @@ function FieldInput({
       <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 p-3">
         <div className="font-medium">{field.label}{field.required ? ' *' : ''}</div>
         <div className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">Use the Photo Attachments panel on the right.</div>
+      </div>
+    )
+  }
+
+  if (field.type === 'select') {
+    return (
+      <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 p-3">
+        <div className="font-medium">{field.label}{field.required ? ' *' : ''}</div>
+        {help && <div className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">{help}</div>}
+        <div className="mt-2">
+          <select
+            className="rf-focus h-10 w-full rounded-2xl border border-neutral-200 bg-white px-3 text-sm dark:border-neutral-800 dark:bg-neutral-950"
+            value={value ?? ''}
+            onChange={(e) => onChange(e.target.value)}
+            disabled={readOnly || options.length === 0}
+            style={{ fontSize }}
+          >
+            <option value="">{options.length ? 'Select option' : 'No options'}</option>
+            {options.map((opt) => (
+              <option key={opt} value={opt}>{opt}</option>
+            ))}
+          </select>
+        </div>
+        {options.length === 0 && (
+          <div className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">Add options in the Builder.</div>
+        )}
+        {hint && <div className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">{hint}</div>}
+      </div>
+    )
+  }
+
+  if (field.type === 'radio') {
+    return (
+      <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 p-3">
+        <div className="font-medium">{field.label}{field.required ? ' *' : ''}</div>
+        {help && <div className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">{help}</div>}
+        <div className="mt-2 space-y-2" style={{ fontSize }}>
+          {options.length === 0 ? (
+            <div className="text-xs text-neutral-500 dark:text-neutral-400">Add options in the Builder.</div>
+          ) : (
+            options.map((opt) => (
+              <label key={opt} className="flex items-center gap-2 text-sm">
+                <input
+                  type="radio"
+                  name={`radio_${field.id}`}
+                  value={opt}
+                  checked={value === opt}
+                  onChange={(e) => onChange(e.target.value)}
+                  disabled={readOnly}
+                />
+                <span>{opt}</span>
+              </label>
+            ))
+          )}
+        </div>
+        {hint && <div className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">{hint}</div>}
       </div>
     )
   }
@@ -345,12 +426,14 @@ function FieldInput({
               setExpanded(false)
             }}
             style={{ fontSize }}
+            disabled={readOnly}
           />
           <select
             className="rf-focus h-10 w-full rounded-2xl border border-neutral-200 bg-white px-3 text-sm dark:border-neutral-800 dark:bg-neutral-950"
             value={value ?? ''}
             onChange={(e) => onChange(e.target.value)}
             style={{ fontSize }}
+            disabled={readOnly}
           >
             <option value="">Select employee</option>
             {visible.map((e) => (
@@ -388,20 +471,39 @@ function FieldInput({
 
       <div className="mt-2">
         {field.type === 'date' ? (
-          <Input type="date" value={value ?? ''} onChange={(e) => onChange(e.target.value)} style={{ fontSize }} />
+          <Input
+            type="date"
+            value={value ?? ''}
+            onChange={(e) => onChange(e.target.value)}
+            style={{ fontSize }}
+            readOnly={readOnly}
+          />
         ) : field.type === 'numeric' ? (
           <Input
             type="number"
             value={value ?? ''}
-            onChange={(e) => onChange(e.target.value === '' ? '' : Number(e.target.value))}
+            onChange={(e) => {
+              const raw = e.target.value
+              const trimmed = maxLength ? raw.slice(0, maxLength) : raw
+              onChange(trimmed === '' ? '' : Number(trimmed))
+            }}
             style={{ fontSize }}
+            readOnly={readOnly}
+            maxLength={maxLength}
           />
         ) : (
-          <Input value={value ?? ''} onChange={(e) => onChange(e.target.value)} style={{ fontSize }} />
+          <Input
+            value={value ?? ''}
+            onChange={(e) => onChange(e.target.value)}
+            style={{ fontSize }}
+            readOnly={readOnly}
+            maxLength={maxLength}
+          />
         )}
       </div>
 
       {hint && <div className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">{hint}</div>}
+      {autoNote && <div className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">{autoNote}{readOnly ? '' : ' (editable)'}</div>}
       {field.type === 'numeric' && field.validation.kind === 'range' && value !== '' && value != null && (
         <RangeHint value={Number(value)} min={field.validation.min} max={field.validation.max} />
       )}
@@ -413,9 +515,16 @@ function FieldInput({
       <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 p-3">
         <div className="font-medium">{field.label}{field.required ? ' *' : ''}</div>
         <div className="mt-2">
-          <Textarea value={value ?? ''} onChange={(e) => onChange(e.target.value)} style={{ fontSize }} />
+          <Textarea
+            value={value ?? ''}
+            onChange={(e) => onChange(e.target.value)}
+            style={{ fontSize }}
+            readOnly={readOnly}
+            maxLength={maxLength}
+          />
         </div>
         {hint && <div className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">{hint}</div>}
+        {autoNote && <div className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">{autoNote}{readOnly ? '' : ' (editable)'}</div>}
       </div>
     )
   }
@@ -430,4 +539,10 @@ function RangeHint({ value, min, max }: { value: number; min: number; max: numbe
       {ok ? 'Within allowed range.' : `Out of range (${min}–${max}).`}
     </div>
   )
+}
+
+function localIsoDate() {
+  const now = new Date()
+  const offset = now.getTimezoneOffset() * 60000
+  return new Date(now.getTime() - offset).toISOString().slice(0, 10)
 }

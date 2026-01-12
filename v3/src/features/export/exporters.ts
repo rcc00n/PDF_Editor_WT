@@ -1,16 +1,7 @@
 import type { Ticket, FormTemplate, FormVersion } from '@/entities/types'
-import { downloadText } from '@/shared/lib/download'
 import { jsPDF } from 'jspdf'
 
 const DEFAULT_FONT_SIZE = 12
-
-export function exportTicketCsv(ticket: Ticket, form: FormTemplate, version: FormVersion) {
-  const keys = version.fields.map(f => f.key)
-  const header = ['ticket_id', ...keys]
-  const row = [ticket.id, ...keys.map(k => safeCsv(ticket.values[k]))]
-  const csv = [header.join(','), row.join(',')].join('\n')
-  downloadText(`${ticket.id}.csv`, csv, 'text/csv')
-}
 
 export async function exportTicketPdf(ticket: Ticket, form: FormTemplate, version: FormVersion) {
   const doc = new jsPDF({ unit: 'pt', format: 'a4' })
@@ -180,15 +171,6 @@ export async function exportRenderedFormPdf(ticket: Ticket, version: FormVersion
   }
 
   doc.save(`${ticket.id}-rendered.pdf`)
-}
-
-function safeCsv(v: any) {
-  if (v == null) return ''
-  const s = String(v)
-  if (s.includes(',') || s.includes('\n') || s.includes('"')) {
-    return `"${s.replaceAll('"', '""')}"`
-  }
-  return s
 }
 
 function writeWrap(doc: jsPDF, text: string, x: number, y: number, width: number) {

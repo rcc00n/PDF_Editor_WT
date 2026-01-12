@@ -19,6 +19,8 @@ from .views import (
     TicketSignatureUploadView,
     EmployeeListCreateView,
     EmployeeDetailView,
+    AccessGroupListCreateView,
+    AccessGroupDetailView,
 )
 
 urlpatterns = [
@@ -42,4 +44,6 @@ urlpatterns = [
     path('tickets/<str:ticket_id>/signature/', TicketSignatureUploadView.as_view()),
     path('employees/', EmployeeListCreateView.as_view()),
     path('employees/<str:employee_id>/', EmployeeDetailView.as_view()),
+    path('groups/', AccessGroupListCreateView.as_view()),
+    path('groups/<str:group_id>/', AccessGroupDetailView.as_view()),
 ]

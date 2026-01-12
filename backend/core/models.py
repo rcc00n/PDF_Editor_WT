@@ -11,6 +11,22 @@ def uid(prefix: str) -> str:
     return f"{prefix}_{uuid.uuid4().hex[:10]}"
 
 
+def form_uid() -> str:
+    return uid('form')
+
+
+def version_uid() -> str:
+    return uid('ver')
+
+
+def employee_uid() -> str:
+    return uid('emp')
+
+
+def group_uid() -> str:
+    return uid('grp')
+
+
 def next_ticket_id() -> str:
     result = Ticket.objects.annotate(
         num=Cast(Substr('id', 4), models.IntegerField())
@@ -39,8 +55,8 @@ class TicketApprovalState(models.TextChoices):
 
 
 class FormTemplate(models.Model):
-    id = models.CharField(primary_key=True, max_length=32, default=lambda: uid('form'), editable=False)
-    name = models.CharField(max_length=200, db_index=True)
+    id = models.CharField(primary_key=True, max_length=32, default=form_uid, editable=False)
+    name = models.CharField(max_length=200)
     subtitle = models.CharField(max_length=200, blank=True)
     created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(auto_now=True)
@@ -53,7 +69,13 @@ class FormTemplate(models.Model):
 
 
 class FormVersion(models.Model):
-    id = models.CharField(primary_key=True, max_length=32, default=lambda: uid('ver'), editable=False)
+    STATUS_CHOICES = (
+        ('draft', 'Draft'),
+        ('active', 'Active'),
+        ('archived', 'Archived'),
+    )
+
+    id = models.CharField(primary_key=True, max_length=32, default=version_uid, editable=False)
     form = models.ForeignKey(FormTemplate, related_name='versions', on_delete=models.CASCADE)
     version = models.CharField(max_length=20, default='v1.0')
     status = models.CharField(max_length=20, choices=FormVersionStatus.choices, default=FormVersionStatus.DRAFT, db_index=True)
@@ -128,12 +150,32 @@ class Attachment(models.Model):
 
 
 class Employee(models.Model):
-    id = models.CharField(primary_key=True, max_length=32, default=lambda: uid('emp'), editable=False)
-    name = models.CharField(max_length=200, db_index=True)
+    id = models.CharField(primary_key=True, max_length=32, default=employee_uid, editable=False)
+    name = models.CharField(max_length=200)
     email = models.EmailField(blank=True)
     role = models.CharField(max_length=120, blank=True)
     phone = models.CharField(max_length=40, blank=True)
     active = models.BooleanField(default=True, db_index=True)
+    created_at = models.DateTimeField(default=timezone.now)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self) -> str:
+        return self.name
+
+    class Meta:
+        ordering = ['name']
+
+
+class AccessGroup(models.Model):
+    id = models.CharField(primary_key=True, max_length=32, default=group_uid, editable=False)
+    name = models.CharField(max_length=200)
+    description = models.CharField(max_length=255, blank=True)
+    include_all_employees = models.BooleanField(default=False)
+    include_all_forms = models.BooleanField(default=False)
+    employees = models.ManyToManyField(Employee, related_name='access_groups', blank=True)
+    forms = models.ManyToManyField(FormTemplate, related_name='access_groups', blank=True)
+    excluded_employees = models.ManyToManyField(Employee, related_name='excluded_from_access_groups', blank=True)
+    excluded_forms = models.ManyToManyField(FormTemplate, related_name='excluded_from_access_groups', blank=True)
     created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(auto_now=True)
 
