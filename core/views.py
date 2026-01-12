@@ -9,8 +9,8 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.parsers import JSONParser, MultiPartParser, FormParser
-from .models import FormTemplate, FormVersion, Ticket, Attachment, Employee, uid
-from .serializers import FormTemplateSerializer, TicketSerializer, TicketUpdateSerializer, EmployeeSerializer
+from .models import FormTemplate, FormVersion, Ticket, Attachment, Employee, AccessGroup, uid
+from .serializers import FormTemplateSerializer, TicketSerializer, TicketUpdateSerializer, EmployeeSerializer, AccessGroupSerializer
 from .permissions import is_admin
 
 
@@ -47,6 +47,15 @@ def data_url_to_content(data_url: str, fallback_name: str):
     return filename, ContentFile(base64.b64decode(b64), name=filename), mime
 
 
+def employee_for_user(user):
+    if not user or not user.is_authenticated:
+        return None
+    email = (user.email or user.username or '').strip()
+    if not email:
+        return None
+    return Employee.objects.filter(email__iexact=email).first()
+
+
 class HealthView(APIView):
     permission_classes = [AllowAny]
 
@@ -64,6 +73,11 @@ class MeView(APIView):
 class FormListCreateView(APIView):
     def get(self, request):
         forms = FormTemplate.objects.prefetch_related('versions').all()
+        if not is_admin(request.user):
+            employee = employee_for_user(request.user)
+            if not employee:
+                return Response([])
+            forms = forms.filter(access_groups__employees=employee).distinct()
         return Response(FormTemplateSerializer(forms, many=True, context={'request': request}).data)
 
     def post(self, request):
@@ -185,6 +199,11 @@ class FormVersionFieldDeleteView(APIView):
 class TicketListCreateView(APIView):
     def get(self, request):
         tickets = Ticket.objects.select_related('form', 'version').prefetch_related('attachments').all()
+        if not is_admin(request.user):
+            employee = employee_for_user(request.user)
+            if not employee:
+                return Response([])
+            tickets = tickets.filter(form__access_groups__employees=employee).distinct()
         return Response(TicketSerializer(tickets, many=True, context={'request': request}).data)
 
     def post(self, request):
@@ -195,6 +214,12 @@ class TicketListCreateView(APIView):
         if not form_id or not version_id:
             return Response({'detail': 'formId and versionId required'}, status=status.HTTP_400_BAD_REQUEST)
         form = get_object_or_404(FormTemplate, pk=form_id)
+        if not is_admin(request.user):
+            employee = employee_for_user(request.user)
+            if not employee:
+                return Response({'detail': 'Employee profile required'}, status=status.HTTP_403_FORBIDDEN)
+            if not form.access_groups.filter(employees=employee).exists():
+                return Response({'detail': 'No access to form'}, status=status.HTTP_403_FORBIDDEN)
         version = get_object_or_404(FormVersion, pk=version_id, form=form)
         ticket = Ticket.objects.create(
             title=title,
@@ -322,4 +347,44 @@ class EmployeeDetailView(APIView):
             return Response({'detail': 'Admin only'}, status=status.HTTP_403_FORBIDDEN)
         employee = get_object_or_404(Employee, pk=employee_id)
         employee.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class AccessGroupListCreateView(APIView):
+    def get(self, request):
+        if not is_admin(request.user):
+            return Response({'detail': 'Admin only'}, status=status.HTTP_403_FORBIDDEN)
+        groups = AccessGroup.objects.prefetch_related('employees', 'forms').all()
+        return Response(AccessGroupSerializer(groups, many=True).data)
+
+    def post(self, request):
+        if not is_admin(request.user):
+            return Response({'detail': 'Admin only'}, status=status.HTTP_403_FORBIDDEN)
+        serializer = AccessGroupSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        group = serializer.save()
+        return Response(AccessGroupSerializer(group).data, status=status.HTTP_201_CREATED)
+
+
+class AccessGroupDetailView(APIView):
+    def get(self, request, group_id):
+        if not is_admin(request.user):
+            return Response({'detail': 'Admin only'}, status=status.HTTP_403_FORBIDDEN)
+        group = get_object_or_404(AccessGroup, pk=group_id)
+        return Response(AccessGroupSerializer(group).data)
+
+    def patch(self, request, group_id):
+        if not is_admin(request.user):
+            return Response({'detail': 'Admin only'}, status=status.HTTP_403_FORBIDDEN)
+        group = get_object_or_404(AccessGroup, pk=group_id)
+        serializer = AccessGroupSerializer(group, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        group = serializer.save()
+        return Response(AccessGroupSerializer(group).data)
+
+    def delete(self, request, group_id):
+        if not is_admin(request.user):
+            return Response({'detail': 'Admin only'}, status=status.HTTP_403_FORBIDDEN)
+        group = get_object_or_404(AccessGroup, pk=group_id)
+        group.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
