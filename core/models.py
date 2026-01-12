@@ -12,8 +12,6 @@ def uid(prefix: str) -> str:
 
 
 def next_ticket_id() -> str:
-    """Generate the next sequential ticket ID (FT-0001, FT-0002, ...)."""
-    # Use Max on the numeric suffix for O(1) index lookup instead of ordering.
     result = Ticket.objects.annotate(
         num=Cast(Substr('id', 4), models.IntegerField())
     ).aggregate(max_num=Max('num'))
