@@ -30,6 +30,7 @@ export default function FieldHomePage() {
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
   const [rigQuery, setRigQuery] = useState('')
+  const [formQuery, setFormQuery] = useState('')
 
   const availableForms = useMemo(() => {
     if (role === 'admin') return forms
@@ -80,10 +81,12 @@ export default function FieldHomePage() {
     [tickets, fromDate, toDate, rigQuery]
   )
 
-  const groupedTickets = useMemo(
-    () => groupTicketsByForm(filteredTickets, forms),
-    [filteredTickets, forms]
-  )
+  const groupedTickets = useMemo(() => {
+    const grouped = groupTicketsByForm(filteredTickets, forms)
+    const q = formQuery.trim().toLowerCase()
+    if (!q) return grouped
+    return grouped.filter((group) => group.name.toLowerCase().includes(q))
+  }, [filteredTickets, forms, formQuery])
 
   return (
     <div className="pb-10">
@@ -106,7 +109,7 @@ export default function FieldHomePage() {
               <CardSub>Tap a form to open it</CardSub>
             </CardHeader>
           <CardBody>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
               <div>
                 <div className="text-xs text-neutral-500 dark:text-neutral-400 mb-1">From</div>
                 <Input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
@@ -118,6 +121,10 @@ export default function FieldHomePage() {
               <div>
                 <div className="text-xs text-neutral-500 dark:text-neutral-400 mb-1">Rig</div>
                 <Input placeholder="Search rig" value={rigQuery} onChange={(e) => setRigQuery(e.target.value)} />
+              </div>
+              <div>
+                <div className="text-xs text-neutral-500 dark:text-neutral-400 mb-1">Form</div>
+                <Input placeholder="Search form name" value={formQuery} onChange={(e) => setFormQuery(e.target.value)} />
               </div>
             </div>
 

@@ -2,6 +2,7 @@ import type { Ticket, FormTemplate, FormVersion } from '@/entities/types'
 import { jsPDF } from 'jspdf'
 
 const DEFAULT_FONT_SIZE = 12
+type SignatureValue = { signer?: string; dataUrl?: string; url?: string }
 
 export async function exportTicketPdf(ticket: Ticket, form: FormTemplate, version: FormVersion) {
   const doc = new jsPDF({ unit: 'pt', format: 'a4' })
@@ -27,10 +28,17 @@ export async function exportTicketPdf(ticket: Ticket, form: FormTemplate, versio
   doc.setFont('helvetica', 'normal')
 
   for (const f of version.fields) {
-    const v = ticket.values[f.key]
-    const line = `${f.label}: ${v == null ? '' : String(v)}`
-    y = writeWrap(doc, line, 40, y, 520)
-    y += 6
+    if (f.type === 'signature') {
+      const sig = signatureFromValue(ticket.values[f.key]) ?? ticket.signature ?? null
+      const line = `${f.label}: ${sig?.signer || '—'}`
+      y = writeWrap(doc, line, 40, y, 520)
+      y += 6
+    } else {
+      const v = ticket.values[f.key]
+      const line = `${f.label}: ${v == null ? '' : String(v)}`
+      y = writeWrap(doc, line, 40, y, 520)
+      y += 6
+    }
     if (y > 760) {
       doc.addPage()
       y = 56
@@ -58,19 +66,34 @@ export async function exportTicketPdf(ticket: Ticket, form: FormTemplate, versio
 
   y += 10
   doc.setFont('helvetica', 'bold')
-  doc.text('Signature', 40, y)
+  doc.text('Signatures', 40, y)
   y += 14
   doc.setFont('helvetica', 'normal')
-  doc.text(ticket.signature?.signer ?? '—', 40, y)
-  y += 10
 
-  const signatureDataUrl = ticket.signature?.dataUrl || (ticket.signature?.url ? await fetchDataUrl(ticket.signature.url) : null)
-  if (signatureDataUrl) {
-    try {
-      const format = signatureDataUrl.startsWith('data:image/jpeg') ? 'JPEG' : 'PNG'
-      doc.addImage(signatureDataUrl, format, 40, y, 240, 80)
-    } catch {
-      // ignore
+  const signatureFields = version.fields.filter((f) => f.type === 'signature')
+  if (signatureFields.length === 0) {
+    doc.text('—', 40, y)
+    y += 14
+  } else {
+    for (const field of signatureFields) {
+      const sig = signatureFromValue(ticket.values[field.key]) ?? ticket.signature ?? null
+      const signer = sig?.signer || '—'
+      y = writeWrap(doc, `${field.label}: ${signer}`, 40, y, 520)
+      y += 6
+      const signatureDataUrl = sig?.dataUrl || (sig?.url ? await fetchDataUrl(sig.url) : null)
+      if (signatureDataUrl) {
+        try {
+          const format = signatureDataUrl.startsWith('data:image/jpeg') ? 'JPEG' : 'PNG'
+          doc.addImage(signatureDataUrl, format, 40, y, 240, 80)
+          y += 90
+        } catch {
+          // ignore
+        }
+      }
+      if (y > 760) {
+        doc.addPage()
+        y = 56
+      }
     }
   }
 
@@ -101,9 +124,6 @@ export async function exportRenderedFormPdf(ticket: Ticket, version: FormVersion
   doc.setFont('helvetica', 'normal')
   doc.setTextColor(20, 20, 20)
 
-  const signatureDataUrl = ticket.signature?.dataUrl || (ticket.signature?.url ? await fetchDataUrl(ticket.signature.url) : null)
-  const signatureFormat = signatureDataUrl?.startsWith('data:image/jpeg') ? 'JPEG' : 'PNG'
-
   for (let pageIndex = 1; pageIndex <= pdf.numPages; pageIndex += 1) {
     const page = pageIndex === 1 ? firstPage : await pdf.getPage(pageIndex)
     const viewport = page.getViewport({ scale: 1 })
@@ -133,11 +153,14 @@ export async function exportRenderedFormPdf(ticket: Ticket, version: FormVersion
       const padding = Math.min(6, fontSize * 0.4)
 
       if (field.type === 'signature') {
+        const signature = signatureFromValue(ticket.values[field.key]) ?? ticket.signature ?? null
+        const signatureDataUrl = signature?.dataUrl || (signature?.url ? await fetchDataUrl(signature.url) : null)
+        const signatureFormat = signatureDataUrl?.startsWith('data:image/jpeg') ? 'JPEG' : 'PNG'
         if (signatureDataUrl) {
           doc.addImage(signatureDataUrl, signatureFormat, x, y, w, h)
-        } else if (ticket.signature?.signer) {
+        } else if (signature?.signer) {
           doc.setFontSize(fontSize)
-          doc.text(ticket.signature.signer, x + padding, y + padding + fontSize, { maxWidth: Math.max(0, w - padding * 2) })
+          doc.text(signature.signer, x + padding, y + padding + fontSize, { maxWidth: Math.max(0, w - padding * 2) })
         }
         continue
       }
@@ -177,6 +200,12 @@ function writeWrap(doc: jsPDF, text: string, x: number, y: number, width: number
   const lines = doc.splitTextToSize(text, width)
   doc.text(lines, x, y)
   return y + lines.length * 12
+}
+
+function signatureFromValue(value: any): SignatureValue | null {
+  if (!value || typeof value !== 'object') return null
+  if (!('signer' in value) && !('dataUrl' in value) && !('url' in value)) return null
+  return value as SignatureValue
 }
 
 function dataUrlToBytes(dataUrl: string) {
