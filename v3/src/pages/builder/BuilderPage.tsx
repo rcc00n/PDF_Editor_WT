@@ -767,7 +767,18 @@ function FieldEditor({ field, onChange }: { field: Field; onChange: (f: Field) =
         <div className="space-y-3 border-t border-neutral-200/80 pt-4 dark:border-neutral-800/80">
           <div className="text-[11px] font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Limits</div>
           <div>
-            <div className="text-xs text-neutral-500 dark:text-neutral-400 mb-1">Max characters</div>
+            <div className="flex items-center justify-between">
+              <div className="text-xs text-neutral-500 dark:text-neutral-400">Max characters</div>
+              {field.maxLength ? (
+                <button
+                  type="button"
+                  className="rf-focus text-[11px] text-neutral-600 hover:text-neutral-900 dark:text-neutral-300 dark:hover:text-white"
+                  onClick={() => onChange({ ...field, maxLength: undefined })}
+                >
+                  Use auto
+                </button>
+              ) : null}
+            </div>
             <Input
               type="number"
               min={1}
