@@ -68,7 +68,6 @@ def employee_for_user(user):
 
 
 def group_includes_employee(group, employee_id: str, prefetched: bool = False) -> bool:
-    """Check if employee is included in group. Use prefetched=True if group has prefetched relations."""
     if group.include_all_employees:
         # Use cached data if prefetched, otherwise use efficient values_list query
         if prefetched:
@@ -82,7 +81,6 @@ def group_includes_employee(group, employee_id: str, prefetched: bool = False) -
 
 
 def group_allowed_form_ids(group, all_form_ids, prefetched: bool = False):
-    """Get form IDs allowed by this group. Use prefetched=True if group has prefetched relations."""
     if group.include_all_forms:
         if prefetched:
             excluded = {f.id for f in group.excluded_forms.all()}
@@ -95,7 +93,6 @@ def group_allowed_form_ids(group, all_form_ids, prefetched: bool = False):
 
 
 def allowed_form_ids_for_employee(employee, forms_qs=None):
-    """Get all form IDs the employee has access to."""
     all_forms_qs = forms_qs or FormTemplate.objects.all()
     all_form_ids = set(all_forms_qs.values_list('id', flat=True))
     if not all_form_ids:
@@ -112,8 +109,6 @@ def allowed_form_ids_for_employee(employee, forms_qs=None):
 
 
 def employee_has_form_access(employee, form) -> bool:
-    """Check if employee has access to a specific form. Optimized for single-form checks."""
-    # Use efficient exists() queries instead of fetching all allowed forms
     groups = AccessGroup.objects.prefetch_related(
         'employees', 'excluded_employees', 'forms', 'excluded_forms'
     ).all()
