@@ -208,32 +208,52 @@ export default function EmployeesPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {visible.map((e) => (
-                    <tr key={e.id} className="border-t border-neutral-200 dark:border-neutral-800">
+                  {visible.map((employee) => (
+                    <tr
+                      key={employee.id}
+                      className="border-t border-neutral-200 dark:border-neutral-800 cursor-pointer transition-colors hover:bg-neutral-50/70 focus-within:bg-neutral-50/70 dark:hover:bg-neutral-900/70 dark:focus-within:bg-neutral-900/70"
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => openEdit(employee)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault()
+                          openEdit(employee)
+                        }
+                      }}
+                    >
                       <td className="py-3">
-                        <div className="font-medium">{e.name}</div>
+                        <div className="font-medium">{employee.name}</div>
                         <div className="text-xs text-neutral-500 dark:text-neutral-400 sm:hidden">
-                          {e.role || '-'} - {e.email || '-'}
+                          {employee.role || '-'} - {employee.email || '-'}
                         </div>
                       </td>
-                      <td className="py-3 hidden sm:table-cell">{e.role || '-'}</td>
-                      <td className="py-3 hidden md:table-cell">{e.email || '-'}</td>
-                      <td className="py-3 hidden md:table-cell">{e.phone || '-'}</td>
+                      <td className="py-3 hidden sm:table-cell">{employee.role || '-'}</td>
+                      <td className="py-3 hidden md:table-cell">{employee.email || '-'}</td>
+                      <td className="py-3 hidden md:table-cell">{employee.phone || '-'}</td>
                       <td className="py-3">
-                        <Badge tone={e.active ? 'success' : 'neutral'}>{e.active ? 'Active' : 'Inactive'}</Badge>
+                        <Badge tone={employee.active ? 'success' : 'neutral'}>{employee.active ? 'Active' : 'Inactive'}</Badge>
                       </td>
                       <td className="py-3 text-right">
                         <div className="flex justify-end gap-2">
-                          <Button size="sm" variant="secondary" onClick={() => openEdit(e)}>
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              openEdit(employee)
+                            }}
+                          >
                             <Pencil size={16} /> Edit
                           </Button>
                           <Button
                             size="sm"
                             variant="ghost"
-                            onClick={async () => {
+                            onClick={async (e) => {
+                              e.stopPropagation()
                               try {
-                                await deleteEmployee(e.id)
-                                pushToast({ title: 'Employee removed', message: e.name, variant: 'success' })
+                                await deleteEmployee(employee.id)
+                                pushToast({ title: 'Employee removed', message: employee.name, variant: 'success' })
                               } catch (err: any) {
                                 pushToast({ title: 'Delete failed', message: err?.message || 'Unable to delete employee', variant: 'danger' })
                               }
