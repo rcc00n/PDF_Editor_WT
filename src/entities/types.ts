@@ -37,6 +37,14 @@ export type Employee = {
   active: boolean
 }
 
+export type AccessGroup = {
+  id: Id
+  name: string
+  description?: string
+  employeeIds: Id[]
+  formIds: Id[]
+}
+
 export type FormVersion = {
   id: Id
   version: string

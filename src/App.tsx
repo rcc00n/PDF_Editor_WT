@@ -10,6 +10,7 @@ import QueuePage from './pages/queue/QueuePage'
 import ReviewPage from './pages/review/ReviewPage'
 import ReviewTicketPage from './pages/review/ReviewTicketPage'
 import EmployeesPage from './pages/employees/EmployeesPage'
+import GroupsPage from './pages/groups/GroupsPage'
 import LoginPage from './pages/auth/LoginPage'
 import { useAppStore } from './shared/state/useAppStore'
 import CommandPalette from './shared/ui/CommandPalette'
@@ -75,6 +76,7 @@ export default function App() {
           <Route path="/review" element={<ReviewPage />} />
           <Route path="/review/:ticketId" element={<ReviewTicketPage />} />
           <Route path="/employees" element={<EmployeesPage />} />
+          <Route path="/groups" element={<GroupsPage />} />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Route>
       </Routes>

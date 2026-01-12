@@ -17,6 +17,10 @@ export default function FieldHomePage() {
   const queue = useAppStore(s => s.queue)
   const lastSync = useAppStore(s => s.lastSyncSuccess)
   const forms = useAppStore(s => s.forms)
+  const groups = useAppStore(s => s.groups)
+  const employees = useAppStore(s => s.employees)
+  const user = useAppStore(s => s.user)
+  const role = useAppStore(s => s.role)
   const createTicket = useAppStore(s => s.createTicket)
   const pushToast = useAppStore(s => s.pushToast)
 
@@ -25,15 +29,39 @@ export default function FieldHomePage() {
   const [assignedTo, setAssignedTo] = useState('Technician')
   const [formId, setFormId] = useState(forms[0]?.id ?? '')
 
+  const availableForms = useMemo(() => {
+    if (role === 'admin') return forms
+    if (!groups.length) return forms
+    const email = user?.email?.trim().toLowerCase()
+    if (!email) return forms
+    const employee = employees.find((e) => (e.email ?? '').toLowerCase() === email)
+    if (!employee) return forms
+    const allowed = new Set<string>()
+    for (const g of groups) {
+      if (g.employeeIds.includes(employee.id)) {
+        for (const id of g.formIds) allowed.add(id)
+      }
+    }
+    if (!allowed.size) return []
+    return forms.filter((f) => allowed.has(f.id))
+  }, [employees, forms, groups, role, user?.email])
+
   useEffect(() => {
-    if (!formId && forms.length > 0) setFormId(forms[0].id)
-  }, [forms, formId])
+    if (!availableForms.length) {
+      if (formId) setFormId('')
+      return
+    }
+    if (!formId || !availableForms.some((f) => f.id === formId)) {
+      setFormId(availableForms[0].id)
+    }
+  }, [availableForms, formId])
 
   const activeVersions = useMemo(() => {
-    const f = forms.find(x => x.id === formId)
+    const f = availableForms.find(x => x.id === formId)
     const v = f?.versions.find(v => v.status === 'active') ?? f?.versions[0]
     return { f, v }
-  }, [forms, formId])
+  }, [availableForms, formId])
+  const canCreate = Boolean(activeVersions.v)
 
   const queuedTickets = queue.filter(q => q.status === 'pending' || q.status === 'in_progress').length
   const needsRetry = queue.filter(q => q.status === 'failed').length
@@ -122,11 +150,17 @@ export default function FieldHomePage() {
         <div className="space-y-3">
           <div>
             <div className="text-xs text-neutral-500 dark:text-neutral-400 mb-1">Form</div>
-            <Select value={formId} onChange={(e) => setFormId(e.target.value)}>
-              {forms.map((f) => (
-                <option key={f.id} value={f.id}>{f.name}</option>
-              ))}
-            </Select>
+            {availableForms.length === 0 ? (
+              <div className="text-sm text-neutral-500 dark:text-neutral-400">
+                No forms assigned to your group yet.
+              </div>
+            ) : (
+              <Select value={formId} onChange={(e) => setFormId(e.target.value)}>
+                {availableForms.map((f) => (
+                  <option key={f.id} value={f.id}>{f.name}</option>
+                ))}
+              </Select>
+            )}
           </div>
           <div>
             <div className="text-xs text-neutral-500 dark:text-neutral-400 mb-1">Title</div>
@@ -138,7 +172,7 @@ export default function FieldHomePage() {
           </div>
           <div className="flex justify-end gap-2">
             <Button variant="secondary" onClick={() => setOpen(false)}>Cancel</Button>
-            <Button onClick={() => {
+            <Button disabled={!canCreate} onClick={() => {
               const run = async () => {
                 const { v } = activeVersions
                 if (!v) return
