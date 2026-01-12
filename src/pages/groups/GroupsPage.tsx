@@ -202,7 +202,7 @@ export default function GroupsPage() {
     ? (form.excludedEmployeeIds.length ? `All except ${form.excludedEmployeeIds.length}` : 'All employees')
     : `${form.employeeIds.length} selected`
   const formBadgeLabel = form.includeAllForms
-    ? (form.excludedFormIds.length ? `All except ${form.excludedFormIds.length}` : 'All forms')
+    ? (form.excludedFormIds.length ? `All except ${form.excludedFormIds.length}` : 'All templates')
     : `${form.formIds.length} selected`
 
   const handleSave = async () => {
@@ -238,7 +238,7 @@ export default function GroupsPage() {
     <div className="pb-10">
       <SectionHeader
         title="Groups"
-        subtitle="Assign employees and forms to access groups."
+        subtitle="Assign employees and form templates to access groups."
         right={
           <div className="flex flex-wrap gap-2">
             <div className="w-full sm:w-64">
@@ -268,7 +268,7 @@ export default function GroupsPage() {
                   <div>{unassignedEmployees.length} employee(s) are not in any group.</div>
                 )}
                 {unassignedForms.length > 0 && (
-                  <div>{unassignedForms.length} form(s) are not assigned to a group.</div>
+                  <div>{unassignedForms.length} form template(s) are not assigned to a group.</div>
                 )}
               </div>
             </CardBody>
@@ -296,7 +296,7 @@ export default function GroupsPage() {
                   <tr className="text-left">
                     <th className="py-2">Group</th>
                     <th className="py-2 hidden sm:table-cell">Members</th>
-                    <th className="py-2 hidden sm:table-cell">Forms</th>
+                    <th className="py-2 hidden sm:table-cell">Form Templates</th>
                     <th className="py-2 text-right">Actions</th>
                   </tr>
                 </thead>
@@ -315,8 +315,8 @@ export default function GroupsPage() {
                       selectedIds: g.formIds,
                       excludedIds: g.excludedFormIds,
                       options: formOptions,
-                      emptyLabel: 'No forms',
-                      allLabel: 'forms'
+                      emptyLabel: 'No templates',
+                      allLabel: 'templates'
                     })
                     return (
                       <tr key={g.id} className="border-t border-neutral-200 dark:border-neutral-800">
@@ -327,7 +327,7 @@ export default function GroupsPage() {
                           )}
                           <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-neutral-500 dark:text-neutral-400 sm:hidden">
                             <Badge tone="neutral">{memberSummary.badge} members</Badge>
-                            <Badge tone="neutral">{formSummary.badge} forms</Badge>
+                            <Badge tone="neutral">{formSummary.badge} templates</Badge>
                           </div>
                         </td>
                         <td className="py-3 hidden sm:table-cell">
@@ -413,7 +413,7 @@ export default function GroupsPage() {
                     'rf-focus rounded-xl border px-2 py-1 text-xs font-medium transition',
                     form.includeAllEmployees
                       ? 'border-neutral-200 text-neutral-700 hover:bg-neutral-50 dark:border-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-900'
-                      : 'border-neutral-900 bg-neutral-900 text-white dark:border-white dark:bg-white dark:text-neutral-900'
+                      : 'border-[var(--rf-accent)] bg-[var(--rf-accent)] text-[var(--rf-accent-contrast)]'
                   )}
                   onClick={() => setForm((s) => ({ ...s, includeAllEmployees: false }))}
                 >
@@ -424,7 +424,7 @@ export default function GroupsPage() {
                   className={cn(
                     'rf-focus rounded-xl border px-2 py-1 text-xs font-medium transition',
                     form.includeAllEmployees
-                      ? 'border-neutral-900 bg-neutral-900 text-white dark:border-white dark:bg-white dark:text-neutral-900'
+                      ? 'border-[var(--rf-accent)] bg-[var(--rf-accent)] text-[var(--rf-accent-contrast)]'
                       : 'border-neutral-200 text-neutral-700 hover:bg-neutral-50 dark:border-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-900'
                   )}
                   onClick={() => setForm((s) => ({ ...s, includeAllEmployees: true }))}
@@ -473,7 +473,7 @@ export default function GroupsPage() {
 
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <div className="text-xs text-neutral-500 dark:text-neutral-400">Forms</div>
+                <div className="text-xs text-neutral-500 dark:text-neutral-400">Form Templates</div>
                 <Badge tone={formIncludedCount ? 'success' : 'warning'}>{formBadgeLabel}</Badge>
               </div>
               <div className="flex flex-wrap gap-2">
@@ -483,7 +483,7 @@ export default function GroupsPage() {
                     'rf-focus rounded-xl border px-2 py-1 text-xs font-medium transition',
                     form.includeAllForms
                       ? 'border-neutral-200 text-neutral-700 hover:bg-neutral-50 dark:border-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-900'
-                      : 'border-neutral-900 bg-neutral-900 text-white dark:border-white dark:bg-white dark:text-neutral-900'
+                      : 'border-[var(--rf-accent)] bg-[var(--rf-accent)] text-[var(--rf-accent-contrast)]'
                   )}
                   onClick={() => setForm((s) => ({ ...s, includeAllForms: false }))}
                 >
@@ -494,7 +494,7 @@ export default function GroupsPage() {
                   className={cn(
                     'rf-focus rounded-xl border px-2 py-1 text-xs font-medium transition',
                     form.includeAllForms
-                      ? 'border-neutral-900 bg-neutral-900 text-white dark:border-white dark:bg-white dark:text-neutral-900'
+                      ? 'border-[var(--rf-accent)] bg-[var(--rf-accent)] text-[var(--rf-accent-contrast)]'
                       : 'border-neutral-200 text-neutral-700 hover:bg-neutral-50 dark:border-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-900'
                   )}
                   onClick={() => setForm((s) => ({ ...s, includeAllForms: true }))}
@@ -504,11 +504,11 @@ export default function GroupsPage() {
               </div>
               <div className="text-[11px] text-neutral-500 dark:text-neutral-400">
                 {form.includeAllForms
-                  ? 'All current and future forms are included unless excluded below.'
-                  : 'Select individual forms to include in this group.'}
+                  ? 'All current and future form templates are included unless excluded below.'
+                  : 'Select individual form templates to include in this group.'}
               </div>
               <Input
-                placeholder="Search forms"
+                placeholder="Search templates"
                 value={formQuery}
                 onChange={(e) => setFormQuery(e.target.value)}
               />
@@ -533,7 +533,7 @@ export default function GroupsPage() {
                 ))}
                 {filteredForms.length === 0 && (
                   <div className="py-6 text-center text-xs text-neutral-500 dark:text-neutral-400">
-                    No matching forms
+                    No matching templates
                   </div>
                 )}
               </div>
