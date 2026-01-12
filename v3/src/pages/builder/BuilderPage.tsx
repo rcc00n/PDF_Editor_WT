@@ -329,8 +329,9 @@ export default function BuilderPage() {
             <div className="mt-3 text-xs text-neutral-500 dark:text-neutral-400">
               Tip: drag fields to reposition, triple-click to duplicate. Hand mode prevents accidental adds.
             </div>
-          </CardBody>
-        </Card>
+            </CardBody>
+          </Card>
+        )}
 
         {/* Canvas */}
         <div>
