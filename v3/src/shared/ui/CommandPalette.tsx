@@ -91,6 +91,14 @@ export default function CommandPalette() {
         run: () => nav('/employees'),
         keywords: 'employees staff team directory'
       })
+      base.splice(apiEnabled ? 7 : 8, 0, {
+        id: 'groups',
+        title: 'Groups',
+        subtitle: 'Access group assignments',
+        icon: Users,
+        run: () => nav('/groups'),
+        keywords: 'groups access forms permissions'
+      })
     }
 
     if (apiEnabled) {

@@ -1,5 +1,5 @@
 import { useAppStore } from './useAppStore'
-import type { FormTemplate, Ticket, QueueItem, Activity, Field, Employee } from '@/entities/types'
+import type { AccessGroup, FormTemplate, Ticket, QueueItem, Activity, Field, Employee } from '@/entities/types'
 import { nowIso, uid } from '@/shared/lib/ids'
 
 export function seedIfEmpty() {
@@ -127,11 +127,33 @@ export function seedIfEmpty() {
     { id: uid('q'), type: 'submit_ticket', ticketId: 'FT-2838', createdAt: nowIso(), status: 'failed', attempts: 2, lastError: 'Network timeout' }
   ]
 
+  const empJordan = uid('emp')
+  const empLuis = uid('emp')
+  const empQuinn = uid('emp')
+  const empSasha = uid('emp')
+
   const employees: Employee[] = [
-    { id: uid('emp'), name: 'Jordan Miles', email: 'jordan.miles@relayforms.io', role: 'Technician', phone: '+1 555-0184', active: true },
-    { id: uid('emp'), name: 'Luis Ortega', email: 'luis.ortega@relayforms.io', role: 'Technician', phone: '+1 555-0162', active: true },
-    { id: uid('emp'), name: 'Quinn Hart', email: 'quinn.hart@relayforms.io', role: 'Supervisor', phone: '+1 555-0147', active: true },
-    { id: uid('emp'), name: 'Sasha Reed', email: 'sasha.reed@relayforms.io', role: 'Inspector', phone: '+1 555-0199', active: true }
+    { id: empJordan, name: 'Jordan Miles', email: 'jordan.miles@relayforms.io', role: 'Technician', phone: '+1 555-0184', active: true },
+    { id: empLuis, name: 'Luis Ortega', email: 'luis.ortega@relayforms.io', role: 'Technician', phone: '+1 555-0162', active: true },
+    { id: empQuinn, name: 'Quinn Hart', email: 'quinn.hart@relayforms.io', role: 'Supervisor', phone: '+1 555-0147', active: true },
+    { id: empSasha, name: 'Sasha Reed', email: 'sasha.reed@relayforms.io', role: 'Inspector', phone: '+1 555-0199', active: true }
+  ]
+
+  const groups: AccessGroup[] = [
+    {
+      id: uid('grp'),
+      name: 'Field Ops',
+      description: 'Daily inspections and field tickets.',
+      employeeIds: [empJordan, empLuis],
+      formIds: [form1Id, form2Id]
+    },
+    {
+      id: uid('grp'),
+      name: 'Supervisors',
+      description: 'Oversight and approvals.',
+      employeeIds: [empQuinn, empSasha],
+      formIds: [form1Id, form3Id, form4Id]
+    }
   ]
 
   const activities: Activity[] = [
@@ -146,6 +168,7 @@ export function seedIfEmpty() {
     queue,
     activities,
     employees,
+    groups,
     lastSyncSuccess: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString()
   })
 }
