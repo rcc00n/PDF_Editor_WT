@@ -4,9 +4,6 @@
 
 :root {
   --rf-radius: 14px;
-  --rf-accent: #2563eb;
-  --rf-accent-hover: #1d4ed8;
-  --rf-accent-contrast: #ffffff;
 }
 
 * { -webkit-tap-highlight-color: transparent; }
@@ -16,18 +13,6 @@
 html, body { height: 100%; }
 
 a { color: inherit; }
-
-html.dark {
-  --rf-accent: #38bdf8;
-  --rf-accent-hover: #0ea5e9;
-  --rf-accent-contrast: #0b1020;
-}
-
-html.theme-planet {
-  --rf-accent: #22d3ee;
-  --rf-accent-hover: #06b6d4;
-  --rf-accent-contrast: #04121c;
-}
 
 .rf-card {
   border-radius: var(--rf-radius);
