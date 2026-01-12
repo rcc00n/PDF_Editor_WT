@@ -19,6 +19,7 @@ export type Field = {
   hint?: string
   helpText?: string
   fontSize?: number
+  maxLength?: number
   options?: string[]
   autoValue?: 'today' | 'creator'
   readOnly?: boolean
