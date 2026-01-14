@@ -437,10 +437,9 @@ class EmployeeDetailView(APIView):
         employee.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
-
 class AccessGroupListCreateView(APIView):
     @admin_required
-    def get(self, request):
+    def get(self):
         groups = AccessGroup.objects.prefetch_related(
             'employees', 'excluded_employees', 'forms', 'excluded_forms'
         ).all()
