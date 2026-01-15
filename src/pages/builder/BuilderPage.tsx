@@ -1008,7 +1008,7 @@ const FieldEditor = React.memo(function FieldEditor({
           </div>
         </div>
 
-        <div>
+        <div className="hidden">
           <div className="text-xs text-neutral-500 dark:text-neutral-400 mb-1">
             Type
           </div>
