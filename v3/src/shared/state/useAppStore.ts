@@ -73,6 +73,23 @@ function upsertById<T extends { id: string }>(items: T[], next: T) {
   return copy
 }
 
+function defaultFormName(forms: FormTemplate[]) {
+  const existing = new Set(forms.map((f) => f.name.trim().toLowerCase()))
+  let idx = Math.max(1, forms.length + 1)
+  let name = `Form ${idx}`
+  while (existing.has(name.toLowerCase())) {
+    idx += 1
+    name = `Form ${idx}`
+  }
+  return name
+}
+
+function normalizeFormName(name: string | undefined, forms: FormTemplate[]) {
+  const trimmed = (name ?? '').trim()
+  if (trimmed) return trimmed
+  return defaultFormName(forms)
+}
+
 type State = {
   booted: boolean
   apiEnabled: boolean
@@ -112,7 +129,7 @@ type State = {
   boot: () => void
 
   // Forms
-  createForm: (name: string) => Promise<Id>
+  createForm: (name?: string) => Promise<Id>
   createVersion: (formId: Id) => Promise<Id>
   renameForm: (formId: Id, name: string) => Promise<void>
   setPdf: (formId: Id, versionId: Id, pdf: FormVersion['pdf']) => void
@@ -304,14 +321,15 @@ export const useAppStore = create<State>()(
       },
 
       createForm: async (name) => {
+        const safeName = normalizeFormName(name, get().forms)
         if (API_ENABLED) {
           const form = await apiJson('/forms/', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name })
+            body: JSON.stringify({ name: safeName })
           })
           set((s) => ({ forms: upsertById(s.forms, form) }))
-          get().addActivity('Form template created', name)
+          get().addActivity('Form template created', safeName)
           return form.id
         }
         const id = uid('form')
@@ -325,11 +343,11 @@ export const useAppStore = create<State>()(
         }
         set((s) => ({
           forms: [
-            { id, name, subtitle: 'PDF locked | Schema v1.0', versions: [version] },
+            { id, name: safeName, subtitle: 'PDF locked | Schema v1.0', versions: [version] },
             ...s.forms
           ]
         }))
-        get().addActivity('Form template created', name)
+        get().addActivity('Form template created', safeName)
         return id
       },
 

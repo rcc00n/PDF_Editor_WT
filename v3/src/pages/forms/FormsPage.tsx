@@ -404,7 +404,7 @@ export default function FormsPage() {
               onClick={async () => {
                 if (!canEdit) return;
                 try {
-                  const id = await createForm((name || "New Form").trim());
+                  const id = await createForm(name);
                   setOpen(false);
                   nav(`/builder/${id}`);
                 } catch (err: any) {

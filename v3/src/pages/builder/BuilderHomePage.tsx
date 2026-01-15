@@ -20,6 +20,28 @@ export default function BuilderHomePage() {
   const canEdit = role === 'admin'
   const [query, setQuery] = useState('')
   const [versionsFormId, setVersionsFormId] = useState<string | null>(null)
+  const [newFormOpen, setNewFormOpen] = useState(false)
+  const [newFormName, setNewFormName] = useState('')
+  const [creatingForm, setCreatingForm] = useState(false)
+
+  const handleCreateForm = async () => {
+    if (creatingForm) return
+    setCreatingForm(true)
+    try {
+      const id = await createForm(newFormName)
+      setNewFormOpen(false)
+      setNewFormName('')
+      nav(`/builder/${id}`)
+    } catch (err: any) {
+      pushToast({
+        title: 'Create failed',
+        message: err?.message || 'Unable to create form',
+        variant: 'danger'
+      })
+    } finally {
+      setCreatingForm(false)
+    }
+  }
 
   const rows = useMemo(
     () =>
@@ -73,16 +95,8 @@ export default function BuilderHomePage() {
               {canEdit ? (
                 <Button
                   onClick={async () => {
-                    try {
-                      const id = await createForm('New Form')
-                      nav(`/builder/${id}`)
-                    } catch (err: any) {
-                      pushToast({
-                        title: 'Create failed',
-                        message: err?.message || 'Unable to create form',
-                        variant: 'danger'
-                      })
-                    }
+                    setNewFormName('')
+                    setNewFormOpen(true)
                   }}
                 >
                   <Plus size={16} /> New Form
@@ -265,6 +279,41 @@ export default function BuilderHomePage() {
           ) : (
             <div className="text-sm text-neutral-500">No versions yet.</div>
           )}
+        </div>
+      </Modal>
+
+      <Modal
+        open={newFormOpen}
+        onClose={() => setNewFormOpen(false)}
+        title="Create new form"
+      >
+        <div className="space-y-3">
+          <div className="text-sm text-neutral-500">
+            Enter a name for the template. Leave it blank and we will assign a short
+            unique name automatically.
+          </div>
+          <Input
+            placeholder="Form name"
+            value={newFormName}
+            onChange={e => setNewFormName(e.target.value)}
+            onKeyDown={e => {
+              if (e.key === 'Enter') {
+                e.preventDefault()
+                void handleCreateForm()
+              }
+            }}
+          />
+          <div className="flex justify-end gap-2">
+            <Button variant="secondary" onClick={() => setNewFormOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              disabled={creatingForm}
+              onClick={handleCreateForm}
+            >
+              Create
+            </Button>
+          </div>
         </div>
       </Modal>
     </div>

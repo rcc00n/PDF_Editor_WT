@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
   Card,
@@ -10,6 +10,8 @@ import {
 import SectionHeader from "@/shared/ui/SectionHeader";
 import Button from "@/shared/ui/Button";
 import Badge from "@/shared/ui/Badge";
+import Input from "@/shared/ui/Input";
+import Modal from "@/shared/ui/Modal";
 import { useAppStore } from "@/shared/state/useAppStore";
 import { dateTimeShort } from "@/shared/lib/format";
 import { ArrowRight, Plus } from "lucide-react";
@@ -64,6 +66,28 @@ export default function DashboardPage() {
   const tickets = useAppStore((s) => s.tickets);
   const lastSync = useAppStore((s) => s.lastSyncSuccess);
   const canEdit = role === "admin";
+  const [newFormOpen, setNewFormOpen] = useState(false);
+  const [newFormName, setNewFormName] = useState("");
+  const [creatingForm, setCreatingForm] = useState(false);
+
+  const handleCreateForm = async () => {
+    if (creatingForm) return;
+    setCreatingForm(true);
+    try {
+      const id = await createForm(newFormName);
+      setNewFormOpen(false);
+      setNewFormName("");
+      nav(`/builder/${id}`);
+    } catch (err: any) {
+      pushToast({
+        title: "Create failed",
+        message: err?.message || "Unable to create form",
+        variant: "danger",
+      });
+    } finally {
+      setCreatingForm(false);
+    }
+  };
 
   const currentEmployee = useMemo(() => {
     const email = user?.email?.trim().toLowerCase();
@@ -154,17 +178,9 @@ export default function DashboardPage() {
           <>
             {canEdit && (
               <Button
-                onClick={async () => {
-                  try {
-                    const id = await createForm("New Form");
-                    nav(`/builder/${id}`);
-                  } catch (err: any) {
-                    pushToast({
-                      title: "Create failed",
-                      message: err?.message || "Unable to create form",
-                      variant: "danger",
-                    });
-                  }
+                onClick={() => {
+                  setNewFormName("");
+                  setNewFormOpen(true);
                 }}>
                 <Plus size={16} /> Create New Form
               </Button>
@@ -283,6 +299,38 @@ export default function DashboardPage() {
           </CardBody>
         </Card>
       </div>
+
+      <Modal
+        open={newFormOpen}
+        onClose={() => setNewFormOpen(false)}
+        title="Create new form"
+      >
+        <div className="space-y-3">
+          <div className="text-sm text-neutral-500">
+            Enter a name for the template. Leave it blank and we will assign a short
+            unique name automatically.
+          </div>
+          <Input
+            placeholder="Form name"
+            value={newFormName}
+            onChange={(e) => setNewFormName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                void handleCreateForm();
+              }
+            }}
+          />
+          <div className="flex justify-end gap-2">
+            <Button variant="secondary" onClick={() => setNewFormOpen(false)}>
+              Cancel
+            </Button>
+            <Button disabled={creatingForm} onClick={handleCreateForm}>
+              Create
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }
