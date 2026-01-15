@@ -309,158 +309,155 @@ export default function GroupsPage() {
       <div className="px-4 mt-4 sm:px-6 sm:mt-6">
         <Card>
           <CardBody className="pt-5 sm:pt-6">
-            <div className="flex items-center justify-between">
-              <div className="text-xs text-neutral-500 dark:text-neutral-400">
-                {filteredGroups.length} group(s)
+            {filteredGroups.length === 0 ? (
+              <div className="py-10 text-center text-sm text-neutral-500 dark:text-neutral-400">
+                {query.trim() ? "No groups match that search" : "No groups yet"}
               </div>
-              {filteredGroups.length > PAGE_SIZE && (
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  onClick={() => setShowAll((s) => !s)}>
-                  {showAll ? "Show less" : "Show more"}
-                </Button>
-              )}
-            </div>
-
-            <div className="mt-4 overflow-auto rf-scrollbar">
-              <table className="w-full text-sm">
-                <thead className="text-xs text-neutral-500 dark:text-neutral-400">
-                  <tr className="text-left">
-                    <th className="py-2">Group</th>
-                    <th className="py-2 hidden sm:table-cell">Members</th>
-                    <th className="py-2 hidden sm:table-cell">Forms</th>
-                    <th className="py-2 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {visibleGroups.map((g) => {
-                    const memberSummary = summarizeGroupScope({
-                      includeAll: g.includeAllEmployees,
-                      selectedIds: g.employeeIds,
-                      excludedIds: g.excludedEmployeeIds,
-                      options: employeeOptions,
-                      emptyLabel: "No members",
-                      allLabel: "employees",
-                    });
-                    const formSummary = summarizeGroupScope({
-                      includeAll: g.includeAllForms,
-                      selectedIds: g.formIds,
-                      excludedIds: g.excludedFormIds,
-                      options: formOptions,
-                      emptyLabel: "No forms",
-                      allLabel: "forms",
-                    });
-                    return (
-                      <tr
-                        key={g.id}
-                        className="border-t border-neutral-200 dark:border-neutral-800 cursor-pointer transition-colors hover:bg-neutral-50/70 focus-within:bg-neutral-50/70 dark:hover:bg-neutral-900/70 dark:focus-within:bg-neutral-900/70"
-                        role="button"
-                        tabIndex={0}
-                        onClick={() => openEdit(g)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" || e.key === " ") {
-                            e.preventDefault();
-                            openEdit(g);
-                          }
-                        }}>
-                        <td className="py-3">
-                          <div className="font-medium">{g.name}</div>
-                          {g.description && (
-                            <div className="text-xs text-neutral-500 dark:text-neutral-400">
-                              {g.description}
-                            </div>
-                          )}
-                          <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-neutral-500 dark:text-neutral-400 sm:hidden">
-                            <Badge tone="neutral">
-                              {memberSummary.badge} members
-                            </Badge>
-                            <Badge tone="neutral">
-                              {formSummary.badge} forms
-                            </Badge>
-                          </div>
-                        </td>
-                        <td className="py-3 hidden sm:table-cell">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <Badge
-                              tone={
-                                memberSummary.count ? "success" : "warning"
-                              }>
-                              {memberSummary.badge}
-                            </Badge>
-                            <span className="text-xs text-neutral-500 dark:text-neutral-400">
-                              {memberSummary.detail}
-                            </span>
-                          </div>
-                        </td>
-                        <td className="py-3 hidden sm:table-cell">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <Badge
-                              tone={formSummary.count ? "success" : "warning"}>
-                              {formSummary.badge}
-                            </Badge>
-                            <span className="text-xs text-neutral-500 dark:text-neutral-400">
-                              {formSummary.detail}
-                            </span>
-                          </div>
-                        </td>
-                        <td className="py-3 text-right">
-                          <div className="flex justify-end gap-2">
-                            <Button
-                              size="sm"
-                              variant="secondary"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                openEdit(g);
-                              }}>
-                              <Pencil size={16} /> Edit
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={async (e) => {
-                                e.stopPropagation();
-                                if (
-                                  !window.confirm(`Delete group "${g.name}"?`)
-                                )
-                                  return;
-                                try {
-                                  await deleteGroup(g.id);
-                                  pushToast({
-                                    title: "Group removed",
-                                    message: g.name,
-                                    variant: "success",
-                                  });
-                                } catch (err: any) {
-                                  pushToast({
-                                    title: "Delete failed",
-                                    message:
-                                      err?.message || "Unable to delete group",
-                                    variant: "danger",
-                                  });
-                                }
-                              }}>
-                              <Trash2 size={16} />
-                            </Button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                  {visibleGroups.length === 0 && (
-                    <tr>
-                      <td
-                        className="py-10 text-center text-sm text-neutral-500 dark:text-neutral-400"
-                        colSpan={4}>
-                        {query.trim()
-                          ? "No groups match that search"
-                          : "No groups yet"}
-                      </td>
-                    </tr>
+            ) : (
+              <>
+                <div className="flex items-center justify-between">
+                  <div className="text-xs text-neutral-500 dark:text-neutral-400">
+                    {filteredGroups.length} group(s)
+                  </div>
+                  {filteredGroups.length > PAGE_SIZE && (
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => setShowAll((s) => !s)}>
+                      {showAll ? "Show less" : "Show more"}
+                    </Button>
                   )}
-                </tbody>
-              </table>
-            </div>
+                </div>
+
+                <div className="mt-4 overflow-auto rf-scrollbar">
+                  <table className="w-full text-sm">
+                    <thead className="text-xs text-neutral-500 dark:text-neutral-400">
+                      <tr className="text-left">
+                        <th className="py-2">Group</th>
+                        <th className="py-2 hidden sm:table-cell">Members</th>
+                        <th className="py-2 hidden sm:table-cell">Forms</th>
+                        <th className="py-2 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {visibleGroups.map((g) => {
+                        const memberSummary = summarizeGroupScope({
+                          includeAll: g.includeAllEmployees,
+                          selectedIds: g.employeeIds,
+                          excludedIds: g.excludedEmployeeIds,
+                          options: employeeOptions,
+                          emptyLabel: "No members",
+                          allLabel: "employees",
+                        });
+                        const formSummary = summarizeGroupScope({
+                          includeAll: g.includeAllForms,
+                          selectedIds: g.formIds,
+                          excludedIds: g.excludedFormIds,
+                          options: formOptions,
+                          emptyLabel: "No forms",
+                          allLabel: "forms",
+                        });
+                        return (
+                          <tr
+                            key={g.id}
+                            className="border-t border-neutral-200 dark:border-neutral-800 cursor-pointer transition-colors hover:bg-neutral-50/70 focus-within:bg-neutral-50/70 dark:hover:bg-neutral-900/70 dark:focus-within:bg-neutral-900/70"
+                            role="button"
+                            tabIndex={0}
+                            onClick={() => openEdit(g)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" || e.key === " ") {
+                                e.preventDefault();
+                                openEdit(g);
+                              }
+                            }}>
+                            <td className="py-3">
+                              <div className="font-medium">{g.name}</div>
+                              {g.description && (
+                                <div className="text-xs text-neutral-500 dark:text-neutral-400">
+                                  {g.description}
+                                </div>
+                              )}
+                              <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-neutral-500 dark:text-neutral-400 sm:hidden">
+                                <Badge tone="neutral">
+                                  {memberSummary.badge} members
+                                </Badge>
+                                <Badge tone="neutral">
+                                  {formSummary.badge} forms
+                                </Badge>
+                              </div>
+                            </td>
+                            <td className="py-3 hidden sm:table-cell">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <Badge
+                                  tone={
+                                    memberSummary.count ? "success" : "warning"
+                                  }>
+                                  {memberSummary.badge}
+                                </Badge>
+                                <span className="text-xs text-neutral-500 dark:text-neutral-400">
+                                  {memberSummary.detail}
+                                </span>
+                              </div>
+                            </td>
+                            <td className="py-3 hidden sm:table-cell">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <Badge
+                                  tone={formSummary.count ? "success" : "warning"}>
+                                  {formSummary.badge}
+                                </Badge>
+                                <span className="text-xs text-neutral-500 dark:text-neutral-400">
+                                  {formSummary.detail}
+                                </span>
+                              </div>
+                            </td>
+                            <td className="py-3 text-right">
+                              <div className="flex justify-end gap-2">
+                                <Button
+                                  size="sm"
+                                  variant="secondary"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    openEdit(g);
+                                  }}>
+                                  <Pencil size={16} /> Edit
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={async (e) => {
+                                    e.stopPropagation();
+                                    if (
+                                      !window.confirm(`Delete group "${g.name}"?`)
+                                    )
+                                      return;
+                                    try {
+                                      await deleteGroup(g.id);
+                                      pushToast({
+                                        title: "Group removed",
+                                        message: g.name,
+                                        variant: "success",
+                                      });
+                                    } catch (err: any) {
+                                      pushToast({
+                                        title: "Delete failed",
+                                        message:
+                                          err?.message || "Unable to delete group",
+                                        variant: "danger",
+                                      });
+                                    }
+                                  }}>
+                                  <Trash2 size={16} />
+                                </Button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            )}
           </CardBody>
         </Card>
       </div>

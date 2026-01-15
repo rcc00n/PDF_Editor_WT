@@ -161,19 +161,19 @@ export default function ReviewPage() {
                     </Badge>
                   </div>
                   <div className="mt-2 overflow-auto rf-scrollbar">
-                    <table className="w-full text-sm">
+                    <table className="w-full text-sm sm:table-fixed">
                       <thead className="text-xs text-neutral-500 dark:text-neutral-400">
                         <tr className="text-left">
-                          <th className="py-2">Ticket</th>
-                          <th className="py-2 hidden sm:table-cell">Rig</th>
-                          <th className="py-2 hidden sm:table-cell">
+                          <th className="py-2 sm:w-[38%]">Ticket</th>
+                          <th className="py-2 hidden sm:table-cell sm:w-[10%]">Rig</th>
+                          <th className="py-2 hidden sm:table-cell sm:w-[18%]">
                             Assigned
                           </th>
-                          <th className="py-2 hidden sm:table-cell">Status</th>
-                          <th className="py-2 hidden sm:table-cell">
+                          <th className="py-2 hidden sm:table-cell sm:w-[12%]">Status</th>
+                          <th className="py-2 hidden sm:table-cell sm:w-[12%]">
                             Approval
                           </th>
-                          <th className="py-2 text-right">Open</th>
+                          <th className="py-2 text-right sm:w-[10%]">Open</th>
                         </tr>
                       </thead>
                       <tbody>
