@@ -5,8 +5,10 @@ import Button from '@/shared/ui/Button'
 import Input from '@/shared/ui/Input'
 import Badge from '@/shared/ui/Badge'
 import { Card, CardBody } from '@/shared/ui/Card'
+import Modal from '@/shared/ui/Modal'
 import { useAppStore } from '@/shared/state/useAppStore'
-import { ArrowRight, GitBranchPlus, Plus } from 'lucide-react'
+import { dateTimeShort } from '@/shared/lib/format'
+import { ArrowRight, GitBranchPlus, History, Plus } from 'lucide-react'
 
 export default function BuilderHomePage() {
   const nav = useNavigate()
@@ -17,6 +19,7 @@ export default function BuilderHomePage() {
   const pushToast = useAppStore(s => s.pushToast)
   const canEdit = role === 'admin'
   const [query, setQuery] = useState('')
+  const [versionsFormId, setVersionsFormId] = useState<string | null>(null)
 
   const rows = useMemo(
     () =>
@@ -44,6 +47,10 @@ export default function BuilderHomePage() {
   }, [query, rows])
 
   const hasForms = rows.length > 0
+  const versionsForm = useMemo(
+    () => forms.find(form => form.id === versionsFormId) ?? null,
+    [forms, versionsFormId]
+  )
 
   return (
     <div className="pb-10">
@@ -169,7 +176,18 @@ export default function BuilderHomePage() {
                             </Button>
                             <Button
                               size="sm"
-                              variant="secondary"
+                              variant="ghost"
+                              className="w-full sm:w-auto border border-orange-200 bg-white hover:bg-orange-50"
+                              onClick={e => {
+                                e.stopPropagation()
+                                setVersionsFormId(form.id)
+                              }}
+                            >
+                              <History size={16} /> Versions
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="primary"
                               className="w-full sm:w-auto"
                               onClick={e => {
                                 e.stopPropagation()
@@ -202,6 +220,53 @@ export default function BuilderHomePage() {
           </CardBody>
         </Card>
       </div>
+
+      <Modal
+        open={Boolean(versionsForm)}
+        onClose={() => setVersionsFormId(null)}
+        title={versionsForm ? `${versionsForm.name} versions` : 'Versions'}
+      >
+        <div className="space-y-3">
+          <div className="text-xs text-neutral-500">
+            Select a version to open in the builder.
+          </div>
+          {versionsForm?.versions.length ? (
+            <div className="space-y-2">
+              {versionsForm.versions.map(version => (
+                <div
+                  key={version.id}
+                  className="rounded-2xl border border-orange-100 bg-orange-50/40 p-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"
+                >
+                  <div>
+                    <div className="text-sm font-semibold">{version.version}</div>
+                    <div className="text-xs text-neutral-500">
+                      {version.fieldCount} fields
+                      {version.publishedAt
+                        ? ` · Published ${dateTimeShort(version.publishedAt)}`
+                        : ''}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge tone={statusTone(version.status)}>{version.status}</Badge>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => {
+                        setVersionsFormId(null)
+                        nav(`/builder/${versionsForm.id}?v=${version.id}`)
+                      }}
+                    >
+                      Open <ArrowRight size={16} />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-sm text-neutral-500">No versions yet.</div>
+          )}
+        </div>
+      </Modal>
     </div>
   )
 }

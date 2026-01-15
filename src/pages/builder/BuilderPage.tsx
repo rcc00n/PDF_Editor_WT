@@ -629,14 +629,16 @@ export default function BuilderPage() {
 
       <div
         className={cn(
-          "flex-1 min-h-0 px-4 pt-4 pb-6 sm:px-6 sm:pt-6 grid gap-4 items-start",
+          "flex-1 min-h-0 px-4 pt-4 pb-6 sm:px-6 sm:pt-6 grid gap-4 items-stretch",
           "grid-cols-1 xl:grid-cols-[260px_1fr_320px]"
         )}>
         {/* Tool Palette */}
         {!canvasFocus && (
-          <div className="hidden xl:block h-full">
-            <Card className="h-full">
-              <CardBody className="h-full">{toolPaletteBody}</CardBody>
+          <div className="hidden xl:block h-full min-h-0">
+            <Card className="h-full min-h-0">
+              <CardBody className="h-full min-h-0 overflow-auto rf-scrollbar">
+                {toolPaletteBody}
+              </CardBody>
             </Card>
           </div>
         )}
@@ -714,9 +716,11 @@ export default function BuilderPage() {
         </div>
 
         {/* Properties */}
-        <div className="hidden xl:block h-full">
-          <Card className="h-full">
-            <CardBody className="h-full">{propertiesBody}</CardBody>
+        <div className="hidden xl:block h-full min-h-0">
+          <Card className="h-full min-h-0">
+            <CardBody className="h-full min-h-0 overflow-auto rf-scrollbar">
+              {propertiesBody}
+            </CardBody>
           </Card>
         </div>
       </div>
