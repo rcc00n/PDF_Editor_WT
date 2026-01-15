@@ -111,7 +111,7 @@ export default function ReviewTicketPage() {
         subtitle={`${form.name} · ${ticket.id} · ${ticket.title}`}
         right={
           <>
-            <Button variant="secondary" onClick={() => nav("/review")}>
+            <Button variant="ghost" onClick={() => nav("/review")}>
               <ArrowLeft size={16} /> Back
             </Button>
             <Button
@@ -121,6 +121,7 @@ export default function ReviewTicketPage() {
             </Button>
             <Button
               variant="secondary"
+              className="bg-orange-100 border-orange-300"
               disabled={!renderPdfUrl}
               onClick={() => setRenderOpen(true)}
               title={

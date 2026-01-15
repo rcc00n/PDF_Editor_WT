@@ -6,7 +6,7 @@ export function Card({ className, children }: PropsWithChildren<{ className?: st
   return (
     <div
       className={cn(
-        'rf-card border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-950/60',
+        'rf-card border border-orange-100 bg-white',
         className
       )}
     >
@@ -36,5 +36,5 @@ export function CardTitle({ className, children }: PropsWithChildren<{ className
 }
 
 export function CardSub({ className, children }: PropsWithChildren<{ className?: string }>) {
-  return <div className={cn('text-sm text-neutral-500 dark:text-neutral-400', className)}>{children}</div>
+  return <div className={cn('text-sm text-neutral-500', className)}>{children}</div>
 }
