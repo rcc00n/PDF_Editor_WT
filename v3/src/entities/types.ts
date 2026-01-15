@@ -85,6 +85,8 @@ export type ApprovalState = 'pending' | 'approved'
 
 export type Ticket = {
   id: Id // FT-xxxx
+  serverId?: Id
+  localOnly?: boolean
   title: string
   formId: Id
   versionId: Id
