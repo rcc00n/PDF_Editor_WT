@@ -1,6 +1,13 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
-  unstable_useBlocker as useBlocker,
+  UNSAFE_NavigationContext,
   useLocation,
   useNavigate,
   useParams,
@@ -256,18 +263,28 @@ export default function BuilderPage() {
   const [publishReady, setPublishReady] = useState(false);
   const [publishNext, setPublishNext] = useState<string | null>(null);
   const shouldBlock = role === "admin" && Boolean(pdf) && !allowNavigate;
-  const blocker = useBlocker(shouldBlock);
+  const { navigator } = useContext(UNSAFE_NavigationContext);
+  const [blockedTx, setBlockedTx] = useState<{
+    retry: () => void;
+    location: { pathname: string; search: string };
+  } | null>(null);
 
   useEffect(() => {
-    if (blocker.state === "blocked") {
+    if (!shouldBlock) return;
+    const unblock = (navigator as any).block((tx: any) => {
+      const retry = () => {
+        unblock();
+        tx.retry();
+      };
+      setBlockedTx({
+        retry,
+        location: { pathname: tx.location.pathname, search: tx.location.search },
+      });
+      setPendingPath(`${tx.location.pathname}${tx.location.search}`);
       setLeaveOpen(true);
-      if (blocker.location) {
-        setPendingPath(
-          `${blocker.location.pathname}${blocker.location.search}`
-        );
-      }
-    }
-  }, [blocker.location, blocker.state]);
+    });
+    return unblock;
+  }, [navigator, shouldBlock]);
 
   useEffect(() => {
     if (!shouldBlock) return;
@@ -670,7 +687,8 @@ export default function BuilderPage() {
         open={leaveOpen}
         onClose={() => {
           setLeaveOpen(false);
-          if (blocker.state === "blocked") blocker.reset();
+          setBlockedTx(null);
+          setPendingPath(null);
         }}
         title="Leave builder?"
       >
@@ -684,7 +702,8 @@ export default function BuilderPage() {
               variant="ghost"
               onClick={() => {
                 setLeaveOpen(false);
-                if (blocker.state === "blocked") blocker.reset();
+                setBlockedTx(null);
+                setPendingPath(null);
               }}
             >
               Keep editing
@@ -695,9 +714,9 @@ export default function BuilderPage() {
                 onClick={() => {
                   setPdf(form.id, version.id, undefined);
                   setLeaveOpen(false);
-                  if (blocker.state === "blocked") {
-                    blocker.proceed();
-                  }
+                  blockedTx?.retry();
+                  setBlockedTx(null);
+                  setPendingPath(null);
                 }}
               >
                 Remove PDF & leave
@@ -707,18 +726,19 @@ export default function BuilderPage() {
               variant="secondary"
               onClick={() => {
                 setLeaveOpen(false);
-                if (blocker.state === "blocked") {
-                  blocker.proceed();
-                }
+                blockedTx?.retry();
+                setBlockedTx(null);
+                setPendingPath(null);
               }}
             >
               Save draft & leave
             </Button>
             <Button
               onClick={async () => {
-                if (blocker.state === "blocked") blocker.reset();
+                setBlockedTx(null);
                 setLeaveOpen(false);
                 await handlePublishComplete(pendingPath);
+                setPendingPath(null);
               }}
               disabled={version.status === "active"}
             >
