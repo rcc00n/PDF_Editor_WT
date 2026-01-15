@@ -195,7 +195,7 @@ export default function FieldTicketPage() {
       <div className="px-4 mt-4 sm:px-6 sm:mt-6 grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-4 items-start">
         <div className="flex flex-col gap-4">
           <Card>
-            <CardBody>
+            <CardBody className="pt-5 sm:pt-6">
               <div className="flex items-center justify-between gap-3">
                 <div className="text-sm font-semibold">Fields</div>
                 <Badge tone={ticketStatusTone(ticket.status)}>
@@ -244,7 +244,7 @@ export default function FieldTicketPage() {
           </Card>
 
           <Card>
-            <CardBody>
+            <CardBody className="pt-5 sm:pt-6">
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <div className="text-sm font-semibold">Live PDF Overlay</div>
@@ -278,7 +278,7 @@ export default function FieldTicketPage() {
 
         <div className="flex flex-col gap-4">
           <Card>
-            <CardBody>
+            <CardBody className="pt-5 sm:pt-6">
               <div className="text-sm font-semibold">Photo Attachments</div>
               <div className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
                 {apiEnabled ? "Stored on server" : "Stored locally (demo)"}
@@ -392,7 +392,7 @@ export default function FieldTicketPage() {
           </Card>
 
           <Card>
-            <CardBody>
+            <CardBody className="pt-5 sm:pt-6">
               <div className="text-sm font-semibold">Signature</div>
               <div className="mt-3 space-y-2">
                 <div>
@@ -449,7 +449,7 @@ export default function FieldTicketPage() {
 
           {ticket.lastError && (
             <Card>
-              <CardBody>
+              <CardBody className="pt-5 sm:pt-6">
                 <div className="text-sm font-semibold">Error</div>
                 <div className="mt-2 text-sm text-red-600 dark:text-red-300">
                   {ticket.lastError}
