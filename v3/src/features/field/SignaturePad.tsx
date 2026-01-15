@@ -1,7 +1,15 @@
 import { useEffect, useRef, useState } from 'react'
 import Button from '@/shared/ui/Button'
 
-export default function SignaturePad({ value, onChange }: { value?: string; onChange: (dataUrl?: string) => void }) {
+export default function SignaturePad({
+  value,
+  onChange,
+  disabled = false
+}: {
+  value?: string
+  onChange: (dataUrl?: string) => void
+  disabled?: boolean
+}) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const [drawing, setDrawing] = useState(false)
 
@@ -49,6 +57,7 @@ export default function SignaturePad({ value, onChange }: { value?: string; onCh
   }
 
   const clear = () => {
+    if (disabled) return
     const canvas = canvasRef.current
     const ctx = canvas?.getContext('2d')
     if (!canvas || !ctx) return
@@ -70,8 +79,9 @@ export default function SignaturePad({ value, onChange }: { value?: string; onCh
           ref={canvasRef}
           width={520}
           height={160}
-          className="w-full h-[160px] touch-none"
+          className={`w-full h-[160px] touch-none ${disabled ? 'opacity-60 pointer-events-none' : ''}`}
           onPointerDown={(e) => {
+            if (disabled) return
             ;(e.target as HTMLCanvasElement).setPointerCapture(e.pointerId)
             const p = pos(e.nativeEvent)
             start(p.x, p.y)
@@ -86,7 +96,9 @@ export default function SignaturePad({ value, onChange }: { value?: string; onCh
         />
       </div>
       <div className="mt-2 flex justify-end">
-        <Button size="sm" variant="secondary" onClick={clear}>Clear</Button>
+        <Button size="sm" variant="secondary" onClick={clear} disabled={disabled}>
+          Clear
+        </Button>
       </div>
     </div>
   )
