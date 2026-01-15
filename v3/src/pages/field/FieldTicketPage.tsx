@@ -157,7 +157,7 @@ export default function FieldTicketPage() {
         } · ${dateTimeShort(ticket.assignedAt)} · ${version.version}`}
         right={
           <>
-            <Button variant="secondary" onClick={() => nav("/field")}>
+            <Button variant="ghost" onClick={() => nav("/field")}>
               <ArrowLeft size={16} /> Back
             </Button>
             <Button
@@ -167,6 +167,7 @@ export default function FieldTicketPage() {
             </Button>
             <Button
               variant="secondary"
+              className="bg-orange-100 border-orange-300"
               disabled={!renderPdfUrl}
               onClick={() => setRenderOpen(true)}
               title={

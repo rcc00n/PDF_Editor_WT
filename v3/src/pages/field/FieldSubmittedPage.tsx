@@ -40,7 +40,7 @@ export default function FieldSubmittedPage() {
         subtitle={`${form?.name ?? 'Form'} · ${ticket.id}`}
         right={
           <>
-            <Button variant="secondary" onClick={() => nav('/field')}>
+            <Button variant="ghost" onClick={() => nav('/field')}>
               Back to Completed Forms
             </Button>
             <Button variant="secondary" onClick={() => nav(`/field/ticket/${ticket.id}`)}>

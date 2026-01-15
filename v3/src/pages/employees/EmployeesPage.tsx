@@ -185,7 +185,7 @@ export default function EmployeesPage() {
         subtitle="Manage the staff directory used by employee dropdown fields."
         right={
           <div className="flex flex-wrap gap-2">
-            <Button variant="secondary" onClick={exportXlsx}>
+            <Button variant="ghost" onClick={exportXlsx}>
               <FileSpreadsheet size={16} /> Export XLSX
             </Button>
             <input

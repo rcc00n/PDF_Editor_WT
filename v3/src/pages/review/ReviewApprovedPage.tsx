@@ -36,7 +36,7 @@ export default function ReviewApprovedPage() {
         subtitle={`${form?.name ?? "Form"} · ${ticket.id}`}
         right={
           <>
-            <Button variant="secondary" onClick={() => nav("/review")}>
+            <Button variant="ghost" onClick={() => nav("/review")}>
               Back to Review
             </Button>
             <Button

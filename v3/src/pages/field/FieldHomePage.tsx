@@ -11,7 +11,7 @@ import {
 import Badge from "@/shared/ui/Badge";
 import { useAppStore } from "@/shared/state/useAppStore";
 import { dateTimeShort } from "@/shared/lib/format";
-import { Plus, ListChecks } from "lucide-react";
+import { Plus } from "lucide-react";
 import Modal from "@/shared/ui/Modal";
 import Input from "@/shared/ui/Input";
 import Select from "@/shared/ui/Select";
@@ -174,18 +174,15 @@ export default function FieldHomePage() {
     <div className="pb-10">
       <SectionHeader
         title="Field App"
-        subtitle="Offline mode, drafts, and queued submits."
+        subtitle="Create, complete, and submit field tickets."
         right={
           <>
-            <Button variant="secondary" onClick={() => nav("/queue")}>
-              <ListChecks size={16} /> View Queue
-            </Button>
             <Button
-              variant="secondary"
+              variant="primary"
               onClick={() => {
                 setOpen(true);
               }}>
-              <Plus size={16} /> Pending Forms
+              <Plus size={16} /> New Ticket
             </Button>
           </>
         }

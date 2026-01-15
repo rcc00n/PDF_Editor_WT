@@ -50,25 +50,19 @@ const safeStorage = {
 }
 
 function normalizeTheme(value: string | null): Theme {
-  if (value === 'light' || value === 'planet') return value
-  if (value === 'dark') return 'planet'
-  return 'planet'
+  if (value === 'light') return 'light'
+  return 'light'
 }
 
 function getStoredTheme(): Theme {
-  try {
-    return normalizeTheme(localStorage.getItem('rf_theme'))
-  } catch {
-    return 'planet'
-  }
+  return 'light'
 }
 
 function applyTheme(theme: Theme) {
   if (typeof document === 'undefined') return
   const root = document.documentElement
-  const isDark = theme === 'planet'
-  root.classList.toggle('dark', isDark)
-  root.classList.toggle('theme-planet', theme === 'planet')
+  root.classList.remove('dark')
+  root.classList.remove('theme-planet')
 }
 
 function upsertById<T extends { id: string }>(items: T[], next: T) {
@@ -182,9 +176,7 @@ export const useAppStore = create<State>()(
         set({ theme })
       },
       toggleTheme: () => {
-        const current = get().theme
-        const next: Theme = current === 'light' ? 'planet' : 'light'
-        get().setTheme(next)
+        get().setTheme('light')
       },
       role: 'admin',
       setRole: (role) => {

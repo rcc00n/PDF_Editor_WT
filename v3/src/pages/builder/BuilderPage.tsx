@@ -312,7 +312,7 @@ export default function BuilderPage() {
         subtitle={`${form.name} · ${version.version} · ${version.fieldCount} fields`}
         right={
           <>
-            <Button variant="secondary" onClick={() => nav("/field")}>
+            <Button variant="ghost" onClick={() => nav("/field")}>
               <Eye size={16} /> Preview Field App
             </Button>
 
