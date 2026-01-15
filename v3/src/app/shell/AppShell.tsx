@@ -1,11 +1,12 @@
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useState } from 'react'
-import { LayoutGrid, PencilRuler, Smartphone, ClipboardCheck, Shield, User, Users, ChevronDown, LogOut, Sparkles } from 'lucide-react'
+import { LayoutGrid, PencilRuler, Smartphone, ClipboardCheck, Shield, User, Users, ChevronDown, LogOut } from 'lucide-react'
 import { useAppStore } from '@/shared/state/useAppStore'
 import { cn } from '@/shared/ui/cn'
 import Modal from '@/shared/ui/Modal'
 import Button from '@/shared/ui/Button'
 import Badge from '@/shared/ui/Badge'
+import Logo from '@/shared/ui/Logo'
 
 const baseNav = [
   { to: '/dashboard', label: 'Dashboard', icon: LayoutGrid },
@@ -53,10 +54,8 @@ export default function AppShell() {
             'h-16 flex items-center border-b border-orange-100 px-4 md:px-5 gap-3'
           )}
         >
-          <div className="h-10 w-10 rounded-2xl border border-orange-200 overflow-hidden">
-            <div className="h-full w-full bg-gradient-to-br from-orange-400 via-orange-500 to-amber-500 text-white flex items-center justify-center">
-              <Sparkles size={18} />
-            </div>
+          <div className="h-10 w-16 rounded-full border border-orange-200 bg-white flex items-center justify-center overflow-hidden">
+            <Logo className="h-9 w-auto" />
           </div>
           <div className="hidden md:block leading-tight">
             <div className="font-semibold">Wolsey Tech</div>
@@ -92,12 +91,17 @@ export default function AppShell() {
       <div className="flex-1 min-w-0 flex flex-col">
         <header className="h-16 shrink-0 border-b border-orange-100 bg-white/90">
           <div className="h-full px-5 sm:px-6 flex items-center justify-between gap-3">
-            <div className="min-w-0">
-              <div className="text-sm font-semibold truncate">
-                {titleForPath(location.pathname)}
+            <div className="min-w-0 flex items-center gap-3">
+              <div className="md:hidden h-9 w-14 rounded-full border border-orange-200 bg-white flex items-center justify-center overflow-hidden">
+                <Logo className="h-8 w-auto" />
               </div>
-              <div className="text-xs text-orange-700/80 truncate">
-                {online ? (lastSyncSuccess ? `Last sync ${formatTime(lastSyncSuccess)}` : 'Online') : 'Offline'}
+              <div className="min-w-0">
+                <div className="text-sm font-semibold truncate">
+                  {titleForPath(location.pathname)}
+                </div>
+                <div className="text-xs text-orange-700/80 truncate">
+                  {online ? (lastSyncSuccess ? `Last sync ${formatTime(lastSyncSuccess)}` : 'Online') : 'Offline'}
+                </div>
               </div>
             </div>
 
