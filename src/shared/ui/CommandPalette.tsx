@@ -69,8 +69,11 @@ export default function CommandPalette() {
         subtitle: 'Start a template from scratch',
         icon: Plus,
         run: async () => {
-          const id = await createForm('New Form')
+          const name = window.prompt('Form name (optional). Leave blank for auto name.', '')
+          if (name === null) return
+          const id = await createForm(name)
           nav(`/builder/${id}`)
+          setOpen(false)
         },
         keywords: 'create new form template builder'
       })

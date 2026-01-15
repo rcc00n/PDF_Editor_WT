@@ -61,6 +61,7 @@ export default function FieldTicketPage() {
   const pushToast = useAppStore((s) => s.pushToast);
   const attachmentInputRef = useRef<HTMLInputElement | null>(null);
   const [renderOpen, setRenderOpen] = useState(false);
+  const [signatureOpen, setSignatureOpen] = useState(false);
 
   const ctx = useMemo(() => {
     if (!ticket) return null;
@@ -147,6 +148,15 @@ export default function FieldTicketPage() {
       });
     }
   }, [ticket, version, pushToast]);
+
+  const handleOverlayValueChange = useCallback(
+    (key: string, value: any) => {
+      updateTicket(ticket.id, {
+        values: { ...ticket.values, [key]: value },
+      });
+    },
+    [ticket.id, ticket.values, updateTicket]
+  );
 
   return (
     <div className="pb-10">
@@ -250,6 +260,11 @@ export default function FieldTicketPage() {
                     pdfUrl={renderPdfUrl}
                     fields={version.fields}
                     ticket={ticket}
+                    interactive
+                    employees={employees}
+                    onValueChange={handleOverlayValueChange}
+                    onSignatureClick={() => setSignatureOpen(true)}
+                    onPhotoClick={() => attachmentInputRef.current?.click()}
                   />
                 ) : (
                   <div className="text-sm text-neutral-500 dark:text-neutral-400">
@@ -444,6 +459,39 @@ export default function FieldTicketPage() {
           )}
         </div>
       </div>
+
+      <Modal
+        open={signatureOpen}
+        onClose={() => setSignatureOpen(false)}
+        title="Signature"
+      >
+        <div className="space-y-3">
+          <div>
+            <div className="text-xs text-neutral-500 dark:text-neutral-400 mb-1">
+              Signer
+            </div>
+            <Input
+              value={signatureSigner}
+              onChange={(e) =>
+                updateTicket(ticket.id, {
+                  signature: {
+                    signer: e.target.value,
+                    dataUrl: ticket.signature?.dataUrl,
+                  },
+                })
+              }
+            />
+          </div>
+          <SignaturePad
+            value={ticket.signature?.dataUrl ?? ticket.signature?.url}
+            onChange={(sig) =>
+              updateTicket(ticket.id, {
+                signature: { signer: signatureSigner, dataUrl: sig },
+              })
+            }
+          />
+        </div>
+      </Modal>
 
       <Modal
         open={renderOpen}
