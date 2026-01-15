@@ -222,6 +222,9 @@ export default function BuilderPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [numPages, setNumPages] = useState(1);
   const [canvasFocus] = useState(false);
+  const [mobilePanel, setMobilePanel] = useState<"tools" | "properties" | null>(
+    null
+  );
 
   const selected = useMemo(
     () => version?.fields.find((f) => f.id === selectedId) ?? null,
@@ -271,7 +274,9 @@ export default function BuilderPage() {
 
   useEffect(() => {
     if (!shouldBlock) return;
-    const unblock = (navigator as any).block((tx: any) => {
+    const block = (navigator as any).block;
+    if (typeof block !== "function") return;
+    const unblock = block((tx: any) => {
       const retry = () => {
         unblock();
         tx.retry();
@@ -381,9 +386,176 @@ export default function BuilderPage() {
     nav(`/builder/complete/${form.id}?${query.toString()}`);
   }, [form.id, nav, publishNext, publishReady, version.id]);
 
+  const toolPaletteBody = (
+    <>
+      <div className="text-sm font-semibold">Tool Palette</div>
+      <div className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
+        Click a tool (or drag it) onto the canvas. Click it again for Hand
+        mode.
+      </div>
+      {TOOL_SECTIONS.map((section, idx) => (
+        <div
+          key={section.title ?? `tools-${idx}`}
+          className={idx === 0 ? "mt-3" : "mt-4"}
+        >
+          {section.title && (
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
+              {section.title}
+            </div>
+          )}
+          <div
+            className={cn(
+              "grid grid-cols-2 gap-2",
+              section.title ? "mt-2" : ""
+            )}
+          >
+            {section.tools.map((t) => (
+              <button
+                key={t.id}
+                className={cn(
+                  "rf-focus rounded-2xl border px-3 py-2 text-sm font-medium",
+                  activeToolId === t.id
+                    ? "border-[var(--rf-accent)] bg-[var(--rf-accent)] text-[var(--rf-accent-contrast)]"
+                    : "border-neutral-200 hover:bg-neutral-50 dark:border-neutral-800 dark:hover:bg-neutral-900"
+                )}
+                draggable
+                title={t.description ?? t.label}
+                onDragStart={(e) => {
+                  e.dataTransfer.setData("application/x-rf-tool", t.id);
+                  e.dataTransfer.effectAllowed = "copy";
+                }}
+                onClick={() =>
+                  setActiveToolId((prev) => (prev === t.id ? null : t.id))
+                }
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      ))}
+
+      <div className="mt-4 flex items-center justify-between">
+        <div className="text-xs text-neutral-500 dark:text-neutral-400">
+          Status
+        </div>
+        <Badge
+          tone={
+            version.status === "active"
+              ? "success"
+              : version.status === "draft"
+              ? "warning"
+              : "neutral"
+          }
+        >
+          {version.status}
+        </Badge>
+      </div>
+
+      {!pdf && (
+        <div className="mt-4">
+          <div className="text-xs text-neutral-500 dark:text-neutral-400">
+            Canvas size (mm)
+          </div>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <button
+              className="rf-focus rounded-xl border border-neutral-200 px-2 py-1 text-xs hover:bg-neutral-50 dark:border-neutral-800 dark:hover:bg-neutral-900"
+              onClick={() =>
+                setCanvasSize(form.id, version.id, {
+                  width: 210,
+                  height: 297,
+                })
+              }
+            >
+              A4
+            </button>
+            <button
+              className="rf-focus rounded-xl border border-neutral-200 px-2 py-1 text-xs hover:bg-neutral-50 dark:border-neutral-800 dark:hover:bg-neutral-900"
+              onClick={() =>
+                setCanvasSize(form.id, version.id, {
+                  width: 216,
+                  height: 279,
+                })
+              }
+            >
+              Letter
+            </button>
+          </div>
+          <div className="mt-2 grid grid-cols-2 gap-2">
+            <div>
+              <div className="text-[11px] text-neutral-500 dark:text-neutral-400 mb-1">
+                W
+              </div>
+              <Input
+                type="number"
+                value={Math.round(canvas.width)}
+                onChange={(e) =>
+                  setCanvasSize(form.id, version.id, {
+                    width: Math.max(50, Number(e.target.value || 0)),
+                    height: canvas.height,
+                  })
+                }
+              />
+            </div>
+            <div>
+              <div className="text-[11px] text-neutral-500 dark:text-neutral-400 mb-1">
+                H
+              </div>
+              <Input
+                type="number"
+                value={Math.round(canvas.height)}
+                onChange={(e) =>
+                  setCanvasSize(form.id, version.id, {
+                    width: canvas.width,
+                    height: Math.max(50, Number(e.target.value || 0)),
+                  })
+                }
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="mt-3 text-xs text-neutral-500 dark:text-neutral-400">
+        Tip: drag fields to reposition, triple-click to duplicate. Hand mode
+        prevents accidental adds.
+      </div>
+    </>
+  );
+
+  const propertiesBody = (
+    <>
+      <div className="flex items-center justify-between gap-2">
+        <div className="text-sm font-semibold">Field Properties</div>
+        <div className="flex items-center gap-2">
+          {selected && (
+            <button
+              className="rf-focus rounded-xl p-2 hover:bg-neutral-100 dark:hover:bg-neutral-900"
+              title="Delete field"
+              onClick={() => {
+                handleDeleteField(selected.id);
+                setSelectedId(null);
+              }}
+            >
+              <Trash2 size={18} />
+            </button>
+          )}
+        </div>
+      </div>
+
+      {!selected ? (
+        <div className="mt-4 text-sm text-neutral-500 dark:text-neutral-400">
+          Select a field on the canvas to edit.
+        </div>
+      ) : (
+        <FieldEditor field={selected} onChange={handleUpsertField} />
+      )}
+    </>
+  );
+
   // Builder page
   return (
-    <div className="pb-10">
+    <div className="h-full flex flex-col overflow-hidden">
       <SectionHeader
         title="Form Builder"
         subtitle={`${form.name} · ${version.version} · ${version.fieldCount} fields`}
@@ -457,149 +629,20 @@ export default function BuilderPage() {
 
       <div
         className={cn(
-          "px-4 mt-4 sm:px-6 sm:mt-6 grid gap-4 items-start",
+          "flex-1 min-h-0 px-4 pt-4 pb-6 sm:px-6 sm:pt-6 grid gap-4 items-start",
           "grid-cols-1 xl:grid-cols-[260px_1fr_320px]"
         )}>
         {/* Tool Palette */}
         {!canvasFocus && (
-          <Card className="sticky top-6 self-start">
-            <CardBody>
-              <div className="text-sm font-semibold">Tool Palette</div>
-              <div className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
-                Click a tool (or drag it) onto the canvas. Click it again for
-                Hand mode.
-              </div>
-              {TOOL_SECTIONS.map((section, idx) => (
-                <div
-                  key={section.title ?? `tools-${idx}`}
-                  className={idx === 0 ? "mt-3" : "mt-4"}>
-                  {section.title && (
-                    <div className="text-[11px] font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
-                      {section.title}
-                    </div>
-                  )}
-                  <div
-                    className={cn(
-                      "grid grid-cols-2 gap-2",
-                      section.title ? "mt-2" : ""
-                    )}>
-                    {section.tools.map((t) => (
-                      <button
-                        key={t.id}
-                        className={cn(
-                          "rf-focus rounded-2xl border px-3 py-2 text-sm font-medium",
-                          activeToolId === t.id
-                            ? "border-[var(--rf-accent)] bg-[var(--rf-accent)] text-[var(--rf-accent-contrast)]"
-                            : "border-neutral-200 hover:bg-neutral-50 dark:border-neutral-800 dark:hover:bg-neutral-900"
-                        )}
-                        draggable
-                        title={t.description ?? t.label}
-                        onDragStart={(e) => {
-                          e.dataTransfer.setData("application/x-rf-tool", t.id);
-                          e.dataTransfer.effectAllowed = "copy";
-                        }}
-                        onClick={() =>
-                          setActiveToolId((prev) =>
-                            prev === t.id ? null : t.id
-                          )
-                        }>
-                        {t.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ))}
-
-              <div className="mt-4 flex items-center justify-between">
-                <div className="text-xs text-neutral-500 dark:text-neutral-400">
-                  Status
-                </div>
-                <Badge
-                  tone={
-                    version.status === "active"
-                      ? "success"
-                      : version.status === "draft"
-                      ? "warning"
-                      : "neutral"
-                  }>
-                  {version.status}
-                </Badge>
-              </div>
-
-              {!pdf && (
-                <div className="mt-4">
-                  <div className="text-xs text-neutral-500 dark:text-neutral-400">
-                    Canvas size (mm)
-                  </div>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    <button
-                      className="rf-focus rounded-xl border border-neutral-200 px-2 py-1 text-xs hover:bg-neutral-50 dark:border-neutral-800 dark:hover:bg-neutral-900"
-                      onClick={() =>
-                        setCanvasSize(form.id, version.id, {
-                          width: 210,
-                          height: 297,
-                        })
-                      }>
-                      A4
-                    </button>
-                    <button
-                      className="rf-focus rounded-xl border border-neutral-200 px-2 py-1 text-xs hover:bg-neutral-50 dark:border-neutral-800 dark:hover:bg-neutral-900"
-                      onClick={() =>
-                        setCanvasSize(form.id, version.id, {
-                          width: 216,
-                          height: 279,
-                        })
-                      }>
-                      Letter
-                    </button>
-                  </div>
-                  <div className="mt-2 grid grid-cols-2 gap-2">
-                    <div>
-                      <div className="text-[11px] text-neutral-500 dark:text-neutral-400 mb-1">
-                        W
-                      </div>
-                      <Input
-                        type="number"
-                        value={Math.round(canvas.width)}
-                        onChange={(e) =>
-                          setCanvasSize(form.id, version.id, {
-                            width: Math.max(50, Number(e.target.value || 0)),
-                            height: canvas.height,
-                          })
-                        }
-                      />
-                    </div>
-                    <div>
-                      <div className="text-[11px] text-neutral-500 dark:text-neutral-400 mb-1">
-                        H
-                      </div>
-                      <Input
-                        type="number"
-                        value={Math.round(canvas.height)}
-                        onChange={(e) =>
-                          setCanvasSize(form.id, version.id, {
-                            width: canvas.width,
-                            height: Math.max(50, Number(e.target.value || 0)),
-                          })
-                        }
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              <div className="mt-3 text-xs text-neutral-500 dark:text-neutral-400">
-                Tip: drag fields to reposition, triple-click to duplicate. Hand
-                mode prevents accidental adds.
-              </div>
-            </CardBody>
-          </Card>
+          <div className="hidden xl:block h-full">
+            <Card className="h-full">
+              <CardBody className="h-full">{toolPaletteBody}</CardBody>
+            </Card>
+          </div>
         )}
 
         {/* Canvas */}
-        <div
-          className="flex flex-col min-h-0"
-          style={{ height: "calc(100vh - 140px)" }}>
+        <div className="flex flex-col min-h-0">
           <Card className="flex flex-col min-h-0 h-full">
             <CardBody className="flex flex-col min-h-0 h-full">
               <div className="flex flex-wrap items-center justify-between gap-3 flex-shrink-0">
@@ -608,10 +651,28 @@ export default function BuilderPage() {
                   <div className="text-sm text-neutral-500 dark:text-neutral-400">
                     {numPages > 1 ? `${numPages} pages` : "Single page"}
                   </div>
+                  <div className="flex items-center gap-2 xl:hidden">
+                    {!canvasFocus && (
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => setMobilePanel("tools")}
+                      >
+                        Tools
+                      </Button>
+                    )}
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => setMobilePanel("properties")}
+                    >
+                      Properties
+                    </Button>
+                  </div>
                 </div>
               </div>
 
-              <div className="mt-3 space-y-6 overflow-y-auto flex-1 min-h-0">
+              <div className="mt-3 space-y-6 overflow-y-auto flex-1 min-h-0 rf-scrollbar">
                 {pageList.map((pageIndex) => (
                   <PageCanvas
                     key={pageIndex}
@@ -653,35 +714,28 @@ export default function BuilderPage() {
         </div>
 
         {/* Properties */}
-        <Card className="xl:sticky xl:top-6">
-          <CardBody>
-            <div className="flex items-center justify-between gap-2">
-              <div className="text-sm font-semibold">Field Properties</div>
-              <div className="flex items-center gap-2">
-                {selected && (
-                  <button
-                    className="rf-focus rounded-xl p-2 hover:bg-neutral-100 dark:hover:bg-neutral-900"
-                    title="Delete field"
-                    onClick={() => {
-                      handleDeleteField(selected.id);
-                      setSelectedId(null);
-                    }}>
-                    <Trash2 size={18} />
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {!selected ? (
-              <div className="mt-4 text-sm text-neutral-500 dark:text-neutral-400">
-                Select a field on the canvas to edit.
-              </div>
-            ) : (
-              <FieldEditor field={selected} onChange={handleUpsertField} />
-            )}
-          </CardBody>
-        </Card>
+        <div className="hidden xl:block h-full">
+          <Card className="h-full">
+            <CardBody className="h-full">{propertiesBody}</CardBody>
+          </Card>
+        </div>
       </div>
+
+      <Modal
+        open={mobilePanel === "tools"}
+        onClose={() => setMobilePanel(null)}
+        title="Tool Palette"
+      >
+        <div className="max-h-[70vh] overflow-y-auto">{toolPaletteBody}</div>
+      </Modal>
+
+      <Modal
+        open={mobilePanel === "properties"}
+        onClose={() => setMobilePanel(null)}
+        title="Field Properties"
+      >
+        <div className="max-h-[70vh] overflow-y-auto">{propertiesBody}</div>
+      </Modal>
 
       <Modal
         open={leaveOpen}
