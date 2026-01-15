@@ -133,7 +133,6 @@ export default function DashboardPage() {
     let pending = 0;
     let attention = 0;
     let syncedToday = 0;
-    let pendingReview = 0;
 
     for (const t of scopedTickets) {
       if (
@@ -148,14 +147,7 @@ export default function DashboardPage() {
       if (t.status === "synced" && sameDay(t.updatedAt)) syncedToday += 1;
     }
 
-    const reviewSource = role === "admin" ? tickets : scopedTickets;
-    for (const t of reviewSource) {
-      if (t.status === "synced" && t.approvalState !== "approved") {
-        pendingReview += 1;
-      }
-    }
-
-    return { pending, attention, syncedToday, pendingReview };
+    return { pending, attention, syncedToday };
   }, [role, scopedTickets, tickets]);
 
   const formsVisible = useMemo(() => availableForms.slice(0, 6), [availableForms]);
@@ -200,11 +192,10 @@ export default function DashboardPage() {
             </CardSub>
           </CardHeader>
           <CardBody className="pt-2">
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
               <SummaryStat label="Pending" value={summary.pending} />
               <SummaryStat label="Needs attention" value={summary.attention} />
               <SummaryStat label="Synced today" value={summary.syncedToday} />
-              <SummaryStat label="Pending review" value={summary.pendingReview} />
             </div>
           </CardBody>
         </Card>
@@ -233,7 +224,7 @@ export default function DashboardPage() {
                     <Link
                       key={form.id}
                       to={`/builder/${form.id}`}
-                      className="rf-focus flex items-center justify-between gap-3 rounded-2xl border border-orange-100 bg-white px-3 py-3 hover:bg-orange-50"
+                      className="rf-focus flex items-center justify-between gap-3 rounded-2xl border border-[var(--rf-border-soft)] bg-[var(--rf-surface)] px-3 py-3 hover:bg-[var(--rf-orange-50)]"
                     >
                       <div className="min-w-0">
                         <div className="font-medium truncate">{form.name}</div>
@@ -278,7 +269,7 @@ export default function DashboardPage() {
                   <Link
                     key={ticket.id}
                     to={`/field/ticket/${ticket.id}`}
-                    className="rf-focus flex items-center justify-between gap-3 rounded-2xl border border-orange-100 bg-white px-3 py-3 hover:bg-orange-50"
+                    className="rf-focus flex items-center justify-between gap-3 rounded-2xl border border-[var(--rf-border-soft)] bg-[var(--rf-surface)] px-3 py-3 hover:bg-[var(--rf-orange-50)]"
                   >
                     <div className="min-w-0">
                       <div className="font-medium truncate">
@@ -334,8 +325,8 @@ export default function DashboardPage() {
 
 function SummaryStat({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-2xl border border-orange-100 bg-orange-50/70 px-4 py-3">
-      <div className="text-xs text-orange-700/70">{label}</div>
+    <div className="rounded-2xl border border-[var(--rf-border-soft)] bg-[var(--rf-orange-50)] px-4 py-3">
+      <div className="text-xs text-[var(--rf-text-accent)] opacity-70">{label}</div>
       <div className="mt-1 text-2xl font-semibold">{value}</div>
     </div>
   );

@@ -220,11 +220,11 @@ export default function FieldTicketPage() {
                 onClick={() => void saveDraft(ticket.id)}>
                 <Save size={16} /> Save Draft
               </Button>
-              <Button
-                variant="secondary"
-                className="bg-orange-100 border-orange-300"
-                disabled={!renderPdfUrl}
-                onClick={() => setRenderOpen(true)}
+            <Button
+              variant="secondary"
+              className="bg-[var(--rf-orange-100)] border-[var(--rf-orange-300)]"
+              disabled={!renderPdfUrl}
+              onClick={() => setRenderOpen(true)}
                 title={
                   renderPdfUrl ? "View rendered PDF" : "No PDF uploaded yet"
                 }>

@@ -275,7 +275,7 @@ export default function FieldHomePage() {
                           : ""}
                       </div>
                       {needsOnline && !online && (
-                        <div className="mt-1 text-xs text-orange-600">
+                        <div className="mt-1 text-xs text-[var(--rf-orange-600)]">
                           Connect to download the PDF.
                         </div>
                       )}

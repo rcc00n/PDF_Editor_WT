@@ -14,6 +14,13 @@ const baseNav = [
   { to: '/review', label: 'Review', icon: ClipboardCheck }
 ]
 
+const THEME_OPTIONS = [
+  { id: 'default', label: 'Default', swatch: '#f97316' },
+  { id: 'slate', label: 'Slate', swatch: '#475569' },
+  { id: 'ocean', label: 'Ocean', swatch: '#0284c7' },
+  { id: 'meadow', label: 'Meadow', swatch: '#10b981' }
+] as const
+
 
 export default function AppShell() {
   const role = useAppStore(s => s.role)
@@ -23,6 +30,8 @@ export default function AppShell() {
   const logout = useAppStore(s => s.logout)
   const online = useAppStore(s => s.online)
   const lastSyncSuccess = useAppStore(s => s.lastSyncSuccess)
+  const theme = useAppStore(s => s.theme)
+  const setTheme = useAppStore(s => s.setTheme)
 
   const location = useLocation()
 
@@ -45,21 +54,21 @@ export default function AppShell() {
     <div className="h-full flex">
       <aside
         className={cn(
-          'hidden md:flex md:flex-col shrink-0 border-r border-orange-100 bg-white/90',
+          'hidden md:flex md:flex-col shrink-0 border-r border-[var(--rf-border-soft)] bg-[var(--rf-surface)]',
           'md:w-[240px]'
         )}
       >
         <div
           className={cn(
-            'h-16 flex items-center border-b border-orange-100 px-4 md:px-5 gap-3'
+            'h-16 flex items-center border-b border-[var(--rf-border-soft)] px-4 md:px-5 gap-3'
           )}
         >
-          <div className="h-10 w-16 rounded-full border border-orange-200 bg-white flex items-center justify-center overflow-hidden">
+          <div className="h-10 w-16 rounded-full border border-[var(--rf-border)] bg-[var(--rf-surface)] flex items-center justify-center overflow-hidden">
             <Logo className="h-9 w-auto" />
           </div>
           <div className="hidden md:block leading-tight">
             <div className="font-semibold">Wolsey Tech</div>
-            <div className="text-xs text-orange-700/80">Tracking System</div>
+            <div className="text-xs text-[var(--rf-text-accent)] opacity-80">Tracking System</div>
           </div>
         </div>
 
@@ -73,13 +82,13 @@ export default function AppShell() {
                 title={item.label}
                 aria-label={item.label}
                 className={({ isActive }) =>
-                  cn(
-                    'rf-focus flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-medium',
-                    'hover:bg-orange-50',
-                    isActive && 'bg-orange-100 text-orange-900'
-                  )
-                }
-              >
+                    cn(
+                      'rf-focus flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-medium',
+                      'hover:bg-[var(--rf-orange-50)]',
+                      isActive && 'bg-[var(--rf-orange-100)] text-[var(--rf-text-accent-strong)]'
+                    )
+                  }
+                >
                 <Icon size={18} className="shrink-0" />
                 <span className="hidden md:block">{item.label}</span>
               </NavLink>
@@ -89,17 +98,17 @@ export default function AppShell() {
       </aside>
 
       <div className="flex-1 min-w-0 flex flex-col">
-        <header className="h-16 shrink-0 border-b border-orange-100 bg-white/90">
+        <header className="h-16 shrink-0 border-b border-[var(--rf-border-soft)] bg-[var(--rf-surface)]">
           <div className="h-full px-5 sm:px-6 flex items-center justify-between gap-3">
             <div className="min-w-0 flex items-center gap-3">
-              <div className="md:hidden h-9 w-14 rounded-full border border-orange-200 bg-white flex items-center justify-center overflow-hidden">
+              <div className="md:hidden h-9 w-14 rounded-full border border-[var(--rf-border)] bg-[var(--rf-surface)] flex items-center justify-center overflow-hidden">
                 <Logo className="h-8 w-auto" />
               </div>
               <div className="min-w-0">
                 <div className="text-sm font-semibold truncate">
                   {titleForPath(location.pathname)}
                 </div>
-                <div className="text-xs text-orange-700/80 truncate">
+                <div className="text-xs text-[var(--rf-text-accent)] opacity-80 truncate">
                   {online ? (lastSyncSuccess ? `Last sync ${formatTime(lastSyncSuccess)}` : 'Online') : 'Offline'}
                 </div>
               </div>
@@ -107,14 +116,14 @@ export default function AppShell() {
 
             <div className="flex items-center gap-2">
               <button
-                className="rf-focus rounded-2xl border border-orange-200 bg-white px-3 py-2 text-sm font-medium hover:bg-orange-50"
+                className="rf-focus rounded-2xl border border-[var(--rf-border)] bg-[var(--rf-surface)] px-3 py-2 text-sm font-medium hover:bg-[var(--rf-orange-50)]"
                 onClick={() => setProfileOpen(true)}
                 title={user?.email || (isAdmin ? 'Admin' : 'Worker')}
               >
                 <span className="inline-flex items-center gap-2">
                   <RoleIcon size={16} />
                   <span className="hidden md:inline">{isAdmin ? 'Admin' : 'Worker'}</span>
-                  <ChevronDown size={14} className="text-orange-400" />
+                  <ChevronDown size={14} className="text-[var(--rf-orange-400)]" />
                 </span>
               </button>
             </div>
@@ -129,7 +138,7 @@ export default function AppShell() {
       <Modal open={profileOpen} onClose={() => setProfileOpen(false)} title="Profile">
         <div className="space-y-4">
           <div className="flex items-center gap-3">
-            <div className="h-12 w-12 rounded-2xl border border-orange-200 flex items-center justify-center font-semibold">
+            <div className="h-12 w-12 rounded-2xl border border-[var(--rf-border)] flex items-center justify-center font-semibold">
               <RoleIcon size={20} />
             </div>
             <div className="min-w-0">
@@ -143,6 +152,33 @@ export default function AppShell() {
             <Badge tone={isAdmin ? 'success' : 'neutral'}>{isAdmin ? 'Admin' : 'Worker'}</Badge>
             <span>{online ? 'Online' : 'Offline'}</span>
           </div>
+          {isAdmin && (
+            <div>
+              <div className="text-xs text-neutral-500">Theme</div>
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                {THEME_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => setTheme(opt.id)}
+                    aria-pressed={theme === opt.id}
+                    className={cn(
+                      'rf-focus flex items-center gap-2 rounded-2xl border px-3 py-2 text-sm',
+                      theme === opt.id
+                        ? 'border-[var(--rf-orange-400)] bg-[var(--rf-orange-50)] text-[var(--rf-text-accent-strong)]'
+                        : 'border-[var(--rf-border-soft)] text-neutral-600 hover:bg-[var(--rf-orange-50)]'
+                    )}
+                  >
+                    <span
+                      className="h-3 w-3 rounded-full border border-white shadow-sm"
+                      style={{ backgroundColor: opt.swatch }}
+                    />
+                    <span className="font-medium">{opt.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
             {!apiEnabled && (
               <Button variant="secondary" onClick={() => setRole(isAdmin ? 'worker' : 'admin')}>
@@ -162,7 +198,7 @@ export default function AppShell() {
         </div>
       </Modal>
 
-      <nav className="fixed bottom-0 left-0 right-0 z-40 md:hidden border-t border-orange-100 bg-white/95 backdrop-blur">
+      <nav className="fixed bottom-0 left-0 right-0 z-40 md:hidden border-t border-[var(--rf-border-soft)] bg-[var(--rf-surface)] backdrop-blur">
         <div
           className={cn(
             'grid gap-1 px-2 py-2',
@@ -185,8 +221,8 @@ export default function AppShell() {
                   cn(
                     'rf-focus flex flex-col items-center justify-center gap-1 rounded-2xl px-2 py-2 text-[10px] font-medium leading-tight',
                     isActive
-                      ? 'bg-orange-100 text-orange-900'
-                      : 'text-orange-600'
+                      ? 'bg-[var(--rf-orange-100)] text-[var(--rf-text-accent-strong)]'
+                      : 'text-[var(--rf-orange-600)]'
                   )
                 }
               >

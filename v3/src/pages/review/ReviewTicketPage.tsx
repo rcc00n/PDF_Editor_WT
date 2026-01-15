@@ -13,13 +13,10 @@ import Badge from "@/shared/ui/Badge";
 import Modal from "@/shared/ui/Modal";
 import { useAppStore } from "@/shared/state/useAppStore";
 import { dateTimeShort } from "@/shared/lib/format";
-import {
-  exportRenderedFormPdf,
-  exportTicketPdf,
-} from "@/features/export/exporters";
+import { exportRenderedFormPdf } from "@/features/export/exporters";
 import RenderedPdfPreview from "@/features/pdf/RenderedPdfPreview";
 import { signatureRoleLabel } from "@/shared/lib/signatureRoles";
-import { ArrowLeft, FileDown, CheckCircle2, Eye } from "lucide-react";
+import { ArrowLeft, FileDown, Eye } from "lucide-react";
 import type { TicketStatus } from "@/entities/types";
 
 function ticketStatusTone(
@@ -43,7 +40,6 @@ export default function ReviewTicketPage() {
 
   const ticket = useAppStore((s) => s.tickets.find((t) => t.id === ticketId));
   const forms = useAppStore((s) => s.forms);
-  const approveTicket = useAppStore((s) => s.approveTicket);
   const pushToast = useAppStore((s) => s.pushToast);
   const [renderOpen, setRenderOpen] = useState(false);
 
@@ -75,21 +71,6 @@ export default function ReviewTicketPage() {
   const renderPdfUrl = version.pdf?.dataUrl ?? version.pdf?.url;
   const sigSrc = signatureSrc(ticket.signature);
 
-  const handleApprove = useCallback(async () => {
-    try {
-      await approveTicket(ticket.id);
-      nav(`/review/approved/${ticket.id}`);
-    } catch (err: unknown) {
-      const message =
-        err instanceof Error ? err.message : "Unable to approve ticket";
-      pushToast({
-        title: "Approval failed",
-        message,
-        variant: "danger",
-      });
-    }
-  }, [approveTicket, ticket.id, nav, pushToast]);
-
   const handleExportRenderedPdf = useCallback(async () => {
     try {
       await exportRenderedFormPdf(ticket, version);
@@ -114,25 +95,18 @@ export default function ReviewTicketPage() {
             <Button variant="ghost" onClick={() => nav("/review")}>
               <ArrowLeft size={16} /> Back
             </Button>
-            <Button
-              variant="secondary"
-              onClick={() => exportTicketPdf(ticket, form, version)}>
+            <Button variant="secondary" onClick={handleExportRenderedPdf}>
               <FileDown size={16} /> Export PDF
             </Button>
             <Button
               variant="secondary"
-              className="bg-orange-100 border-orange-300"
+              className="bg-[var(--rf-orange-100)] border-[var(--rf-orange-300)]"
               disabled={!renderPdfUrl}
               onClick={() => setRenderOpen(true)}
               title={
                 renderPdfUrl ? "View rendered PDF" : "No PDF uploaded yet"
               }>
               <Eye size={16} /> View Rendered PDF
-            </Button>
-            <Button
-              onClick={() => void handleApprove()}
-              disabled={ticket.approvalState === "approved"}>
-              <CheckCircle2 size={16} /> Approve & Archive
             </Button>
           </>
         }
@@ -279,32 +253,6 @@ export default function ReviewTicketPage() {
             </CardBody>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Approval State</CardTitle>
-              <CardSub>Auto-archive after approval</CardSub>
-            </CardHeader>
-            <CardBody>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-neutral-500 dark:text-neutral-400">
-                  State
-                </span>
-                <Badge
-                  tone={
-                    ticket.approvalState === "approved" ? "success" : "warning"
-                  }>
-                  {ticket.approvalState}
-                </Badge>
-              </div>
-              <div className="mt-3">
-                <Button
-                  onClick={() => void handleApprove()}
-                  disabled={ticket.approvalState === "approved"}>
-                  <CheckCircle2 size={16} /> Approve & Archive
-                </Button>
-              </div>
-            </CardBody>
-          </Card>
         </div>
       </div>
 

@@ -195,11 +195,17 @@ class FormVersionCreateView(APIView):
         form = get_object_or_404(FormTemplate, pk=form_id)
         latest = FormVersion.objects.filter(form=form).order_by('-created_at').first()
         next_version = bump_version(latest.version if latest else 'v1.0')
+        pdf_file = latest.pdf if latest and latest.pdf else None
+        pdf_name = latest.pdf_name if pdf_file else ''
+        pdf_mime = latest.pdf_mime if pdf_file else ''
         FormVersion.objects.create(
             form=form,
             version=next_version,
             status='draft',
-            fields=clone_fields(latest.fields if latest else [])
+            fields=clone_fields(latest.fields if latest else []),
+            pdf=pdf_file,
+            pdf_name=pdf_name,
+            pdf_mime=pdf_mime,
         )
         form = FormTemplate.objects.prefetch_related('versions').get(pk=form_id)
         return Response(FormTemplateSerializer(form, context={'request': request}).data, status=status.HTTP_201_CREATED)
@@ -301,7 +307,7 @@ class TicketListCreateView(APIView):
             version=version,
             assigned_to=assigned_to,
             status='pending',
-            approval_state='pending',
+            approval_state='approved',
         )
         return Response(TicketSerializer(ticket, context={'request': request}).data, status=status.HTTP_201_CREATED)
 
@@ -344,8 +350,9 @@ class TicketSubmitView(APIView):
         )
         ticket.status = 'synced'
         ticket.last_error = ''
+        ticket.approval_state = 'approved'
         ticket.updated_at = timezone.now()
-        ticket.save(update_fields=['status', 'last_error', 'updated_at'])
+        ticket.save(update_fields=['status', 'last_error', 'approval_state', 'updated_at'])
         return Response(TicketSerializer(ticket, context={'request': request}).data)
 
 
