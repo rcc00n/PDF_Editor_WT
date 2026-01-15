@@ -308,7 +308,7 @@ export default function GroupsPage() {
 
       <div className="px-4 mt-4 sm:px-6 sm:mt-6">
         <Card>
-          <CardBody>
+          <CardBody className="pt-5 sm:pt-6">
             <div className="flex items-center justify-between">
               <div className="text-xs text-neutral-500 dark:text-neutral-400">
                 {filteredGroups.length} group(s)
