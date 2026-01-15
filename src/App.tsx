@@ -4,6 +4,7 @@ import AppShell from './app/shell/AppShell'
 import DashboardPage from './pages/dashboard/DashboardPage'
 import BuilderPage from './pages/builder/BuilderPage'
 import BuilderHomePage from './pages/builder/BuilderHomePage'
+import BuilderCompletePage from './pages/builder/BuilderCompletePage'
 import FieldHomePage from './pages/field/FieldHomePage'
 import FieldTicketPage from './pages/field/FieldTicketPage'
 import ReviewPage from './pages/review/ReviewPage'
@@ -69,6 +70,7 @@ export default function App() {
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/builder" element={<BuilderHomePage />} />
           <Route path="/builder/:formId" element={<BuilderPage />} />
+          <Route path="/builder/complete/:formId" element={<BuilderCompletePage />} />
           <Route path="/field" element={<FieldHomePage />} />
           <Route path="/field/ticket/:ticketId" element={<FieldTicketPage />} />
           <Route path="/review" element={<ReviewPage />} />
