@@ -173,7 +173,6 @@ export default function DashboardPage() {
     <div className="pb-10">
       <SectionHeader
         title="Dashboard"
-        subtitle="A clean snapshot of forms and field activity."
         right={
           <>
             {canEdit && (
@@ -217,7 +216,6 @@ export default function DashboardPage() {
             <div className="flex items-center justify-between gap-3">
               <div>
                 <CardTitle>Forms</CardTitle>
-                <CardSub>Open a template to edit or publish.</CardSub>
               </div>
               <Button variant="secondary" onClick={() => nav("/builder")}>Open Builder</Button>
             </div>
@@ -267,7 +265,6 @@ export default function DashboardPage() {
             <div className="flex items-center justify-between gap-3">
               <div>
                 <CardTitle>Recent Tickets</CardTitle>
-                <CardSub>Latest assignments and updates.</CardSub>
               </div>
               <Button variant="secondary" onClick={() => nav("/field")}>View Field App</Button>
             </div>
