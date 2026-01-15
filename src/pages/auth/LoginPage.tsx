@@ -13,16 +13,16 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null)
 
   return (
-    <div className="min-h-screen relative overflow-hidden bg-orange-50 px-4">
+    <div className="min-h-screen relative overflow-hidden bg-[var(--rf-surface-muted)] px-4">
       <div className="pointer-events-none absolute inset-0">
-        <div className="absolute -top-24 -left-24 h-72 w-72 rounded-full bg-orange-300/35 blur-3xl" />
-        <div className="absolute top-1/4 -right-28 h-80 w-80 rounded-full bg-amber-300/30 blur-3xl" />
-        <div className="absolute bottom-0 left-1/4 h-64 w-64 rounded-full bg-orange-200/40 blur-3xl" />
+        <div className="absolute -top-24 -left-24 h-72 w-72 rounded-full bg-[var(--rf-orange-300)] opacity-40 blur-3xl" />
+        <div className="absolute top-1/4 -right-28 h-80 w-80 rounded-full bg-[var(--rf-orange-200)] opacity-30 blur-3xl" />
+        <div className="absolute bottom-0 left-1/4 h-64 w-64 rounded-full bg-[var(--rf-orange-200)] opacity-40 blur-3xl" />
       </div>
 
       <div className="relative z-10 mx-auto flex min-h-screen w-full max-w-md flex-col items-center justify-center gap-8 py-14">
         <div className="flex flex-col items-center gap-4">
-          <div className="h-16 w-24 rounded-full border border-orange-200 bg-white flex items-center justify-center overflow-hidden">
+          <div className="h-16 w-24 rounded-full border border-[var(--rf-border)] bg-[var(--rf-surface)] flex items-center justify-center overflow-hidden">
             <Logo className="h-14 w-auto" />
           </div>
           <div className="text-sm font-semibold">Wolsey Tech Tracking System</div>

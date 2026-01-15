@@ -17,13 +17,13 @@ export default function Button(
         'rf-focus inline-flex items-center justify-center gap-2 rounded-2xl font-medium disabled:opacity-50 disabled:cursor-not-allowed',
         size === 'sm' ? 'h-9 px-3 text-sm' : 'h-11 px-5 text-sm',
         variant === 'primary' &&
-          'bg-orange-600 text-white hover:bg-orange-500',
+          'bg-[var(--rf-orange-600)] text-[var(--rf-accent-contrast)] hover:bg-[var(--rf-orange-500)]',
         variant === 'secondary' &&
-          'border border-orange-200 bg-orange-50 text-orange-900 hover:bg-orange-100',
+          'border border-[var(--rf-border)] bg-[var(--rf-orange-50)] text-[var(--rf-text-accent-strong)] hover:bg-[var(--rf-orange-100)]',
         variant === 'ghost' &&
-          'text-orange-700 hover:bg-orange-100',
+          'text-[var(--rf-text-accent)] hover:bg-[var(--rf-orange-100)]',
         variant === 'danger' &&
-          'bg-orange-800 text-white hover:bg-orange-700',
+          'bg-[var(--rf-orange-800)] text-[var(--rf-accent-contrast)] hover:bg-[var(--rf-orange-700)]',
         className
       )}
     />

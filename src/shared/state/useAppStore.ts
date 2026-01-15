@@ -6,7 +6,7 @@ import { clamp } from '@/shared/lib/math'
 import { API_ENABLED } from '@/shared/api/config'
 import { apiFetch, apiJson, clearStoredTokens, getStoredAccessToken, getStoredRefreshToken, storeTokens } from '@/shared/api/client'
 
-export type Theme = 'light' | 'planet'
+export type Theme = 'default' | 'slate' | 'ocean' | 'meadow'
 export type UserRole = 'admin' | 'worker'
 export type AuthStatus = 'unknown' | 'authenticated' | 'unauthenticated'
 
@@ -54,13 +54,28 @@ const safeStorage = {
   }
 }
 
+const THEME_CLASSES: Record<Theme, string | null> = {
+  default: null,
+  slate: 'theme-slate',
+  ocean: 'theme-ocean',
+  meadow: 'theme-meadow'
+}
+
 function normalizeTheme(value: string | null): Theme {
-  if (value === 'light') return 'light'
-  return 'light'
+  if (!value) return 'default'
+  if (value === 'light' || value === 'planet') return 'default'
+  if (value === 'slate' || value === 'ocean' || value === 'meadow' || value === 'default') {
+    return value
+  }
+  return 'default'
 }
 
 function getStoredTheme(): Theme {
-  return 'light'
+  try {
+    return normalizeTheme(localStorage.getItem('rf_theme'))
+  } catch {
+    return normalizeTheme(memoryStorage.get('rf_theme') ?? null)
+  }
 }
 
 function applyTheme(theme: Theme) {
@@ -68,6 +83,11 @@ function applyTheme(theme: Theme) {
   const root = document.documentElement
   root.classList.remove('dark')
   root.classList.remove('theme-planet')
+  Object.values(THEME_CLASSES).forEach((cls) => {
+    if (cls) root.classList.remove(cls)
+  })
+  const nextClass = THEME_CLASSES[theme]
+  if (nextClass) root.classList.add(nextClass)
 }
 
 function upsertById<T extends { id: string }>(items: T[], next: T) {
@@ -201,7 +221,11 @@ export const useAppStore = create<State>()(
         set({ theme })
       },
       toggleTheme: () => {
-        get().setTheme('light')
+        const order: Theme[] = ['default', 'slate', 'ocean', 'meadow']
+        const current = get().theme
+        const idx = order.indexOf(current)
+        const next = order[(idx + 1) % order.length]
+        get().setTheme(next)
       },
       role: 'admin',
       setRole: (role) => {
@@ -384,7 +408,8 @@ export const useAppStore = create<State>()(
               status: 'draft',
               fieldCount: 0,
               fields: latest ? latest.fields.map((x) => ({ ...x, id: uid('fld') })) : [],
-              canvas: latest?.canvas
+              canvas: latest?.canvas,
+              pdf: latest?.pdf ? { ...latest.pdf } : undefined
             }
             newV.fieldCount = newV.fields.length
             return { ...f, versions: [newV, ...f.versions] }
@@ -641,7 +666,7 @@ export const useAppStore = create<State>()(
           assignedTo,
           assignedAt: nowIso(),
           status: 'pending',
-          approvalState: 'pending',
+          approvalState: 'approved',
           values: {},
           attachments: [],
           signatureRole: 'employee',
@@ -788,7 +813,7 @@ export const useAppStore = create<State>()(
       },
 
       markSynced: (ticketId) => {
-        get().updateTicket(ticketId, { status: 'synced', lastError: undefined })
+        get().updateTicket(ticketId, { status: 'synced', approvalState: 'approved', lastError: undefined })
         get().addActivity('Sync completed', ticketId)
       },
 

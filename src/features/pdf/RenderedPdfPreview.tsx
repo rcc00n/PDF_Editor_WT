@@ -224,7 +224,7 @@ function EditableField({
   } as const
 
   const inputClass =
-    'w-full h-full rounded-md border border-orange-200 bg-white/85 px-1.5 py-0.5 text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-orange-200'
+    'w-full h-full rounded-md border border-[var(--rf-border)] bg-white/85 px-1.5 py-0.5 text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-[var(--rf-orange-200)]'
 
   if (field.type === 'checkbox') {
     return (
@@ -237,7 +237,7 @@ function EditableField({
           checked={Boolean(value)}
           onChange={(e) => onValueChange(field.key, e.target.checked)}
           disabled={readOnly}
-          className="h-4 w-4 accent-orange-600"
+          className="h-4 w-4 accent-[var(--rf-orange-600)]"
           aria-label={field.label}
         />
       </div>
@@ -293,7 +293,7 @@ function EditableField({
     return (
       <button
         type="button"
-        className="absolute pointer-events-auto flex items-center justify-center rounded-md border border-orange-200 bg-white/85 text-[11px] text-neutral-700 hover:bg-orange-50"
+        className="absolute pointer-events-auto flex items-center justify-center rounded-md border border-[var(--rf-border)] bg-white/85 text-[11px] text-neutral-700 hover:bg-[var(--rf-orange-50)]"
         style={style}
         onClick={onSignatureClick}
         title={field.label}
@@ -314,7 +314,7 @@ function EditableField({
     return (
       <button
         type="button"
-        className="absolute pointer-events-auto flex items-center justify-center rounded-md border border-orange-200 bg-white/85 text-[11px] text-neutral-700 hover:bg-orange-50"
+        className="absolute pointer-events-auto flex items-center justify-center rounded-md border border-[var(--rf-border)] bg-white/85 text-[11px] text-neutral-700 hover:bg-[var(--rf-orange-50)]"
         style={style}
         onClick={onPhotoClick}
         title={field.label}

@@ -13,9 +13,9 @@ import {
   groupTicketsByForm,
 } from "@/shared/lib/ticketFilters";
 import { Filter } from "lucide-react";
-import type { TicketStatus, ApprovalState } from "@/entities/types";
+import type { TicketStatus } from "@/entities/types";
 
-type FilterKey = "all" | "pending" | "approved" | "needs_attention";
+type FilterKey = "all" | "synced" | "needs_attention";
 
 function ticketStatusTone(
   status: TicketStatus
@@ -32,14 +32,9 @@ function ticketStatusTone(
   }
 }
 
-function approvalTone(state: ApprovalState): "success" | "warning" {
-  return state === "approved" ? "success" : "warning";
-}
-
 const FILTER_OPTIONS: { key: FilterKey; label: string; icon?: boolean }[] = [
   { key: "all", label: "All", icon: true },
-  { key: "pending", label: "Pending" },
-  { key: "approved", label: "Approved" },
+  { key: "synced", label: "Synced" },
   { key: "needs_attention", label: "Needs attention" },
 ];
 
@@ -56,9 +51,7 @@ export default function ReviewPage() {
   const statusFiltered = useMemo(() => {
     return tickets.filter((t) => {
       if (filter === "all") return true;
-      if (filter === "pending")
-        return t.status === "synced" && t.approvalState !== "approved";
-      if (filter === "approved") return t.approvalState === "approved";
+      if (filter === "synced") return t.status === "synced";
       if (filter === "needs_attention")
         return (
           t.status === "error" ||
@@ -170,9 +163,6 @@ export default function ReviewPage() {
                             Assigned
                           </th>
                           <th className="py-2 hidden sm:table-cell sm:w-[12%]">Status</th>
-                          <th className="py-2 hidden sm:table-cell sm:w-[12%]">
-                            Approval
-                          </th>
                           <th className="py-2 text-right sm:w-[10%]">Open</th>
                         </tr>
                       </thead>
@@ -204,9 +194,6 @@ export default function ReviewPage() {
                                 <Badge tone={ticketStatusTone(t.status)}>
                                   {t.status}
                                 </Badge>
-                                <Badge tone={approvalTone(t.approvalState)}>
-                                  {t.approvalState}
-                                </Badge>
                               </div>
                             </td>
                             <td className="py-3 hidden sm:table-cell">
@@ -218,11 +205,6 @@ export default function ReviewPage() {
                             <td className="py-3 hidden sm:table-cell">
                               <Badge tone={ticketStatusTone(t.status)}>
                                 {t.status}
-                              </Badge>
-                            </td>
-                            <td className="py-3 hidden sm:table-cell">
-                              <Badge tone={approvalTone(t.approvalState)}>
-                                {t.approvalState}
                               </Badge>
                             </td>
                             <td className="py-3 text-right">
@@ -239,7 +221,7 @@ export default function ReviewPage() {
                           <tr>
                             <td
                               className="py-10 text-center text-sm text-neutral-500 dark:text-neutral-400"
-                              colSpan={6}>
+                              colSpan={5}>
                               Nothing here
                             </td>
                           </tr>
