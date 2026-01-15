@@ -28,15 +28,36 @@ export function useQueueProcessor() {
 
         if (API_ENABLED) {
           const ticket = s.tickets.find((t) => t.id === next.ticketId)
-          if (ticket) {
-            await apiJson(`/tickets/${ticket.id}/`, {
-              method: 'PATCH',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ values: ticket.values, signature: ticket.signature })
-            })
+          if (!ticket) {
+            markQueueItem(next.id, 'failed', 'Ticket not found')
+            updateTicket(next.ticketId, { status: 'error', lastError: 'Ticket not found' })
+            return
           }
-          const updated = await apiJson(`/tickets/${next.ticketId}/submit/`, { method: 'POST' })
-          updateTicket(next.ticketId, updated)
+
+          let remoteId = ticket.serverId ?? ticket.id
+          if (ticket.localOnly && !ticket.serverId) {
+            const created = await apiJson('/tickets/', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                formId: ticket.formId,
+                versionId: ticket.versionId,
+                title: ticket.title,
+                assignedTo: ticket.assignedTo
+              })
+            })
+            remoteId = created.id
+            updateTicket(ticket.id, { serverId: created.id, localOnly: false })
+          }
+
+          await apiJson(`/tickets/${remoteId}/`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ values: ticket.values, signature: ticket.signature })
+          })
+          const updated = await apiJson(`/tickets/${remoteId}/submit/`, { method: 'POST' })
+          const { id: serverId, ...rest } = updated
+          updateTicket(next.ticketId, { ...rest, serverId })
           markQueueItem(next.id, 'synced')
           markSynced(next.ticketId)
           recordSyncSuccess()

@@ -618,7 +618,8 @@ export const useAppStore = create<State>()(
       },
 
       createTicket: async (formId, versionId, title, assignedTo) => {
-        if (API_ENABLED) {
+        const online = get().online
+        if (API_ENABLED && online) {
           const ticket = await apiJson('/tickets/', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -632,6 +633,8 @@ export const useAppStore = create<State>()(
         const id = nextTicketId(get().tickets)
         const t: Ticket = {
           id,
+          serverId: undefined,
+          localOnly: API_ENABLED && !online,
           title,
           formId,
           versionId,
@@ -658,16 +661,34 @@ export const useAppStore = create<State>()(
       },
 
       saveDraft: async (ticketId) => {
+        const online = get().online
         get().updateTicket(ticketId, { status: 'queued' })
-        if (API_ENABLED && get().online) {
+        if (API_ENABLED && online) {
           const t = get().tickets.find((x) => x.id === ticketId)
           if (t) {
-            const updated = await apiJson(`/tickets/${ticketId}/`, {
+            let remoteId = t.serverId ?? t.id
+            if (t.localOnly && !t.serverId) {
+              const created = await apiJson('/tickets/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  formId: t.formId,
+                  versionId: t.versionId,
+                  title: t.title,
+                  assignedTo: t.assignedTo
+                })
+              })
+              remoteId = created.id
+              get().updateTicket(t.id, { serverId: created.id, localOnly: false })
+            }
+
+            const updated = await apiJson(`/tickets/${remoteId}/`, {
               method: 'PATCH',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ values: t.values, signature: t.signature, status: 'queued' })
             })
-            set((s) => ({ tickets: upsertById(s.tickets, updated) }))
+            const { id: serverId, ...rest } = updated
+            get().updateTicket(t.id, { ...rest, serverId })
           }
         }
         get().pushToast({ title: 'Draft saved', message: 'Saved locally on this device', variant: 'success' })
@@ -697,8 +718,15 @@ export const useAppStore = create<State>()(
 
       approveTicket: async (ticketId) => {
         if (API_ENABLED) {
-          const updated = await apiJson(`/tickets/${ticketId}/approve/`, { method: 'POST' })
-          set((s) => ({ tickets: upsertById(s.tickets, updated) }))
+          const local = get().tickets.find((t) => t.id === ticketId)
+          const remoteId = local?.serverId ?? ticketId
+          const updated = await apiJson(`/tickets/${remoteId}/approve/`, { method: 'POST' })
+          if (local) {
+            const { id: serverId, ...rest } = updated
+            get().updateTicket(local.id, { ...rest, serverId })
+          } else {
+            set((s) => ({ tickets: upsertById(s.tickets, updated) }))
+          }
           get().addActivity('Approved & Archived', ticketId)
           get().pushToast({ title: 'Approved', message: `${ticketId} archived`, variant: 'success' })
           return
@@ -710,22 +738,36 @@ export const useAppStore = create<State>()(
 
       uploadAttachment: async (ticketId, file) => {
         if (!API_ENABLED) return
+        const local = get().tickets.find((t) => t.id === ticketId)
+        const remoteId = local?.serverId ?? ticketId
         const formData = new FormData()
         formData.append('file', file)
-        const res = await apiFetch(`/tickets/${ticketId}/attachments/`, { method: 'POST', body: formData })
+        const res = await apiFetch(`/tickets/${remoteId}/attachments/`, { method: 'POST', body: formData })
         if (!res.ok) throw new Error('Attachment upload failed')
         const updated = await res.json()
-        set((s) => ({ tickets: upsertById(s.tickets, updated) }))
+        if (local) {
+          const { id: serverId, ...rest } = updated
+          get().updateTicket(local.id, { ...rest, serverId })
+        } else {
+          set((s) => ({ tickets: upsertById(s.tickets, updated) }))
+        }
       },
 
       uploadSignature: async (ticketId, dataUrl, signer) => {
         if (!API_ENABLED) return
-        const updated = await apiJson(`/tickets/${ticketId}/signature/`, {
+        const local = get().tickets.find((t) => t.id === ticketId)
+        const remoteId = local?.serverId ?? ticketId
+        const updated = await apiJson(`/tickets/${remoteId}/signature/`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ dataUrl, signer })
         })
-        set((s) => ({ tickets: upsertById(s.tickets, updated) }))
+        if (local) {
+          const { id: serverId, ...rest } = updated
+          get().updateTicket(local.id, { ...rest, serverId })
+        } else {
+          set((s) => ({ tickets: upsertById(s.tickets, updated) }))
+        }
       },
 
       retryFailed: () => {
