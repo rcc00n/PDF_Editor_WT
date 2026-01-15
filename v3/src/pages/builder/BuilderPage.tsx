@@ -208,6 +208,7 @@ export default function BuilderPage() {
   );
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [numPages, setNumPages] = useState(1);
+  const [canvasFocus] = useState(false);
 
   const selected = useMemo(
     () => version?.fields.find((f) => f.id === selectedId) ?? null,

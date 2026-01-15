@@ -12,9 +12,47 @@ import Button from "@/shared/ui/Button";
 import Badge from "@/shared/ui/Badge";
 import { useAppStore } from "@/shared/state/useAppStore";
 import { dateTimeShort, timeHHMM } from "@/shared/lib/format";
+import { extractRig } from "@/shared/lib/ticketFilters";
 import { Plus, ArrowRight, ChevronDown } from "lucide-react";
 import { cn } from "@/shared/ui/cn";
-import type { TicketStatus } from "@/entities/types";
+import type {
+  AccessGroup,
+  Employee,
+  FormTemplate,
+  TicketStatus,
+} from "@/entities/types";
+
+type ResolveAvailableFormsArgs = {
+  forms: FormTemplate[];
+  groups: AccessGroup[];
+  employees: Employee[];
+  role: string;
+  userEmail?: string | null;
+};
+
+function resolveAvailableForms({
+  forms,
+  groups,
+  employees,
+  role,
+  userEmail,
+}: ResolveAvailableFormsArgs): FormTemplate[] {
+  if (role === "admin") return forms;
+  const email = userEmail?.trim().toLowerCase();
+  if (!email) return forms;
+  const employee =
+    employees.find((e) => (e.email ?? "").trim().toLowerCase() === email) ??
+    null;
+  if (!employee) return forms;
+  const allowed = new Set<string>();
+  for (const group of groups) {
+    if (group.employeeIds.includes(employee.id)) {
+      for (const formId of group.formIds) allowed.add(formId);
+    }
+  }
+  if (!allowed.size) return forms;
+  return forms.filter((form) => allowed.has(form.id));
+}
 
 export default function DashboardPage() {
   const nav = useNavigate();
