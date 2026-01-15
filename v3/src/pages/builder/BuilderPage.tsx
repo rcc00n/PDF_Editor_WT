@@ -1,5 +1,10 @@
-import React, { useCallback, useMemo, useRef, useState } from "react";
-import { useLocation, useNavigate, useParams } from "react-router-dom";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  unstable_useBlocker as useBlocker,
+  useLocation,
+  useNavigate,
+  useParams,
+} from "react-router-dom";
 import SectionHeader from "@/shared/ui/SectionHeader";
 import Button from "@/shared/ui/Button";
 import Badge from "@/shared/ui/Badge";
@@ -7,6 +12,7 @@ import Input from "@/shared/ui/Input";
 import Textarea from "@/shared/ui/Textarea";
 import Select from "@/shared/ui/Select";
 import { Card, CardBody } from "@/shared/ui/Card";
+import Modal from "@/shared/ui/Modal";
 import { useAppStore } from "@/shared/state/useAppStore";
 import type { Field, FieldType, Validation } from "@/entities/types";
 import { uid } from "@/shared/lib/ids";
@@ -244,6 +250,34 @@ export default function BuilderPage() {
 
   const pdf = version.pdf;
   const canvas = version.canvas ?? { width: 210, height: 297 };
+  const [leaveOpen, setLeaveOpen] = useState(false);
+  const [allowNavigate, setAllowNavigate] = useState(false);
+  const [pendingPath, setPendingPath] = useState<string | null>(null);
+  const [publishReady, setPublishReady] = useState(false);
+  const [publishNext, setPublishNext] = useState<string | null>(null);
+  const shouldBlock = role === "admin" && Boolean(pdf) && !allowNavigate;
+  const blocker = useBlocker(shouldBlock);
+
+  useEffect(() => {
+    if (blocker.state === "blocked") {
+      setLeaveOpen(true);
+      if (blocker.location) {
+        setPendingPath(
+          `${blocker.location.pathname}${blocker.location.search}`
+        );
+      }
+    }
+  }, [blocker.location, blocker.state]);
+
+  useEffect(() => {
+    if (!shouldBlock) return;
+    const onBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [shouldBlock]);
 
   const handleUpsertField = useCallback(
     (next: Field) => {
@@ -303,6 +337,32 @@ export default function BuilderPage() {
         : [1],
     [pdf, numPages]
   );
+
+  const handlePublishComplete = useCallback(
+    async (nextPath?: string | null) => {
+      try {
+        await publishVersion(form.id, version.id);
+        setAllowNavigate(true);
+        setPublishNext(nextPath ?? null);
+        setPublishReady(true);
+      } catch (err: any) {
+        pushToast({
+          title: "Publish failed",
+          message: err?.message || "Unable to publish",
+          variant: "danger",
+        });
+      }
+    },
+    [form.id, publishVersion, pushToast, version.id]
+  );
+
+  useEffect(() => {
+    if (!publishReady) return;
+    const query = new URLSearchParams();
+    query.set("v", version.id);
+    if (publishNext) query.set("next", publishNext);
+    nav(`/builder/complete/${form.id}?${query.toString()}`);
+  }, [form.id, nav, publishNext, publishReady, version.id]);
 
   // Builder page
   return (
@@ -369,15 +429,7 @@ export default function BuilderPage() {
 
             <Button
               onClick={async () => {
-                try {
-                  await publishVersion(form.id, version.id);
-                } catch (err: any) {
-                  pushToast({
-                    title: "Publish failed",
-                    message: err?.message || "Unable to publish",
-                    variant: "danger",
-                  });
-                }
+                await handlePublishComplete(null);
               }}
               disabled={version.status === "active"}>
               <CheckCircle2 size={16} /> Publish
@@ -613,6 +665,68 @@ export default function BuilderPage() {
           </CardBody>
         </Card>
       </div>
+
+      <Modal
+        open={leaveOpen}
+        onClose={() => {
+          setLeaveOpen(false);
+          if (blocker.state === "blocked") blocker.reset();
+        }}
+        title="Leave builder?"
+      >
+        <div className="space-y-4">
+          <div className="text-sm text-neutral-600">
+            This form has a PDF attached. Choose what you want to do before
+            leaving the builder.
+          </div>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setLeaveOpen(false);
+                if (blocker.state === "blocked") blocker.reset();
+              }}
+            >
+              Keep editing
+            </Button>
+            {!apiEnabled && (
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setPdf(form.id, version.id, undefined);
+                  setLeaveOpen(false);
+                  if (blocker.state === "blocked") {
+                    blocker.proceed();
+                  }
+                }}
+              >
+                Remove PDF & leave
+              </Button>
+            )}
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setLeaveOpen(false);
+                if (blocker.state === "blocked") {
+                  blocker.proceed();
+                }
+              }}
+            >
+              Save draft & leave
+            </Button>
+            <Button
+              onClick={async () => {
+                if (blocker.state === "blocked") blocker.reset();
+                setLeaveOpen(false);
+                await handlePublishComplete(pendingPath);
+              }}
+              disabled={version.status === "active"}
+            >
+              Publish & continue
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

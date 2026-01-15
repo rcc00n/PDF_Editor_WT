@@ -42,8 +42,6 @@ function ticketStatusTone(
 export default function FieldHomePage() {
   const nav = useNavigate();
   const tickets = useAppStore((s) => s.tickets);
-  const queue = useAppStore((s) => s.queue);
-  const lastSync = useAppStore((s) => s.lastSyncSuccess);
   const forms = useAppStore((s) => s.forms);
   const groups = useAppStore((s) => s.groups);
   const employees = useAppStore((s) => s.employees);
@@ -130,11 +128,6 @@ export default function FieldHomePage() {
   }, [availableForms, formId]);
   const canCreate = Boolean(activeVersions.v);
 
-  const queuedTickets = queue.filter(
-    (q) => q.status === "pending" || q.status === "in_progress"
-  ).length;
-  const needsRetry = queue.filter((q) => q.status === "failed").length;
-
   const filteredTickets = useMemo(
     () =>
       filterTickets(tickets, {
@@ -188,7 +181,7 @@ export default function FieldHomePage() {
         }
       />
 
-      <div className="px-4 mt-4 sm:px-6 sm:mt-6 grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-4">
+      <div className="px-4 mt-4 sm:px-6 sm:mt-6 grid grid-cols-1 gap-4">
         <Card>
           <CardHeader>
             <CardTitle>Daily Field Tickets</CardTitle>
@@ -290,44 +283,6 @@ export default function FieldHomePage() {
           </CardBody>
         </Card>
 
-        <div className="flex flex-col gap-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Offline Queue Status</CardTitle>
-              <CardSub>Sync happens automatically when online</CardSub>
-            </CardHeader>
-            <CardBody>
-              <div className="flex items-center justify-between">
-                <div className="text-sm">Queued tickets</div>
-                <Badge tone={queuedTickets ? "warning" : "neutral"}>
-                  {queuedTickets}
-                </Badge>
-              </div>
-              <div className="mt-2 flex items-center justify-between">
-                <div className="text-sm">Requires retry</div>
-                <Badge tone={needsRetry ? "danger" : "neutral"}>
-                  {needsRetry}
-                </Badge>
-              </div>
-              <div className="mt-3 text-xs text-neutral-500 dark:text-neutral-400">
-                Last success: {lastSync ? dateTimeShort(lastSync) : "—"}
-              </div>
-            </CardBody>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Device</CardTitle>
-              <CardSub>Touch-friendly UI</CardSub>
-            </CardHeader>
-            <CardBody>
-              <div className="text-sm">Tablet / Rugged device</div>
-              <div className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
-                Drafts and attachments are stored locally (demo).
-              </div>
-            </CardBody>
-          </Card>
-        </div>
       </div>
 
       <Modal open={open} onClose={() => setOpen(false)} title="Create ticket">
