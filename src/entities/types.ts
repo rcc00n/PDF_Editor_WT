@@ -81,6 +81,7 @@ export type FormTemplate = {
 }
 
 export type TicketStatus = 'pending' | 'in_progress' | 'synced' | 'error' | 'queued'
+export type ApprovalState = 'pending' | 'approved'
 
 export type Ticket = {
   id: Id // FT-xxxx
@@ -90,7 +91,7 @@ export type Ticket = {
   assignedTo: string
   assignedAt: string // ISO
   status: TicketStatus
-  approvalState: 'pending' | 'approved'
+  approvalState: ApprovalState
   values: Record<string, any>
   attachments: Array<{ id: Id; name: string; mime: string; dataUrl?: string; url?: string }>
   signature?: { signer: string; dataUrl?: string; url?: string }
