@@ -1,6 +1,6 @@
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useState } from 'react'
-import { LayoutGrid, PencilRuler, Smartphone, ClipboardCheck, Shield, User, Users, ChevronDown, LogOut } from 'lucide-react'
+import { LayoutGrid, PencilRuler, Smartphone, ClipboardCheck, Shield, User, ChevronDown, LogOut } from 'lucide-react'
 import { useAppStore } from '@/shared/state/useAppStore'
 import { cn } from '@/shared/ui/cn'
 import Modal from '@/shared/ui/Modal'
@@ -43,8 +43,7 @@ export default function AppShell() {
         { to: '/builder', label: 'Builder', icon: PencilRuler },
         { to: '/field', label: 'Field App', icon: Smartphone },
         { to: '/review', label: 'Review', icon: ClipboardCheck },
-        { to: '/employees', label: 'Employees', icon: User },
-        { to: '/groups', label: 'Groups', icon: Users }
+        { to: '/employees', label: 'Employees', icon: User }
       ]
     : baseNav
   const [profileOpen, setProfileOpen] = useState(false)
@@ -243,7 +242,7 @@ function titleForPath(path: string) {
   if (path.startsWith('/field')) return 'Field App'
   if (path.startsWith('/review')) return 'Admin Review & Export'
   if (path.startsWith('/employees')) return 'Employees'
-  if (path.startsWith('/groups')) return 'Groups'
+  if (path.startsWith('/groups')) return 'Employees'
   return 'Wolsey Tech Tracking System'
 }
 

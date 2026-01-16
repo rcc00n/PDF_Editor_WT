@@ -9,6 +9,7 @@ import { useAppStore } from "@/shared/state/useAppStore";
 import type { Employee } from "@/entities/types";
 import { FileSpreadsheet, Plus, Upload, Pencil, Trash2 } from "lucide-react";
 import { read, utils, writeFile } from "xlsx";
+import GroupsSection from "@/pages/groups/GroupsSection";
 
 const PAGE_SIZE = 10;
 
@@ -343,6 +344,8 @@ export default function EmployeesPage() {
           </CardBody>
         </Card>
       </div>
+
+      <GroupsSection embedded />
 
       <Modal
         open={open}
