@@ -5,6 +5,7 @@ import { Card, CardBody } from "@/shared/ui/Card";
 import Badge from "@/shared/ui/Badge";
 import Button from "@/shared/ui/Button";
 import Input from "@/shared/ui/Input";
+import Select from "@/shared/ui/Select";
 import { useAppStore } from "@/shared/state/useAppStore";
 import { dateTimeShort } from "@/shared/lib/format";
 import {
@@ -47,6 +48,13 @@ export default function ReviewPage() {
   const [toDate, setToDate] = useState("");
   const [rigQuery, setRigQuery] = useState("");
   const [query, setQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<TicketStatus | "all">("all");
+  const [formFilter, setFormFilter] = useState("all");
+
+  const formOptions = useMemo(
+    () => forms.slice().sort((a, b) => a.name.localeCompare(b.name)),
+    [forms]
+  );
 
   const statusFiltered = useMemo(() => {
     return tickets.filter((t) => {
@@ -69,8 +77,10 @@ export default function ReviewPage() {
         to: toDate,
         rig: rigQuery,
         query,
+        status: statusFilter,
+        formId: formFilter === "all" ? undefined : formFilter,
       }),
-    [statusFiltered, fromDate, toDate, rigQuery, query]
+    [statusFiltered, fromDate, toDate, rigQuery, query, statusFilter, formFilter]
   );
 
   const grouped = useMemo(
@@ -78,30 +88,58 @@ export default function ReviewPage() {
     [filtered, forms]
   );
 
+  const hasFilters =
+    filter !== "all" ||
+    fromDate ||
+    toDate ||
+    rigQuery ||
+    query ||
+    statusFilter !== "all" ||
+    formFilter !== "all";
+
+  const clearFilters = () => {
+    setFilter("all");
+    setFromDate("");
+    setToDate("");
+    setRigQuery("");
+    setQuery("");
+    setStatusFilter("all");
+    setFormFilter("all");
+  };
+
   return (
     <div className="pb-10">
       <SectionHeader
         title="Admin Review & Export"
         subtitle="Completed preview with metadata, attachments, and export actions."
         right={
-          <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center sm:flex-nowrap">
-            {FILTER_OPTIONS.map((opt) => (
-              <Button
-                key={opt.key}
-                size="sm"
-                variant={filter === opt.key ? "primary" : "secondary"}
-                onClick={() => setFilter(opt.key)}>
-                {opt.icon && <Filter size={16} />} {opt.label}
-              </Button>
-            ))}
-          </div>
+          <>
+            <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center sm:flex-nowrap">
+              {FILTER_OPTIONS.map((opt) => (
+                <Button
+                  key={opt.key}
+                  size="sm"
+                  variant={filter === opt.key ? "primary" : "secondary"}
+                  onClick={() => setFilter(opt.key)}>
+                  {opt.icon && <Filter size={16} />} {opt.label}
+                </Button>
+              ))}
+            </div>
+            <Button
+              size="sm"
+              variant="ghost"
+              disabled={!hasFilters}
+              onClick={clearFilters}>
+              Clear filters
+            </Button>
+          </>
         }
       />
 
       <div className="px-4 mt-4 sm:px-6 sm:mt-6">
         <Card>
           <CardBody>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 pt-2 pl-1">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-6 pt-2 pl-1">
               <div>
                 <div className="text-xs text-neutral-500 dark:text-neutral-400 mb-1">
                   From
@@ -124,6 +162,38 @@ export default function ReviewPage() {
               </div>
               <div>
                 <div className="text-xs text-neutral-500 dark:text-neutral-400 mb-1">
+                  Status
+                </div>
+                <Select
+                  value={statusFilter}
+                  onChange={(e) =>
+                    setStatusFilter(e.target.value as TicketStatus | "all")
+                  }>
+                  <option value="all">All statuses</option>
+                  <option value="synced">Synced</option>
+                  <option value="queued">Queued</option>
+                  <option value="pending">Pending</option>
+                  <option value="in_progress">In progress</option>
+                  <option value="error">Error</option>
+                </Select>
+              </div>
+              <div>
+                <div className="text-xs text-neutral-500 dark:text-neutral-400 mb-1">
+                  Form
+                </div>
+                <Select
+                  value={formFilter}
+                  onChange={(e) => setFormFilter(e.target.value)}>
+                  <option value="all">All forms</option>
+                  {formOptions.map((form) => (
+                    <option key={form.id} value={form.id}>
+                      {form.name}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+              <div>
+                <div className="text-xs text-neutral-500 dark:text-neutral-400 mb-1">
                   Rig
                 </div>
                 <Input
@@ -134,7 +204,7 @@ export default function ReviewPage() {
               </div>
               <div>
                 <div className="text-xs text-neutral-500 dark:text-neutral-400 mb-1">
-                  Ticket or assignee
+                  Ticket, assignee, or values
                 </div>
                 <Input
                   placeholder="Search tickets"

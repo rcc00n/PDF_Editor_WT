@@ -6,6 +6,8 @@ type TicketFilter = {
   rig?: string
   status?: TicketStatus | 'all'
   query?: string
+  formId?: string
+  approvalState?: Ticket['approvalState'] | 'all'
 }
 
 export function extractRig(ticket: Ticket) {
@@ -26,8 +28,12 @@ export function filterTickets(tickets: Ticket[], filter: TicketFilter) {
   const rigQuery = filter.rig?.trim().toLowerCase() || ''
   const status = filter.status && filter.status !== 'all' ? filter.status : ''
   const query = filter.query?.trim().toLowerCase() || ''
+  const formId = filter.formId?.trim() || ''
+  const approval = filter.approvalState && filter.approvalState !== 'all' ? filter.approvalState : ''
   return tickets.filter((ticket) => {
     if (status && ticket.status !== status) return false
+    if (formId && ticket.formId !== formId) return false
+    if (approval && ticket.approvalState !== approval) return false
     const day = toLocalYmd(ticket.assignedAt)
     if (from && day && day < from) return false
     if (to && day && day > to) return false
@@ -38,7 +44,8 @@ export function filterTickets(tickets: Ticket[], filter: TicketFilter) {
     }
     if (query) {
       const rig = extractRig(ticket)
-      const hay = `${ticket.id} ${ticket.title} ${ticket.assignedTo} ${rig}`.toLowerCase()
+      const values = flattenValues(ticket.values)
+      const hay = `${ticket.id} ${ticket.title} ${ticket.assignedTo} ${rig} ${ticket.status} ${ticket.approvalState} ${values}`.toLowerCase()
       if (!hay.includes(query)) return false
     }
     return true
@@ -71,4 +78,21 @@ function toLocalYmd(iso?: string) {
   const mm = `${d.getMonth() + 1}`.padStart(2, '0')
   const dd = `${d.getDate()}`.padStart(2, '0')
   return `${d.getFullYear()}-${mm}-${dd}`
+}
+
+function flattenValues(values?: Record<string, any>) {
+  if (!values) return ''
+  const parts: string[] = []
+  for (const value of Object.values(values)) {
+    if (value == null || value === '') continue
+    if (Array.isArray(value)) {
+      for (const v of value) {
+        if (v != null && v !== '') parts.push(String(v))
+      }
+      continue
+    }
+    if (typeof value === 'object') continue
+    parts.push(String(value))
+  }
+  return parts.join(' ')
 }
