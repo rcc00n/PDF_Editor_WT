@@ -3,6 +3,7 @@ import { createJSONStorage, persist } from 'zustand/middleware'
 import type { Activity, AccessGroup, Employee, FormTemplate, FormVersion, Id, QueueItem, Ticket } from '@/entities/types'
 import { nowIso, uid, nextTicketId } from '@/shared/lib/ids'
 import { clamp } from '@/shared/lib/math'
+import { buildPdfCacheKey, deleteCachedPdf, setCachedPdf } from '@/shared/lib/pdfCache'
 import { API_ENABLED } from '@/shared/api/config'
 import { apiFetch, apiJson, clearStoredTokens, getStoredAccessToken, getStoredRefreshToken, storeTokens } from '@/shared/api/client'
 
@@ -26,6 +27,7 @@ export type Toast = {
 export type OfflineFormMeta = {
   versionId: Id
   downloadedAt: string
+  pdfKey?: string
 }
 
 const memoryStorage = new Map<string, string>()
@@ -153,6 +155,7 @@ type State = {
   dismissToast: (id: Id) => void
 
   boot: () => void
+  primePdfCache: () => Promise<void>
 
   // Forms
   createForm: (name?: string) => Promise<Id>
@@ -292,10 +295,12 @@ export const useAppStore = create<State>()(
         }
         const canvasByVersion = new Map<string, FormVersion['canvas']>()
         const pdfDataByVersion = new Map<string, string>()
+        const pdfCacheByVersion = new Map<string, string>()
         for (const f of get().forms) {
           for (const v of f.versions) {
             if (v.canvas) canvasByVersion.set(v.id, v.canvas)
             if (v.pdf?.dataUrl) pdfDataByVersion.set(v.id, v.pdf.dataUrl)
+            if (v.pdf?.cacheKey) pdfCacheByVersion.set(v.id, v.pdf.cacheKey)
           }
         }
         const mergedForms = forms.map((f: FormTemplate) => ({
@@ -303,7 +308,13 @@ export const useAppStore = create<State>()(
           versions: f.versions.map((v) => ({
             ...v,
             canvas: canvasByVersion.get(v.id),
-            pdf: v.pdf ? { ...v.pdf, dataUrl: pdfDataByVersion.get(v.id) ?? v.pdf.dataUrl } : v.pdf
+            pdf: v.pdf
+              ? {
+                  ...v.pdf,
+                  dataUrl: pdfDataByVersion.get(v.id) ?? v.pdf.dataUrl,
+                  cacheKey: pdfCacheByVersion.get(v.id) ?? v.pdf.cacheKey
+                }
+              : v.pdf
           }))
         }))
         set({ forms: mergedForms, tickets, employees, groups, queue: [], activities: [], lastSyncSuccess: undefined })
@@ -355,6 +366,44 @@ export const useAppStore = create<State>()(
         // sync theme on boot
         applyTheme(get().theme)
         set({ booted: true })
+      },
+
+      primePdfCache: async () => {
+        const updates = new Map<string, string>()
+        for (const form of get().forms) {
+          for (const version of form.versions) {
+            if (!version.pdf?.dataUrl || version.pdf.cacheKey) continue
+            const key = buildPdfCacheKey(form.id, version.id)
+            try {
+              const res = await fetch(version.pdf.dataUrl)
+              if (!res.ok) continue
+              const blob = await res.blob()
+              const cached = await setCachedPdf(key, blob)
+              if (!cached) continue
+              updates.set(`${form.id}:${version.id}`, key)
+            } catch {
+              // ignore cache failures
+            }
+          }
+        }
+        if (!updates.size) return
+
+        set((s) => {
+          const nextForms = s.forms.map((form) => ({
+            ...form,
+            versions: form.versions.map((version) => {
+              const cacheKey = updates.get(`${form.id}:${version.id}`)
+              if (!cacheKey || !version.pdf) return version
+              return { ...version, pdf: { ...version.pdf, cacheKey } }
+            })
+          }))
+          const nextOffline = { ...s.offlineForms }
+          for (const [formId, meta] of Object.entries(nextOffline)) {
+            const cacheKey = updates.get(`${formId}:${meta.versionId}`)
+            if (cacheKey) nextOffline[formId] = { ...meta, pdfKey: cacheKey }
+          }
+          return { forms: nextForms, offlineForms: nextOffline }
+        })
       },
 
       createForm: async (name) => {
@@ -409,7 +458,7 @@ export const useAppStore = create<State>()(
               fieldCount: 0,
               fields: latest ? latest.fields.map((x) => ({ ...x, id: uid('fld') })) : [],
               canvas: latest?.canvas,
-              pdf: latest?.pdf ? { ...latest.pdf } : undefined
+              pdf: latest?.pdf ? { ...latest.pdf, cacheKey: undefined } : undefined
             }
             newV.fieldCount = newV.fields.length
             return { ...f, versions: [newV, ...f.versions] }
@@ -523,19 +572,41 @@ export const useAppStore = create<State>()(
         const version = form.versions.find((v) => v.status === 'active') ?? form.versions[0]
         if (!version) throw new Error('No version available')
 
-        const needsPdfFetch = Boolean(version.pdf?.url && !version.pdf?.dataUrl)
+        const meta = get().offlineForms[formId]
+        const metaKey = meta?.versionId === version.id ? meta.pdfKey : undefined
+        const existingKey = version.pdf?.cacheKey ?? metaKey
+        const needsPdfFetch = Boolean(version.pdf?.url && !version.pdf?.dataUrl && !existingKey)
         if (needsPdfFetch && !get().online) {
           throw new Error('Connect to the internet to download this PDF')
         }
 
         let pdfDataUrl = version.pdf?.dataUrl
-        if (needsPdfFetch && version.pdf?.url) {
-          const token = getStoredAccessToken()
-          const headers = token ? { Authorization: `Bearer ${token}` } : undefined
-          const res = await fetch(version.pdf.url, { headers })
-          if (!res.ok) throw new Error('Unable to download PDF')
-          const blob = await res.blob()
-          pdfDataUrl = await blobToDataUrl(blob)
+        let cacheKey = existingKey
+        if (version.pdf && !existingKey) {
+          const nextKey = buildPdfCacheKey(formId, version.id)
+          let blob: Blob | null = null
+          if (version.pdf.dataUrl) {
+            try {
+              const res = await fetch(version.pdf.dataUrl)
+              if (res.ok) blob = await res.blob()
+            } catch {
+              blob = null
+            }
+          }
+          if (!blob && version.pdf.url) {
+            const token = getStoredAccessToken()
+            const headers = token ? { Authorization: `Bearer ${token}` } : undefined
+            const res = await fetch(version.pdf.url, { headers })
+            if (!res.ok) throw new Error('Unable to download PDF')
+            blob = await res.blob()
+          }
+          if (blob) {
+            const cached = await setCachedPdf(nextKey, blob)
+            if (cached) cacheKey = nextKey
+            if (!pdfDataUrl) {
+              pdfDataUrl = await blobToDataUrl(blob)
+            }
+          }
         }
 
         set((s) => ({
@@ -546,17 +617,24 @@ export const useAppStore = create<State>()(
               versions: f.versions.map((v) => {
                 if (v.id !== version.id) return v
                 if (!v.pdf) return v
-                return { ...v, pdf: { ...v.pdf, dataUrl: pdfDataUrl ?? v.pdf.dataUrl } }
+                return {
+                  ...v,
+                  pdf: {
+                    ...v.pdf,
+                    dataUrl: pdfDataUrl ?? v.pdf.dataUrl,
+                    cacheKey: cacheKey ?? v.pdf.cacheKey
+                  }
+                }
               })
             }
           }),
           offlineForms: {
             ...s.offlineForms,
-            [formId]: { versionId: version.id, downloadedAt: nowIso() }
+            [formId]: { versionId: version.id, downloadedAt: nowIso(), pdfKey: cacheKey }
           }
         }))
 
-        const hasPdf = Boolean(version.pdf?.url || version.pdf?.dataUrl)
+        const hasPdf = Boolean(version.pdf?.url || version.pdf?.dataUrl || cacheKey)
         get().pushToast({
           title: 'Offline download ready',
           message: hasPdf ? `${form.name} saved on this device.` : `${form.name} saved (no PDF attached).`,
@@ -567,6 +645,8 @@ export const useAppStore = create<State>()(
       removeOfflineForm: (formId) => {
         const form = get().forms.find((f) => f.id === formId)
         const meta = get().offlineForms[formId]
+        const cachedKey = meta?.pdfKey ?? form?.versions.find((v) => v.id === meta?.versionId)?.pdf?.cacheKey
+        if (cachedKey) void deleteCachedPdf(cachedKey)
         set((s) => {
           const { [formId]: _, ...rest } = s.offlineForms
           const forms = meta
@@ -576,8 +656,8 @@ export const useAppStore = create<State>()(
                   ...f,
                   versions: f.versions.map((v) => {
                     if (v.id !== meta.versionId) return v
-                    if (!v.pdf?.dataUrl) return v
-                    return { ...v, pdf: { ...v.pdf, dataUrl: undefined } }
+                    if (!v.pdf) return v
+                    return { ...v, pdf: { ...v.pdf, dataUrl: undefined, cacheKey: undefined } }
                   })
                 }
               })
@@ -645,15 +725,20 @@ export const useAppStore = create<State>()(
       createTicket: async (formId, versionId, title, assignedTo) => {
         const online = get().online
         if (API_ENABLED && online) {
-          const ticket = await apiJson('/tickets/', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ formId, versionId, title, assignedTo })
-          })
-          const nextTicket = { ...ticket, signatureRole: ticket.signatureRole ?? 'employee' }
-          set((s) => ({ tickets: upsertById(s.tickets, nextTicket) }))
-          get().addActivity('Ticket created', `${ticket.id} · ${ticket.title}`)
-          return ticket.id
+          try {
+            const ticket = await apiJson('/tickets/', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ formId, versionId, title, assignedTo })
+            })
+            const nextTicket = { ...ticket, signatureRole: ticket.signatureRole ?? 'employee' }
+            set((s) => ({ tickets: upsertById(s.tickets, nextTicket) }))
+            get().addActivity('Ticket created', `${ticket.id} · ${ticket.title}`)
+            return ticket.id
+          } catch (err) {
+            if (!isOfflineError(err)) throw err
+            get().setSystemOnline(false)
+          }
         }
         const id = nextTicketId(get().tickets)
         const t: Ticket = {
@@ -950,7 +1035,7 @@ export const useAppStore = create<State>()(
         systemOnline: s.systemOnline,
         forcedOffline: s.forcedOffline,
         online: s.online,
-        forms: s.forms,
+        forms: stripPdfDataUrls(s.forms),
         tickets: s.tickets,
         queue: s.queue,
         activities: s.activities,
@@ -978,4 +1063,27 @@ function blobToDataUrl(blob: Blob) {
     reader.onerror = () => reject(new Error('Unable to read file data'))
     reader.readAsDataURL(blob)
   })
+}
+
+function stripPdfDataUrls(forms: FormTemplate[]) {
+  return forms.map((form) => ({
+    ...form,
+    versions: form.versions.map((version) => {
+      if (!version.pdf?.dataUrl || !version.pdf?.cacheKey) return version
+      return {
+        ...version,
+        pdf: {
+          ...version.pdf,
+          dataUrl: undefined
+        }
+      }
+    })
+  }))
+}
+
+function isOfflineError(err: unknown) {
+  if (err instanceof TypeError) return true
+  if (!err || typeof err !== 'object') return false
+  const message = 'message' in err ? String((err as { message?: unknown }).message || '') : ''
+  return /failed to fetch|networkerror|network request failed|load failed/i.test(message)
 }

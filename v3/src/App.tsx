@@ -20,6 +20,7 @@ import { API_ENABLED } from './shared/api/config'
 
 export default function App() {
   const boot = useAppStore(s => s.boot)
+  const primePdfCache = useAppStore(s => s.primePdfCache)
   const online = useAppStore(s => s.online)
   const setSystemOnline = useAppStore(s => s.setSystemOnline)
   const initAuth = useAppStore(s => s.initAuth)
@@ -30,8 +31,9 @@ export default function App() {
   useEffect(() => {
     if (!API_ENABLED) seedIfEmpty()
     boot()
+    void primePdfCache()
     if (API_ENABLED) void initAuth()
-  }, [boot, initAuth])
+  }, [boot, initAuth, primePdfCache])
 
   useEffect(() => {
     const on = () => setSystemOnline(true)

@@ -11,6 +11,7 @@ type Props = {
   fields: Field[]
   ticket: Ticket
   interactive?: boolean
+  pageMode?: 'paged' | 'scroll'
   employees?: Employee[]
   onValueChange?: (key: string, value: any) => void
   onSignatureClick?: () => void
@@ -22,6 +23,7 @@ export default function RenderedPdfPreview({
   fields,
   ticket,
   interactive = false,
+  pageMode = 'paged',
   employees = [],
   onValueChange,
   onSignatureClick,
@@ -33,11 +35,20 @@ export default function RenderedPdfPreview({
   const canEdit = interactive && typeof onValueChange === 'function'
   const handleValueChange =
     onValueChange ?? ((_: string, __: any) => {})
+  const isScroll = pageMode === 'scroll'
 
-  const pageFields = useMemo(
-    () => fields.filter((f) => f.page === page),
-    [fields, page]
-  )
+  const fieldsByPage = useMemo(() => {
+    const map = new Map<number, Field[]>()
+    for (const field of fields) {
+      const list = map.get(field.page)
+      if (list) list.push(field)
+      else map.set(field.page, [field])
+    }
+    for (const list of map.values()) {
+      list.sort((a, b) => a.y - b.y || a.x - b.x)
+    }
+    return map
+  }, [fields])
 
   if (!pdfUrl) {
     return (
@@ -47,46 +58,27 @@ export default function RenderedPdfPreview({
     )
   }
 
-  const preview = (fullscreen: boolean) => (
-    <div className={fullscreen ? 'flex h-full min-h-0 flex-col gap-3' : 'space-y-3'}>
-      <div className="flex items-center justify-between gap-3 text-xs text-neutral-500 dark:text-neutral-400">
-        <div>Page {page} / {numPages}</div>
-        <div className="flex items-center gap-2">
-          <button
-            className="rf-focus rounded-xl px-2 py-1 text-sm hover:bg-neutral-100 dark:hover:bg-neutral-900"
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
-            type="button"
-          >
-            &lt;
-          </button>
-          <button
-            className="rf-focus rounded-xl px-2 py-1 text-sm hover:bg-neutral-100 dark:hover:bg-neutral-900"
-            onClick={() => setPage((p) => Math.min(numPages, p + 1))}
-            type="button"
-          >
-            &gt;
-          </button>
-          <button
-            className="rf-focus rounded-xl p-1 text-sm hover:bg-neutral-100 dark:hover:bg-neutral-900"
-            onClick={() => setFullOpen((s) => !s)}
-            type="button"
-            title={fullscreen ? 'Exit full screen' : 'Full screen'}
-            aria-label={fullscreen ? 'Exit full screen' : 'Full screen'}
-          >
-            {fullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
-          </button>
-        </div>
-      </div>
+  const handleMeta = (meta: { numPages: number }) => {
+    setNumPages((current) => (current === meta.numPages ? current : meta.numPages))
+    if (!isScroll) {
+      setPage((p) => Math.min(p, meta.numPages))
+    }
+  }
 
-      <div className={fullscreen ? 'flex-1 min-h-0 overflow-auto rf-scrollbar' : ''}>
+  const renderPage = (pageNumber: number, fullscreen: boolean) => {
+    const pageFields = fieldsByPage.get(pageNumber) ?? []
+    return (
+      <div key={pageNumber} className={isScroll ? 'space-y-1.5' : ''}>
+        {isScroll && numPages > 1 && (
+          <div className="text-[11px] text-neutral-500 dark:text-neutral-400">
+            Page {pageNumber} / {numPages}
+          </div>
+        )}
         <div className="relative">
           <PdfPageCanvas
             dataUrl={pdfUrl}
-            page={page}
-            onMeta={(meta) => {
-              setNumPages(meta.numPages)
-              setPage((p) => Math.min(p, meta.numPages))
-            }}
+            page={pageNumber}
+            onMeta={handleMeta}
           />
 
           <div className="absolute inset-0 pointer-events-none">
@@ -107,6 +99,53 @@ export default function RenderedPdfPreview({
             )}
           </div>
         </div>
+      </div>
+    )
+  }
+
+  const preview = (fullscreen: boolean) => (
+    <div className={fullscreen ? 'flex h-full min-h-0 flex-col gap-3' : 'space-y-3'}>
+      <div className="flex items-center justify-between gap-3 text-xs text-neutral-500 dark:text-neutral-400">
+        <div>{isScroll ? `Pages ${numPages}` : `Page ${page} / ${numPages}`}</div>
+        <div className="flex items-center gap-2">
+          {!isScroll && (
+            <>
+              <button
+                className="rf-focus rounded-xl px-2 py-1 text-sm hover:bg-neutral-100 dark:hover:bg-neutral-900"
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                type="button"
+              >
+                &lt;
+              </button>
+              <button
+                className="rf-focus rounded-xl px-2 py-1 text-sm hover:bg-neutral-100 dark:hover:bg-neutral-900"
+                onClick={() => setPage((p) => Math.min(numPages, p + 1))}
+                type="button"
+              >
+                &gt;
+              </button>
+            </>
+          )}
+          <button
+            className="rf-focus rounded-xl p-1 text-sm hover:bg-neutral-100 dark:hover:bg-neutral-900"
+            onClick={() => setFullOpen((s) => !s)}
+            type="button"
+            title={fullscreen ? 'Exit full screen' : 'Full screen'}
+            aria-label={fullscreen ? 'Exit full screen' : 'Full screen'}
+          >
+            {fullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+          </button>
+        </div>
+      </div>
+
+      <div className={fullscreen ? 'flex-1 min-h-0 overflow-auto rf-scrollbar' : ''}>
+        {isScroll ? (
+          <div className="space-y-6">
+            {Array.from({ length: numPages }, (_, idx) => renderPage(idx + 1, fullscreen))}
+          </div>
+        ) : (
+          renderPage(page, fullscreen)
+        )}
       </div>
     </div>
   )
@@ -227,24 +266,34 @@ function EditableField({
     'w-full h-full rounded-md border border-[var(--rf-border)] bg-white/85 px-1.5 py-0.5 text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-[var(--rf-orange-200)]'
 
   if (field.type === 'checkbox') {
+    const checked = Boolean(value)
+    const checkboxClass = [
+      'absolute pointer-events-auto flex items-center justify-center rounded-sm border border-[var(--rf-border)] text-neutral-900',
+      checked ? 'bg-[var(--rf-orange-100)]' : 'bg-white/85 text-transparent',
+      readOnly ? 'opacity-60 cursor-not-allowed' : 'hover:bg-[var(--rf-orange-50)]'
+    ].join(' ')
     return (
-      <div
-        className="absolute pointer-events-auto flex items-center justify-center"
+      <button
+        type="button"
+        className={checkboxClass}
         style={style}
+        onClick={() => {
+          if (readOnly) return
+          onValueChange(field.key, !checked)
+        }}
+        role="checkbox"
+        aria-checked={checked}
+        aria-label={field.label}
+        disabled={readOnly}
       >
-        <input
-          type="checkbox"
-          checked={Boolean(value)}
-          onChange={(e) => onValueChange(field.key, e.target.checked)}
-          disabled={readOnly}
-          className="h-4 w-4 accent-[var(--rf-orange-600)]"
-          aria-label={field.label}
-        />
-      </div>
+        <span className="text-base font-semibold leading-none">
+          {checked ? '✓' : ''}
+        </span>
+      </button>
     )
   }
 
-  if (field.type === 'select' || field.type === 'radio') {
+  if (field.type === 'select') {
     return (
       <div className="absolute pointer-events-auto" style={style}>
         <select
@@ -261,6 +310,33 @@ function EditableField({
             </option>
           ))}
         </select>
+      </div>
+    )
+  }
+
+  if (field.type === 'radio') {
+    return (
+      <div className="absolute pointer-events-auto" style={style}>
+        <div className="h-full w-full rounded-md border border-[var(--rf-border)] bg-white/85 px-1.5 py-1 text-[11px] text-neutral-900 overflow-auto rf-scrollbar">
+          {options.length ? (
+            options.map((opt) => (
+              <label key={opt} className="flex items-center gap-1.5">
+                <input
+                  type="radio"
+                  name={`radio_${field.id}`}
+                  value={opt}
+                  checked={value === opt}
+                  onChange={(e) => onValueChange(field.key, e.target.value)}
+                  disabled={readOnly}
+                  className="h-3 w-3 accent-[var(--rf-orange-600)]"
+                />
+                <span className="truncate">{opt}</span>
+              </label>
+            ))
+          ) : (
+            <div className="text-[10px] text-neutral-400">No options</div>
+          )}
+        </div>
       </div>
     )
   }

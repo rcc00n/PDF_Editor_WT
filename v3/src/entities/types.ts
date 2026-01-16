@@ -69,6 +69,7 @@ export type FormVersion = {
     mime: string
     dataUrl?: string // base64 data url (demo)
     url?: string // API media URL
+    cacheKey?: string
   }
   fields: Field[]
 }

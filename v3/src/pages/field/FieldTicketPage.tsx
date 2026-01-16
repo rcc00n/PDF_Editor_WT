@@ -17,6 +17,7 @@ import type {
 } from "@/entities/types";
 import { dateTimeShort } from "@/shared/lib/format";
 import { downloadDataUrl } from "@/shared/lib/download";
+import { getCachedPdf } from "@/shared/lib/pdfCache";
 import { exportRenderedFormPdf } from "@/features/export/exporters";
 import RenderedPdfPreview from "@/features/pdf/RenderedPdfPreview";
 import SignaturePad from "@/features/field/SignaturePad";
@@ -58,11 +59,13 @@ export default function FieldTicketPage() {
 
   const ticket = useAppStore((s) => s.tickets.find((t) => t.id === ticketId));
   const forms = useAppStore((s) => s.forms);
+  const offlineForms = useAppStore((s) => s.offlineForms);
   const updateTicket = useAppStore((s) => s.updateTicket);
   const employees = useAppStore((s) => s.employees);
   const saveDraft = useAppStore((s) => s.saveDraft);
   const submitTicket = useAppStore((s) => s.submitTicket);
   const apiEnabled = useAppStore((s) => s.apiEnabled);
+  const online = useAppStore((s) => s.online);
   const user = useAppStore((s) => s.user);
   const role = useAppStore((s) => s.role);
   const uploadAttachment = useAppStore((s) => s.uploadAttachment);
@@ -71,6 +74,8 @@ export default function FieldTicketPage() {
   const [renderOpen, setRenderOpen] = useState(false);
   const [signatureOpen, setSignatureOpen] = useState(false);
   const [activeView, setActiveView] = useState<"fields" | "overlay">("fields");
+  const [cachedPdfUrl, setCachedPdfUrl] = useState<string | null>(null);
+  const cachedPdfRef = useRef<string | null>(null);
 
   const ctx = useMemo(() => {
     if (!ticket) return null;
@@ -83,6 +88,44 @@ export default function FieldTicketPage() {
       .sort((a, b) => a.page - b.page || a.y - b.y || a.x - b.x);
     return { form, version, fields };
   }, [ticket, forms]);
+
+const offlineMeta = ctx?.form ? offlineForms[ctx.form.id] : undefined;
+const cacheKey =
+  ctx?.version?.pdf?.cacheKey ??
+  (offlineMeta?.versionId === ctx?.version?.id ? offlineMeta?.pdfKey : undefined);
+
+  useEffect(() => {
+    let active = true;
+    if (!cacheKey || ctx?.version?.pdf?.dataUrl) {
+      if (cachedPdfRef.current) {
+        URL.revokeObjectURL(cachedPdfRef.current);
+        cachedPdfRef.current = null;
+      }
+      setCachedPdfUrl(null);
+      return;
+    }
+    void (async () => {
+      const blob = await getCachedPdf(cacheKey);
+      if (!active) return;
+      if (!blob) {
+        setCachedPdfUrl(null);
+        return;
+      }
+      const objectUrl = URL.createObjectURL(blob);
+      if (cachedPdfRef.current) URL.revokeObjectURL(cachedPdfRef.current);
+      cachedPdfRef.current = objectUrl;
+      setCachedPdfUrl(objectUrl);
+    })();
+    return () => {
+      active = false;
+    };
+  }, [cacheKey, ctx?.version?.pdf?.dataUrl]);
+
+  useEffect(() => {
+    return () => {
+      if (cachedPdfRef.current) URL.revokeObjectURL(cachedPdfRef.current);
+    };
+  }, []);
 
   if (!ticket || !ctx?.form || !ctx?.version) {
     return (
@@ -100,7 +143,8 @@ export default function FieldTicketPage() {
   }
 
   const { form, version, fields } = ctx;
-  const renderPdfUrl = version.pdf?.dataUrl ?? version.pdf?.url;
+  const renderPdfUrl =
+    cachedPdfUrl ?? version.pdf?.dataUrl ?? (online ? version.pdf?.url : undefined);
   const signatureLocked = Boolean(
     ticket.signature?.dataUrl || ticket.signature?.url
   );
@@ -180,7 +224,7 @@ export default function FieldTicketPage() {
 
   const handleExportPdf = useCallback(async () => {
     try {
-      await exportRenderedFormPdf(ticket, version);
+      await exportRenderedFormPdf(ticket, version, renderPdfUrl);
     } catch (err: unknown) {
       const message =
         err instanceof Error ? err.message : "Unable to export rendered PDF";
@@ -190,7 +234,7 @@ export default function FieldTicketPage() {
         variant: "danger",
       });
     }
-  }, [ticket, version, pushToast]);
+  }, [ticket, version, renderPdfUrl, pushToast]);
 
   const handleOverlayValueChange = useCallback(
     (key: string, value: any) => {
@@ -341,6 +385,7 @@ export default function FieldTicketPage() {
                         fields={version.fields}
                         ticket={ticket}
                         interactive={!isLocked}
+                        pageMode="scroll"
                         employees={employees}
                         onValueChange={handleOverlayValueChange}
                         onSignatureClick={
