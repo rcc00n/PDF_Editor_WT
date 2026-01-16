@@ -247,7 +247,7 @@ const cacheKey =
   );
 
   return (
-    <div className="pb-10">
+    <div className="pb-28 sm:pb-10">
       <div className="sticky top-0 z-30 border-b border-neutral-200/80 bg-white/95 backdrop-blur dark:border-neutral-800/80 dark:bg-neutral-950/95">
         <SectionHeader
           title={`${form.name}`}
@@ -261,25 +261,51 @@ const cacheKey =
               </Button>
               <Button
                 variant="secondary"
+                className="hidden sm:inline-flex"
                 onClick={() => void saveDraft(ticket.id)}>
                 <Save size={16} /> Save Draft
               </Button>
-            <Button
-              variant="secondary"
-              className="bg-[var(--rf-orange-100)] border-[var(--rf-orange-300)]"
-              disabled={!renderPdfUrl}
-              onClick={() => setRenderOpen(true)}
+              <Button
+                variant="secondary"
+                className="hidden sm:inline-flex bg-[var(--rf-orange-100)] border-[var(--rf-orange-300)]"
+                disabled={!renderPdfUrl}
+                onClick={() => setRenderOpen(true)}
                 title={
                   renderPdfUrl ? "View rendered PDF" : "No PDF uploaded yet"
                 }>
                 <Eye size={16} /> View Rendered PDF
               </Button>
-              <Button onClick={() => void handleSubmit()}>
+              <Button className="hidden sm:inline-flex" onClick={() => void handleSubmit()}>
                 <Send size={16} /> Submit (Queued)
               </Button>
             </>
           }
         />
+      </div>
+
+      <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-neutral-200/80 bg-white/95 backdrop-blur sm:hidden">
+        <div className="px-4 py-3">
+          <div className="grid grid-cols-2 gap-2">
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => void saveDraft(ticket.id)}>
+              <Save size={16} /> Save Draft
+            </Button>
+            <Button
+              size="sm"
+              variant="secondary"
+              className="bg-[var(--rf-orange-100)] border-[var(--rf-orange-300)]"
+              disabled={!renderPdfUrl}
+              onClick={() => setRenderOpen(true)}
+              title={renderPdfUrl ? "View rendered PDF" : "No PDF uploaded yet"}>
+              <Eye size={16} /> View PDF
+            </Button>
+          </div>
+          <Button className="mt-2 w-full" onClick={() => void handleSubmit()}>
+            <Send size={16} /> Submit (Queued)
+          </Button>
+        </div>
       </div>
 
       <div className="px-4 mt-4 sm:px-6 sm:mt-6 grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-4 items-start">

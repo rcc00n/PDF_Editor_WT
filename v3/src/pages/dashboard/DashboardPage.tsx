@@ -121,34 +121,27 @@ export default function DashboardPage() {
 
   const summary = useMemo(() => {
     const now = new Date();
-    const sameDay = (iso: string) => {
-      const d = new Date(iso);
-      return (
-        d.getFullYear() === now.getFullYear() &&
-        d.getMonth() === now.getMonth() &&
-        d.getDate() === now.getDate()
-      );
-    };
+    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const startOfWeek = new Date(startOfDay);
+    const day = startOfWeek.getDay();
+    const weekOffset = (day + 6) % 7;
+    startOfWeek.setDate(startOfWeek.getDate() - weekOffset);
 
-    let pending = 0;
-    let attention = 0;
-    let syncedToday = 0;
+    let submittedToday = 0;
+    let submittedWeek = 0;
+    let submittedMonth = 0;
 
     for (const t of scopedTickets) {
-      if (
-        t.status === "pending" ||
-        t.status === "queued" ||
-        t.status === "in_progress"
-      )
-        pending += 1;
-      if (t.status === "error" || t.status === "queued" || t.status === "pending") {
-        attention += 1;
-      }
-      if (t.status === "synced" && sameDay(t.updatedAt)) syncedToday += 1;
+      if (t.status !== "synced") continue;
+      const submittedAt = new Date(t.updatedAt);
+      if (submittedAt >= startOfDay) submittedToday += 1;
+      if (submittedAt >= startOfWeek) submittedWeek += 1;
+      if (submittedAt >= startOfMonth) submittedMonth += 1;
     }
 
-    return { pending, attention, syncedToday };
-  }, [role, scopedTickets, tickets]);
+    return { submittedToday, submittedWeek, submittedMonth };
+  }, [scopedTickets]);
 
   const formsVisible = useMemo(() => availableForms.slice(0, 6), [availableForms]);
 
@@ -193,9 +186,9 @@ export default function DashboardPage() {
           </CardHeader>
           <CardBody className="pt-2">
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-              <SummaryStat label="Pending" value={summary.pending} />
-              <SummaryStat label="Needs attention" value={summary.attention} />
-              <SummaryStat label="Synced today" value={summary.syncedToday} />
+              <SummaryStat label="Submitted today" value={summary.submittedToday} />
+              <SummaryStat label="Submitted this week" value={summary.submittedWeek} />
+              <SummaryStat label="Submitted this month" value={summary.submittedMonth} />
             </div>
           </CardBody>
         </Card>
