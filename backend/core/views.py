@@ -446,7 +446,7 @@ class EmployeeDetailView(APIView):
 
 class AccessGroupListCreateView(APIView):
     @admin_required
-    def get(self):
+    def get(self, request):
         groups = AccessGroup.objects.prefetch_related(
             'employees', 'excluded_employees', 'forms', 'excluded_forms'
         ).all()
