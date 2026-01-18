@@ -1,18 +1,64 @@
 import base64
+import binascii
 import mimetypes
 import uuid
 from functools import wraps
-from django.utils import timezone
+
 from django.core.files.base import ContentFile
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
 from rest_framework import status
+from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework.parsers import JSONParser, MultiPartParser, FormParser
-from .models import FormTemplate, FormVersion, Ticket, Attachment, Employee, AccessGroup, uid
-from .serializers import FormTemplateSerializer, TicketSerializer, TicketUpdateSerializer, EmployeeSerializer, AccessGroupSerializer
+
+from .models import AccessGroup, Attachment, Employee, FormTemplate, FormVersion, Ticket, uid
 from .permissions import is_admin
+from .serializers import (
+    AccessGroupSerializer,
+    EmployeeSerializer,
+    FormTemplateSerializer,
+    TicketSerializer,
+    TicketUpdateSerializer,
+)
+
+FORM_PREFETCH = ('versions',)
+TICKET_PREFETCH = ('attachments',)
+ACCESS_GROUP_PREFETCH = ('employees', 'excluded_employees', 'forms', 'excluded_forms')
+
+
+def form_queryset():
+    # Keep versions prefetched for serialization.
+    return FormTemplate.objects.prefetch_related(*FORM_PREFETCH)
+
+
+def ticket_queryset():
+    # Keep related data prefetched for serialization.
+    return Ticket.objects.select_related('form', 'version').prefetch_related(*TICKET_PREFETCH)
+
+
+def access_group_queryset():
+    # Load group relations once for access checks.
+    return AccessGroup.objects.prefetch_related(*ACCESS_GROUP_PREFETCH)
+
+
+def serialize_forms(forms, request):
+    # Keep serializer responses consistent.
+    return FormTemplateSerializer(forms, many=True, context={'request': request}).data
+
+
+def serialize_form(form, request):
+    return FormTemplateSerializer(form, context={'request': request}).data
+
+
+def serialize_tickets(tickets, request):
+    # Keep serializer responses consistent.
+    return TicketSerializer(tickets, many=True, context={'request': request}).data
+
+
+def serialize_ticket(ticket, request):
+    return TicketSerializer(ticket, context={'request': request}).data
 
 
 def admin_required(view_method):
@@ -20,6 +66,7 @@ def admin_required(view_method):
     @wraps(view_method)
     def wrapper(self, request, *args, **kwargs):
         if not is_admin(request.user):
+            # Return 403 for non-admin access.
             return Response({'detail': 'Admin only'}, status=status.HTTP_403_FORBIDDEN)
         return view_method(self, request, *args, **kwargs)
     return wrapper
@@ -30,20 +77,18 @@ def bump_version(current: str) -> str:
         v = current.lstrip('vV')
         major, minor = v.split('.', 1)
         return f"v{int(major)}.{int(minor) + 1}"
-    except Exception:
+    except (AttributeError, TypeError, ValueError):
+        # Fall back to a safe default on malformed versions.
         return 'v1.0'
 
 
 def clone_fields(fields):
-    cloned = []
-    for f in fields or []:
-        next_field = dict(f)
-        next_field['id'] = uid('fld')
-        cloned.append(next_field)
-    return cloned
+    # Clone field dicts with fresh IDs.
+    return [{**field, 'id': uid('fld')} for field in (fields or [])]
 
 
 def data_url_to_content(data_url: str, fallback_name: str):
+    # Parse a data URL into filename/content/mime parts.
     if not data_url:
         return None, None, None
     if ',' in data_url:
@@ -55,7 +100,38 @@ def data_url_to_content(data_url: str, fallback_name: str):
         mime = header.split(';')[0].replace('data:', '')
     ext = mimetypes.guess_extension(mime) or ''
     filename = f"{fallback_name}{ext}"
-    return filename, ContentFile(base64.b64decode(b64), name=filename), mime
+    b64_payload = (b64 or '').strip()
+    padding = (-len(b64_payload)) % 4
+    if padding:
+        # Add missing padding so base64 decoding can validate properly.
+        b64_payload = f"{b64_payload}{'=' * padding}"
+    try:
+        content = ContentFile(base64.b64decode(b64_payload, validate=True), name=filename)
+    except (ValueError, binascii.Error):
+        return filename, None, mime
+    return filename, content, mime
+
+
+def apply_signature_update(ticket, data_url: str, signer: str | None, *, touch_updated_at: bool) -> bool:
+    # Save a signature file from a data URL payload.
+    filename, content, mime = data_url_to_content(
+        data_url,
+        f"signature_{ticket.id}_{uuid.uuid4().hex}",
+    )
+    if not content:
+        return False
+    ticket.signature_file.save(filename, content, save=False)
+    ticket.signature_mime = mime or ''
+    ticket.signature_name = filename
+    update_fields = ['signature_file', 'signature_mime', 'signature_name']
+    if signer is not None:
+        ticket.signature_signer = signer
+        update_fields.append('signature_signer')
+    if touch_updated_at:
+        ticket.updated_at = timezone.now()
+        update_fields.append('updated_at')
+    ticket.save(update_fields=update_fields)
+    return True
 
 
 def employee_for_user(user):
@@ -64,12 +140,13 @@ def employee_for_user(user):
     email = (user.email or user.username or '').strip()
     if not email:
         return None
+    # Match by email to the employee profile.
     return Employee.objects.filter(email__iexact=email).first()
 
 
 def group_includes_employee(group, employee_id: str, prefetched: bool = False) -> bool:
     if group.include_all_employees:
-        # Use cached data if prefetched, otherwise use efficient values_list query
+        # Use prefetched data when available to avoid extra queries.
         if prefetched:
             excluded = {e.id for e in group.excluded_employees.all()}
         else:
@@ -82,6 +159,7 @@ def group_includes_employee(group, employee_id: str, prefetched: bool = False) -
 
 def group_allowed_form_ids(group, all_form_ids, prefetched: bool = False):
     if group.include_all_forms:
+        # Exclude forms based on the group rules.
         if prefetched:
             excluded = {f.id for f in group.excluded_forms.all()}
         else:
@@ -97,10 +175,8 @@ def allowed_form_ids_for_employee(employee, forms_qs=None):
     all_form_ids = set(all_forms_qs.values_list('id', flat=True))
     if not all_form_ids:
         return set()
-    # Prefetch all related data in a single query
-    groups = AccessGroup.objects.prefetch_related(
-        'employees', 'excluded_employees', 'forms', 'excluded_forms'
-    ).all()
+    # Prefetch all related data in a single query.
+    groups = access_group_queryset().all()
     allowed = set()
     for group in groups:
         if group_includes_employee(group, employee.id, prefetched=True):
@@ -109,19 +185,12 @@ def allowed_form_ids_for_employee(employee, forms_qs=None):
 
 
 def employee_has_form_access(employee, form) -> bool:
-    groups = AccessGroup.objects.prefetch_related(
-        'employees', 'excluded_employees', 'forms', 'excluded_forms'
-    ).all()
+    # Fast-path with prefetched relations to avoid N+1 queries.
+    groups = access_group_queryset().all()
     for group in groups:
         if group_includes_employee(group, employee.id, prefetched=True):
-            if group.include_all_forms:
-                # Check if form is NOT in excluded
-                if not group.excluded_forms.filter(id=form.id).exists():
-                    return True
-            else:
-                # Check if form IS in included
-                if group.forms.filter(id=form.id).exists():
-                    return True
+            if form.id in group_allowed_form_ids(group, {form.id}, prefetched=True):
+                return True
     return False
 
 
@@ -141,7 +210,7 @@ class MeView(APIView):
 
 class FormListCreateView(APIView):
     def get(self, request):
-        forms = FormTemplate.objects.prefetch_related('versions').all()
+        forms = form_queryset().all()
         if not is_admin(request.user):
             employee = employee_for_user(request.user)
             if not employee:
@@ -150,7 +219,7 @@ class FormListCreateView(APIView):
             if not allowed_ids:
                 return Response([])
             forms = forms.filter(id__in=allowed_ids)
-        return Response(FormTemplateSerializer(forms, many=True, context={'request': request}).data)
+        return Response(serialize_forms(forms, request))
 
     @admin_required
     def post(self, request):
@@ -158,15 +227,15 @@ class FormListCreateView(APIView):
         subtitle = (request.data.get('subtitle') or '').strip()
         form = FormTemplate.objects.create(name=name, subtitle=subtitle)
         FormVersion.objects.create(form=form, version='v1.0', status='draft', fields=[])
-        # Prefetch versions for serialization instead of refresh_from_db
-        form = FormTemplate.objects.prefetch_related('versions').get(pk=form.pk)
-        return Response(FormTemplateSerializer(form, context={'request': request}).data, status=status.HTTP_201_CREATED)
+        # Re-fetch with versions prefetched for serialization.
+        form = form_queryset().get(pk=form.pk)
+        return Response(serialize_form(form, request), status=status.HTTP_201_CREATED)
 
 
 class FormDetailView(APIView):
     @admin_required
     def patch(self, request, form_id):
-        form = get_object_or_404(FormTemplate.objects.prefetch_related('versions'), pk=form_id)
+        form = get_object_or_404(form_queryset(), pk=form_id)
         update_fields = []
         if 'name' in request.data:
             form.name = request.data['name']
@@ -176,7 +245,7 @@ class FormDetailView(APIView):
             update_fields.append('subtitle')
         if update_fields:
             form.save(update_fields=update_fields)
-        return Response(FormTemplateSerializer(form, context={'request': request}).data)
+        return Response(serialize_form(form, request))
 
 
 class FormArchiveView(APIView):
@@ -184,9 +253,9 @@ class FormArchiveView(APIView):
     def post(self, request, form_id):
         form = get_object_or_404(FormTemplate, pk=form_id)
         FormVersion.objects.filter(form=form).update(status='archived')
-        # Re-fetch with prefetch for serialization
-        form = FormTemplate.objects.prefetch_related('versions').get(pk=form_id)
-        return Response(FormTemplateSerializer(form, context={'request': request}).data)
+        # Re-fetch with versions prefetched for serialization.
+        form = form_queryset().get(pk=form_id)
+        return Response(serialize_form(form, request))
 
 
 class FormVersionCreateView(APIView):
@@ -207,8 +276,8 @@ class FormVersionCreateView(APIView):
             pdf_name=pdf_name,
             pdf_mime=pdf_mime,
         )
-        form = FormTemplate.objects.prefetch_related('versions').get(pk=form_id)
-        return Response(FormTemplateSerializer(form, context={'request': request}).data, status=status.HTTP_201_CREATED)
+        form = form_queryset().get(pk=form_id)
+        return Response(serialize_form(form, request), status=status.HTTP_201_CREATED)
 
 
 class FormVersionPublishView(APIView):
@@ -220,9 +289,9 @@ class FormVersionPublishView(APIView):
         version.status = 'active'
         version.published_at = timezone.now()
         version.save(update_fields=['status', 'published_at'])
-        # Re-fetch with prefetch for serialization
-        form = FormTemplate.objects.prefetch_related('versions').get(pk=form_id)
-        return Response(FormTemplateSerializer(form, context={'request': request}).data)
+        # Re-fetch with versions prefetched for serialization.
+        form = form_queryset().get(pk=form_id)
+        return Response(serialize_form(form, request))
 
 
 class FormVersionPdfUploadView(APIView):
@@ -238,8 +307,8 @@ class FormVersionPdfUploadView(APIView):
         version.pdf_name = pdf.name
         version.pdf_mime = pdf.content_type or 'application/pdf'
         version.save(update_fields=['pdf', 'pdf_name', 'pdf_mime'])
-        form = FormTemplate.objects.prefetch_related('versions').get(pk=form_id)
-        return Response(FormTemplateSerializer(form, context={'request': request}).data)
+        form = form_queryset().get(pk=form_id)
+        return Response(serialize_form(form, request))
 
 
 class FormVersionFieldUpsertView(APIView):
@@ -259,8 +328,8 @@ class FormVersionFieldUpsertView(APIView):
             fields[idx] = field
         version.fields = fields
         version.save(update_fields=['fields'])
-        form = FormTemplate.objects.prefetch_related('versions').get(pk=form_id)
-        return Response(FormTemplateSerializer(form, context={'request': request}).data)
+        form = form_queryset().get(pk=form_id)
+        return Response(serialize_form(form, request))
 
 
 class FormVersionFieldDeleteView(APIView):
@@ -269,13 +338,13 @@ class FormVersionFieldDeleteView(APIView):
         version = get_object_or_404(FormVersion, pk=version_id, form_id=form_id)
         version.fields = [f for f in (version.fields or []) if f.get('id') != field_id]
         version.save(update_fields=['fields'])
-        form = FormTemplate.objects.prefetch_related('versions').get(pk=form_id)
-        return Response(FormTemplateSerializer(form, context={'request': request}).data)
+        form = form_queryset().get(pk=form_id)
+        return Response(serialize_form(form, request))
 
 
 class TicketListCreateView(APIView):
     def get(self, request):
-        tickets = Ticket.objects.select_related('form', 'version').prefetch_related('attachments').all()
+        tickets = ticket_queryset().all()
         if not is_admin(request.user):
             employee = employee_for_user(request.user)
             if not employee:
@@ -284,7 +353,7 @@ class TicketListCreateView(APIView):
             if not allowed_ids:
                 return Response([])
             tickets = tickets.filter(form_id__in=allowed_ids)
-        return Response(TicketSerializer(tickets, many=True, context={'request': request}).data)
+        return Response(serialize_tickets(tickets, request))
 
     def post(self, request):
         form_id = request.data.get('formId')
@@ -309,64 +378,54 @@ class TicketListCreateView(APIView):
             status='pending',
             approval_state='approved',
         )
-        return Response(TicketSerializer(ticket, context={'request': request}).data, status=status.HTTP_201_CREATED)
+        return Response(serialize_ticket(ticket, request), status=status.HTTP_201_CREATED)
 
 
 class TicketDetailView(APIView):
     def get(self, request, ticket_id):
-        ticket = get_object_or_404(Ticket.objects.select_related('form', 'version').prefetch_related('attachments'), pk=ticket_id)
-        return Response(TicketSerializer(ticket, context={'request': request}).data)
+        ticket = get_object_or_404(ticket_queryset(), pk=ticket_id)
+        return Response(serialize_ticket(ticket, request))
 
     def patch(self, request, ticket_id):
-        ticket = get_object_or_404(
-            Ticket.objects.select_related('form', 'version').prefetch_related('attachments'),
-            pk=ticket_id
-        )
+        ticket = get_object_or_404(ticket_queryset(), pk=ticket_id)
         serializer = TicketUpdateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         ticket = serializer.update(ticket, serializer.validated_data)
-        
-        # Handle signature update
-        sig = request.data.get('signature')
-        if sig and sig.get('dataUrl'):
-            filename, content, mime = data_url_to_content(sig.get('dataUrl'), f"signature_{ticket.id}_{uuid.uuid4().hex}")
-            if content:
-                ticket.signature_file.save(filename, content, save=False)
-                ticket.signature_mime = mime or ''
-                ticket.signature_name = filename
-                ticket.signature_signer = sig.get('signer', ticket.signature_signer)
-                ticket.save(update_fields=['signature_file', 'signature_mime', 'signature_name', 'signature_signer'])
-        
-        # Refresh for serialization with all related data
-        ticket.refresh_from_db()
-        return Response(TicketSerializer(ticket, context={'request': request}).data)
+
+        # Handle optional signature update from the payload.
+        sig = request.data.get('signature') or {}
+        if sig.get('dataUrl'):
+            apply_signature_update(
+                ticket,
+                sig.get('dataUrl'),
+                sig.get('signer', ticket.signature_signer),
+                touch_updated_at=False,
+            )
+
+        # Re-fetch with prefetched relations for serialization.
+        ticket = ticket_queryset().get(pk=ticket_id)
+        return Response(serialize_ticket(ticket, request))
 
 
 class TicketSubmitView(APIView):
     def post(self, request, ticket_id):
-        ticket = get_object_or_404(
-            Ticket.objects.select_related('form', 'version').prefetch_related('attachments'),
-            pk=ticket_id
-        )
+        ticket = get_object_or_404(ticket_queryset(), pk=ticket_id)
         ticket.status = 'synced'
         ticket.last_error = ''
         ticket.approval_state = 'approved'
         ticket.updated_at = timezone.now()
         ticket.save(update_fields=['status', 'last_error', 'approval_state', 'updated_at'])
-        return Response(TicketSerializer(ticket, context={'request': request}).data)
+        return Response(serialize_ticket(ticket, request))
 
 
 class TicketApproveView(APIView):
     @admin_required
     def post(self, request, ticket_id):
-        ticket = get_object_or_404(
-            Ticket.objects.select_related('form', 'version').prefetch_related('attachments'),
-            pk=ticket_id
-        )
+        ticket = get_object_or_404(ticket_queryset(), pk=ticket_id)
         ticket.approval_state = 'approved'
         ticket.updated_at = timezone.now()
         ticket.save(update_fields=['approval_state', 'updated_at'])
-        return Response(TicketSerializer(ticket, context={'request': request}).data)
+        return Response(serialize_ticket(ticket, request))
 
 
 class TicketAttachmentUploadView(APIView):
@@ -383,33 +442,23 @@ class TicketAttachmentUploadView(APIView):
             name=upload.name,
             mime=upload.content_type or 'application/octet-stream'
         )
-        # Re-fetch with all related data for serialization
-        ticket = Ticket.objects.select_related('form', 'version').prefetch_related('attachments').get(pk=ticket_id)
-        return Response(TicketSerializer(ticket, context={'request': request}).data)
+        # Re-fetch with prefetched relations for serialization.
+        ticket = ticket_queryset().get(pk=ticket_id)
+        return Response(serialize_ticket(ticket, request))
 
 
 class TicketSignatureUploadView(APIView):
     parser_classes = [JSONParser]
 
     def post(self, request, ticket_id):
-        ticket = get_object_or_404(
-            Ticket.objects.select_related('form', 'version').prefetch_related('attachments'),
-            pk=ticket_id
-        )
+        ticket = get_object_or_404(ticket_queryset(), pk=ticket_id)
         data_url = request.data.get('dataUrl')
         signer = request.data.get('signer', '')
         if not data_url:
             return Response({'detail': 'dataUrl required'}, status=status.HTTP_400_BAD_REQUEST)
-        filename, content, mime = data_url_to_content(data_url, f"signature_{ticket.id}_{uuid.uuid4().hex}")
-        if not content:
+        if not apply_signature_update(ticket, data_url, signer, touch_updated_at=True):
             return Response({'detail': 'Invalid dataUrl'}, status=status.HTTP_400_BAD_REQUEST)
-        ticket.signature_file.save(filename, content, save=False)
-        ticket.signature_mime = mime or ''
-        ticket.signature_name = filename
-        ticket.signature_signer = signer
-        ticket.updated_at = timezone.now()
-        ticket.save(update_fields=['signature_file', 'signature_mime', 'signature_name', 'signature_signer', 'updated_at'])
-        return Response(TicketSerializer(ticket, context={'request': request}).data)
+        return Response(serialize_ticket(ticket, request))
 
 
 class EmployeeListCreateView(APIView):
@@ -444,12 +493,11 @@ class EmployeeDetailView(APIView):
         employee.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
+
 class AccessGroupListCreateView(APIView):
     @admin_required
     def get(self, request):
-        groups = AccessGroup.objects.prefetch_related(
-            'employees', 'excluded_employees', 'forms', 'excluded_forms'
-        ).all()
+        groups = access_group_queryset().all()
         return Response(AccessGroupSerializer(groups, many=True).data)
 
     @admin_required
@@ -464,9 +512,7 @@ class AccessGroupDetailView(APIView):
     @admin_required
     def get(self, request, group_id):
         group = get_object_or_404(
-            AccessGroup.objects.prefetch_related(
-                'employees', 'excluded_employees', 'forms', 'excluded_forms'
-            ),
+            access_group_queryset(),
             pk=group_id
         )
         return Response(AccessGroupSerializer(group).data)
