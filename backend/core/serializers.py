@@ -43,6 +43,7 @@ class FormVersionSerializer(serializers.ModelSerializer):
         if not obj.pdf:
             return None
         request: Optional[Request] = self.context.get('request')
+        # Default name/mime when stored metadata is missing.
         return {
             'name': obj.pdf_name or obj.pdf.name.rsplit('/', 1)[-1],
             'mime': obj.pdf_mime or 'application/pdf',
@@ -84,9 +85,19 @@ class TicketSerializer(serializers.ModelSerializer):
     class Meta:
         model = Ticket
         fields = [
-            'id', 'title', 'formId', 'versionId', 'assignedTo', 'assignedAt',
-            'status', 'approvalState', 'values', 'attachments', 'signature',
-            'lastError', 'updatedAt'
+            'id',
+            'title',
+            'formId',
+            'versionId',
+            'assignedTo',
+            'assignedAt',
+            'status',
+            'approvalState',
+            'values',
+            'attachments',
+            'signature',
+            'lastError',
+            'updatedAt',
         ]
 
     def get_signature(self, obj: Ticket) -> Optional[dict[str, Any]]:
@@ -125,6 +136,7 @@ class TicketUpdateSerializer(serializers.Serializer):
                 setattr(instance, model_attr, validated_data[api_key])
 
         if 'signature' in validated_data:
+            # Signature metadata is stored separately from values.
             sig = validated_data['signature'] or {}
             instance.signature_signer = sig.get('signer', '')
 
@@ -140,13 +152,50 @@ class EmployeeSerializer(serializers.ModelSerializer):
 
 
 class AccessGroupSerializer(serializers.ModelSerializer):
-    employeeIds = serializers.PrimaryKeyRelatedField(source='employees', many=True, queryset=Employee.objects.all(), required=False)
-    formIds = serializers.PrimaryKeyRelatedField(source='forms', many=True, queryset=FormTemplate.objects.all(), required=False)
-    includeAllEmployees = serializers.BooleanField(source='include_all_employees', required=False)
-    includeAllForms = serializers.BooleanField(source='include_all_forms', required=False)
-    excludedEmployeeIds = serializers.PrimaryKeyRelatedField(source='excluded_employees', many=True, queryset=Employee.objects.all(), required=False)
-    excludedFormIds = serializers.PrimaryKeyRelatedField(source='excluded_forms', many=True, queryset=FormTemplate.objects.all(), required=False)
+    # Map API-friendly fields to model relations/flags.
+    employeeIds = serializers.PrimaryKeyRelatedField(
+        source='employees',
+        many=True,
+        queryset=Employee.objects.all(),
+        required=False,
+    )
+    formIds = serializers.PrimaryKeyRelatedField(
+        source='forms',
+        many=True,
+        queryset=FormTemplate.objects.all(),
+        required=False,
+    )
+    includeAllEmployees = serializers.BooleanField(
+        source='include_all_employees',
+        required=False,
+    )
+    includeAllForms = serializers.BooleanField(
+        source='include_all_forms',
+        required=False,
+    )
+    excludedEmployeeIds = serializers.PrimaryKeyRelatedField(
+        source='excluded_employees',
+        many=True,
+        queryset=Employee.objects.all(),
+        required=False,
+    )
+    excludedFormIds = serializers.PrimaryKeyRelatedField(
+        source='excluded_forms',
+        many=True,
+        queryset=FormTemplate.objects.all(),
+        required=False,
+    )
 
     class Meta:
         model = AccessGroup
-        fields = ['id', 'name', 'description', 'includeAllEmployees', 'includeAllForms', 'employeeIds', 'formIds', 'excludedEmployeeIds', 'excludedFormIds']
+        fields = [
+            'id',
+            'name',
+            'description',
+            'includeAllEmployees',
+            'includeAllForms',
+            'employeeIds',
+            'formIds',
+            'excludedEmployeeIds',
+            'excludedFormIds',
+        ]
