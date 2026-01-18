@@ -1,45 +1,44 @@
-import os
 from django.core.management.base import BaseCommand
 from django.contrib.auth.models import User, Group
+
+from relayforms.env import env_str
 
 
 class Command(BaseCommand):
     help = 'Seed initial admin/worker users and role groups.'
 
     def handle(self, *args, **options):
+        # Ensure role groups exist before assigning users.
         admin_group, _ = Group.objects.get_or_create(name='admin')
         worker_group, _ = Group.objects.get_or_create(name='worker')
 
-        admin_email = os.getenv('ADMIN_EMAIL')
-        admin_password = os.getenv('ADMIN_PASSWORD')
-        worker_email = os.getenv('WORKER_EMAIL')
-        worker_password = os.getenv('WORKER_PASSWORD')
-
-        if admin_email and admin_password:
-            admin_user, created = User.objects.get_or_create(
-                username=admin_email,
-                defaults={'email': admin_email}
+        def seed_user(email, password, group, *, make_staff=False):
+            if not email or not password:
+                return
+            user, created = User.objects.get_or_create(
+                username=email,
+                defaults={'email': email},
             )
             if created:
-                admin_user.set_password(admin_password)
-                admin_user.is_staff = True
-                admin_user.save()
-                admin_user.groups.add(admin_group)
-                self.stdout.write(self.style.SUCCESS(f'Created admin user {admin_email}'))
-            else:
-                if not admin_user.groups.filter(name='admin').exists():
-                    admin_user.groups.add(admin_group)
+                user.set_password(password)
+                if make_staff:
+                    user.is_staff = True
+                user.save()
+                user.groups.add(group)
+                self.stdout.write(self.style.SUCCESS(f'Created {group.name} user {email}'))
+                return
+            if not user.groups.filter(name=group.name).exists():
+                user.groups.add(group)
 
-        if worker_email and worker_password:
-            worker_user, created = User.objects.get_or_create(
-                username=worker_email,
-                defaults={'email': worker_email}
-            )
-            if created:
-                worker_user.set_password(worker_password)
-                worker_user.save()
-                worker_user.groups.add(worker_group)
-                self.stdout.write(self.style.SUCCESS(f'Created worker user {worker_email}'))
-            else:
-                if not worker_user.groups.filter(name='worker').exists():
-                    worker_user.groups.add(worker_group)
+        # Seed users only when credentials are provided.
+        seed_user(
+            env_str('ADMIN_EMAIL'),
+            env_str('ADMIN_PASSWORD'),
+            admin_group,
+            make_staff=True,
+        )
+        seed_user(
+            env_str('WORKER_EMAIL'),
+            env_str('WORKER_PASSWORD'),
+            worker_group,
+        )

@@ -7,14 +7,17 @@ from django.test import TestCase
 
 
 class SeedInitialCommandTests(TestCase):
-    def test_seed_initial_creates_users_and_groups(self):
-        env = {
+    def seed_env(self):
+        # Base env payload for seeding users in tests.
+        return {
             'ADMIN_EMAIL': 'admin@example.com',
             'ADMIN_PASSWORD': 'admin-pass',
             'WORKER_EMAIL': 'worker@example.com',
             'WORKER_PASSWORD': 'worker-pass',
         }
-        with mock.patch.dict(os.environ, env, clear=False):
+
+    def test_seed_initial_creates_users_and_groups(self):
+        with mock.patch.dict(os.environ, self.seed_env(), clear=False):
             call_command('seed_initial')
 
         self.assertTrue(Group.objects.filter(name='admin').exists())
@@ -34,13 +37,7 @@ class SeedInitialCommandTests(TestCase):
     def test_seed_initial_adds_missing_groups(self):
         admin = User.objects.create_user('admin@example.com', email='admin@example.com', password='pass')
         worker = User.objects.create_user('worker@example.com', email='worker@example.com', password='pass')
-        env = {
-            'ADMIN_EMAIL': 'admin@example.com',
-            'ADMIN_PASSWORD': 'admin-pass',
-            'WORKER_EMAIL': 'worker@example.com',
-            'WORKER_PASSWORD': 'worker-pass',
-        }
-        with mock.patch.dict(os.environ, env, clear=False):
+        with mock.patch.dict(os.environ, self.seed_env(), clear=False):
             call_command('seed_initial')
         admin.refresh_from_db()
         worker.refresh_from_db()
