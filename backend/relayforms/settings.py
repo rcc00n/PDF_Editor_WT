@@ -1,17 +1,20 @@
-import os
-from pathlib import Path
 from datetime import timedelta
+from pathlib import Path
+
 import dj_database_url
+
+from relayforms.env import env_bool, env_list, env_str
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'insecure-change-me')
-DEBUG = os.getenv('DJANGO_DEBUG', '').lower() in {'1', 'true', 'yes'}
+SECRET_KEY = env_str('DJANGO_SECRET_KEY', 'insecure-change-me')
+DEBUG = env_bool('DJANGO_DEBUG')
 
-allowed_hosts = [h.strip() for h in os.getenv('DJANGO_ALLOWED_HOSTS', '').split(',') if h.strip()]
+
+allowed_hosts = env_list('DJANGO_ALLOWED_HOSTS')
 ALLOWED_HOSTS = allowed_hosts or (['*'] if DEBUG else [])
 
-DATA_DIR = Path(os.getenv('DATA_DIR', '/app/data'))
+DATA_DIR = Path(env_str('DATA_DIR', '/app/data'))
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 INSTALLED_APPS = [
@@ -57,7 +60,7 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'relayforms.wsgi.application'
 
-DATABASE_URL = os.getenv('DATABASE_URL')
+DATABASE_URL = env_str('DATABASE_URL')
 if not DATABASE_URL:
     DATABASE_URL = f"sqlite:///{DATA_DIR / 'db.sqlite3'}"
 
@@ -84,8 +87,8 @@ STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-CORS_ALLOWED_ORIGINS = [o.strip() for o in os.getenv('CORS_ALLOWED_ORIGINS', '').split(',') if o.strip()]
-CSRF_TRUSTED_ORIGINS = [o.strip() for o in os.getenv('CSRF_TRUSTED_ORIGINS', '').split(',') if o.strip()]
+CORS_ALLOWED_ORIGINS = env_list('CORS_ALLOWED_ORIGINS')
+CSRF_TRUSTED_ORIGINS = env_list('CSRF_TRUSTED_ORIGINS')
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
