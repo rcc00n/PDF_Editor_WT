@@ -28,6 +28,7 @@ def group_uid() -> str:
 
 
 def next_ticket_id() -> str:
+    # Ticket IDs look like "FT-0001"; parse the numeric suffix.
     result = Ticket.objects.annotate(
         num=Cast(Substr('id', 4), models.IntegerField())
     ).aggregate(max_num=Max('num'))
