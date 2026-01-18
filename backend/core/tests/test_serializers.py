@@ -77,3 +77,60 @@ class SerializerTests(TestCase):
         )
         serializer = AttachmentSerializer(attachment, context={'request': self.factory.get('/api/tickets/')})
         self.assertTrue(serializer.data['url'].startswith('http://testserver/media/'))
+
+    def test_ticket_serializer_signature(self):
+        serializer = TicketSerializer(self.ticket, context={'request': self.factory.get('/api/tickets/')})
+        self.assertIsNone(serializer.data['signature'])
+        self.ticket.signature_signer = 'Alex'
+        self.ticket.save(update_fields=['signature_signer'])
+        serializer = TicketSerializer(self.ticket, context={'request': self.factory.get('/api/tickets/')})
+        self.assertEqual(serializer.data['signature']['signer'], 'Alex')
+        self.assertIsNone(serializer.data['signature']['url'])
+
+    def test_ticket_update_serializer_updates_fields(self):
+        before = timezone.now()
+        serializer = TicketUpdateSerializer(data={
+            'title': 'Updated',
+            'assignedTo': 'New Tech',
+            'status': 'in_progress',
+            'approvalState': 'approved',
+            'values': {'step': 1},
+            'signature': {'signer': 'Jordan'}
+        })
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        ticket = serializer.update(self.ticket, serializer.validated_data)
+        ticket.refresh_from_db()
+        self.assertEqual(ticket.title, 'Updated')
+        self.assertEqual(ticket.assigned_to, 'New Tech')
+        self.assertEqual(ticket.status, 'in_progress')
+        self.assertEqual(ticket.approval_state, 'approved')
+        self.assertEqual(ticket.values, {'step': 1})
+        self.assertEqual(ticket.signature_signer, 'Jordan')
+        self.assertGreaterEqual(ticket.updated_at, before)
+
+    def test_ticket_update_serializer_rejects_invalid_status(self):
+        serializer = TicketUpdateSerializer(data={'status': 'not-real'})
+        self.assertFalse(serializer.is_valid())
+        self.assertIn('status', serializer.errors)
+
+    def test_access_group_serializer_maps_fields(self):
+        employee = Employee.objects.create(name='Avery', email='avery@example.com')
+        form = FormTemplate.objects.create(name='Safety', subtitle='')
+        data = {
+            'name': 'Group',
+            'description': 'Desc',
+            'includeAllEmployees': False,
+            'includeAllForms': False,
+            'employeeIds': [employee.id],
+            'formIds': [form.id],
+            'excludedEmployeeIds': [],
+            'excludedFormIds': [],
+        }
+        serializer = AccessGroupSerializer(data=data)
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        group = serializer.save()
+        self.assertEqual(group.name, 'Group')
+        self.assertFalse(group.include_all_employees)
+        self.assertFalse(group.include_all_forms)
+        self.assertEqual(list(group.employees.all()), [employee])
+        self.assertEqual(list(group.forms.all()), [form])
