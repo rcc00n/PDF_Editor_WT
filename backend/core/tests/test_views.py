@@ -270,3 +270,236 @@ class FormEndpointsTests(BaseAPITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         version.refresh_from_db()
         self.assertEqual(version.fields, [])
+
+
+class TicketEndpointsTests(BaseAPITestCase):
+    def test_ticket_list_admin(self):
+        ticket_a = self.create_ticket(title='A')
+        ticket_b = self.create_ticket(title='B')
+        response = self.admin_client.get('/api/tickets/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        ids = [ticket['id'] for ticket in response.data]
+        self.assertCountEqual(ids, [ticket_a.id, ticket_b.id])
+
+    def test_ticket_list_worker_filters_without_employee(self):
+        self.create_ticket(title='A')
+        response = self.worker_client.get('/api/tickets/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data, [])
+
+    def test_ticket_list_worker_with_access(self):
+        employee = Employee.objects.create(name='Worker', email='worker@example.com')
+        allowed_form, allowed_version = self.create_form_with_version(name='Allowed')
+        denied_form, denied_version = self.create_form_with_version(name='Denied')
+        self.create_ticket(form=allowed_form, version=allowed_version, title='Allowed ticket')
+        self.create_ticket(form=denied_form, version=denied_version, title='Denied ticket')
+        self.create_access_group(
+            name='Allowed',
+            employees=[employee],
+            forms=[allowed_form],
+            excluded_employees=[employee],
+        )
+        response = self.worker_client.get('/api/tickets/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        ids = [ticket['formId'] for ticket in response.data]
+        self.assertEqual(ids, [allowed_form.id])
+
+    def test_ticket_list_worker_with_no_allowed_forms(self):
+        employee = Employee.objects.create(name='Worker', email='worker@example.com')
+        form, version = self.create_form_with_version(name='Form A')
+        self.create_ticket(form=form, version=version, title='Ticket')
+        self.create_access_group(
+            name='Excluded',
+            include_all_employees=True,
+            include_all_forms=True,
+            excluded_forms=[form],
+        )
+        response = self.worker_client.get('/api/tickets/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data, [])
+
+    def test_ticket_create_validation_and_permissions(self):
+        form, version = self.create_form_with_version()
+        response = self.worker_client.post('/api/tickets/', {'title': 'No IDs'}, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+        response = self.worker_client.post(
+            '/api/tickets/',
+            {'formId': form.id, 'versionId': version.id},
+            format='json'
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+        Employee.objects.create(name='Worker', email='worker@example.com')
+        response = self.worker_client.post(
+            '/api/tickets/',
+            {'formId': form.id, 'versionId': version.id},
+            format='json'
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+        self.create_access_group(
+            name='Allowed',
+            employees=list(Employee.objects.filter(email='worker@example.com')),
+            forms=[form],
+        )
+        response = self.worker_client.post(
+            '/api/tickets/',
+            {'formId': form.id, 'versionId': version.id, 'title': 'Ticket', 'assignedTo': 'Tech'},
+            format='json'
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data['status'], 'pending')
+        self.assertEqual(response.data['approvalState'], 'approved')
+
+    def test_ticket_detail_and_update(self):
+        ticket = self.create_ticket()
+        response = self.admin_client.get(f'/api/tickets/{ticket.id}/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        response = self.admin_client.patch(
+            f'/api/tickets/{ticket.id}/',
+            {'status': 'bad-status'},
+            format='json'
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+        payload = {
+            'title': 'Updated',
+            'assignedTo': 'Lead',
+            'status': 'in_progress',
+            'approvalState': 'approved',
+            'values': {'done': True},
+            'signature': {
+                'signer': 'Casey',
+                'dataUrl': f"data:text/plain;base64,{base64.b64encode(b'hi').decode('ascii')}"
+            },
+        }
+        response = self.admin_client.patch(f'/api/tickets/{ticket.id}/', payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        ticket.refresh_from_db()
+        self.assertEqual(ticket.title, 'Updated')
+        self.assertEqual(ticket.signature_signer, 'Casey')
+        self.assertTrue(ticket.signature_file.name)
+
+    def test_ticket_submit_and_approve(self):
+        ticket = self.create_ticket()
+        response = self.admin_client.post(f'/api/tickets/{ticket.id}/submit/', format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        ticket.refresh_from_db()
+        self.assertEqual(ticket.status, 'synced')
+        self.assertEqual(ticket.approval_state, 'approved')
+        response = self.worker_client.post(f'/api/tickets/{ticket.id}/approve/', format='json')
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        response = self.admin_client.post(f'/api/tickets/{ticket.id}/approve/', format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_ticket_attachment_upload(self):
+        ticket = self.create_ticket()
+        response = self.admin_client.post(f'/api/tickets/{ticket.id}/attachments/', format='multipart')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        upload = SimpleUploadedFile('photo.jpg', b'jpg', content_type='image/jpeg')
+        response = self.admin_client.post(
+            f'/api/tickets/{ticket.id}/attachments/',
+            {'file': upload},
+            format='multipart'
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data['attachments']), 1)
+
+    def test_ticket_signature_upload(self):
+        ticket = self.create_ticket()
+        response = self.admin_client.post(f'/api/tickets/{ticket.id}/signature/', {}, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        data_url = f"data:text/plain;base64,{base64.b64encode(b'hi').decode('ascii')}"
+        response = self.admin_client.post(
+            f'/api/tickets/{ticket.id}/signature/',
+            {'dataUrl': data_url, 'signer': 'Drew'},
+            format='json'
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        ticket.refresh_from_db()
+        self.assertEqual(ticket.signature_signer, 'Drew')
+
+    def test_ticket_signature_upload_invalid_data(self):
+        ticket = self.create_ticket()
+        with mock.patch('core.views.data_url_to_content', return_value=('bad.txt', None, None)):
+            response = self.admin_client.post(
+                f'/api/tickets/{ticket.id}/signature/',
+                {'dataUrl': 'bad'},
+                format='json'
+            )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+
+class EmployeeEndpointsTests(BaseAPITestCase):
+    def test_employee_list_and_create(self):
+        Employee.objects.create(name='One', email='one@example.com')
+        response = self.admin_client.get('/api/employees/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 1)
+
+        response = self.worker_client.post('/api/employees/', {'name': 'Two'}, format='json')
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+        response = self.admin_client.post(
+            '/api/employees/',
+            {'name': 'Two', 'email': 'two@example.com', 'role': 'Tech', 'phone': '123'},
+            format='json'
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data['name'], 'Two')
+
+    def test_employee_detail_patch_delete(self):
+        employee = Employee.objects.create(name='Three', email='three@example.com')
+        response = self.admin_client.get(f'/api/employees/{employee.id}/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        response = self.admin_client.patch(
+            f'/api/employees/{employee.id}/',
+            {'role': 'Supervisor'},
+            format='json'
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        employee.refresh_from_db()
+        self.assertEqual(employee.role, 'Supervisor')
+
+        response = self.admin_client.delete(f'/api/employees/{employee.id}/')
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertFalse(Employee.objects.filter(id=employee.id).exists())
+
+
+class AccessGroupEndpointsTests(BaseAPITestCase):
+    def test_group_list_create_and_detail(self):
+        response = self.worker_client.get('/api/groups/')
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+        employee = Employee.objects.create(name='One', email='one@example.com')
+        form, _ = self.create_form_with_version()
+        payload = {
+            'name': 'Group',
+            'description': 'Desc',
+            'employeeIds': [employee.id],
+            'formIds': [form.id],
+        }
+        response = self.admin_client.post('/api/groups/', payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        group_id = response.data['id']
+
+        response = self.admin_client.get('/api/groups/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 1)
+
+        response = self.admin_client.get(f'/api/groups/{group_id}/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['name'], 'Group')
+
+        response = self.admin_client.patch(
+            f'/api/groups/{group_id}/',
+            {'description': 'Updated'},
+            format='json'
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        response = self.admin_client.delete(f'/api/groups/{group_id}/')
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
