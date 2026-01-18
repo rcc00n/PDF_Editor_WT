@@ -63,6 +63,13 @@ class ViewUtilityTests(TestCase):
         self.assertTrue(filename.startswith('plain'))
         self.assertEqual(content.read(), b'hi')
 
+    def test_data_url_to_content_invalid_base64(self):
+        data_url = "data:text/plain;base64,@@@"
+        filename, content, mime = data_url_to_content(data_url, 'bad')
+        self.assertEqual(mime, 'text/plain')
+        self.assertTrue(filename.startswith('bad'))
+        self.assertIsNone(content)
+
     def test_employee_for_user(self):
         self.assertIsNone(employee_for_user(None))
         self.assertIsNone(employee_for_user(AnonymousUser()))
@@ -85,6 +92,12 @@ class ViewUtilityTests(TestCase):
         group.excluded_employees.add(self.other_employee)
         self.assertTrue(group_includes_employee(group, self.employee.id, prefetched=False))
         self.assertFalse(group_includes_employee(group, self.other_employee.id, prefetched=False))
+
+    def test_group_includes_employee_with_prefetched_exclusions(self):
+        group = AccessGroup.objects.create(name='Group', description='', include_all_employees=True)
+        group.excluded_employees.add(self.other_employee)
+        self.assertTrue(group_includes_employee(group, self.employee.id, prefetched=True))
+        self.assertFalse(group_includes_employee(group, self.other_employee.id, prefetched=True))
 
     def test_group_allowed_form_ids_with_includes(self):
         group = AccessGroup.objects.create(name='Group', description='', include_all_forms=False)
@@ -111,6 +124,15 @@ class ViewUtilityTests(TestCase):
         allowed = allowed_form_ids_for_employee(self.employee)
         self.assertEqual(allowed, {self.form_a.id})
 
+    def test_allowed_form_ids_for_employee_multiple_groups(self):
+        group_a = AccessGroup.objects.create(name='Group A', description='', include_all_employees=True, include_all_forms=False)
+        group_a.forms.add(self.form_a)
+        group_b = AccessGroup.objects.create(name='Group B', description='', include_all_employees=False, include_all_forms=False)
+        group_b.employees.add(self.employee)
+        group_b.forms.add(self.form_b)
+        allowed = allowed_form_ids_for_employee(self.employee)
+        self.assertEqual(allowed, {self.form_a.id, self.form_b.id})
+
     def test_allowed_form_ids_for_employee_no_forms(self):
         FormTemplate.objects.all().delete()
         allowed = allowed_form_ids_for_employee(self.employee)
@@ -121,3 +143,6 @@ class ViewUtilityTests(TestCase):
         group.excluded_forms.add(self.form_b)
         self.assertTrue(employee_has_form_access(self.employee, self.form_a))
         self.assertFalse(employee_has_form_access(self.employee, self.form_b))
+
+    def test_employee_has_form_access_without_groups(self):
+        self.assertFalse(employee_has_form_access(self.employee, self.form_a))

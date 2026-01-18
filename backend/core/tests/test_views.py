@@ -431,6 +431,15 @@ class TicketEndpointsTests(BaseAPITestCase):
             )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
+    def test_ticket_signature_upload_invalid_base64(self):
+        ticket = self.create_ticket()
+        response = self.admin_client.post(
+            f'/api/tickets/{ticket.id}/signature/',
+            {'dataUrl': 'data:text/plain;base64,@@@'},
+            format='json'
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
 
 class EmployeeEndpointsTests(BaseAPITestCase):
     def test_employee_list_and_create(self):
