@@ -3,7 +3,7 @@ import Button from '@/shared/ui/Button'
 import Input from '@/shared/ui/Input'
 import { Card, CardBody } from '@/shared/ui/Card'
 import { useAppStore } from '@/shared/state/useAppStore'
-import { Sparkles } from 'lucide-react'
+import Logo from '@/shared/ui/Logo'
 
 export default function LoginPage() {
   const login = useAppStore(s => s.login)
@@ -22,10 +22,8 @@ export default function LoginPage() {
 
       <div className="relative z-10 mx-auto flex min-h-screen w-full max-w-md flex-col items-center justify-center gap-8 py-14">
         <div className="flex flex-col items-center gap-4">
-          <div className="h-14 w-14 rounded-2xl border border-orange-200 overflow-hidden">
-            <div className="h-full w-full bg-gradient-to-br from-orange-400 via-orange-500 to-amber-500 text-white flex items-center justify-center">
-              <Sparkles size={22} />
-            </div>
+          <div className="h-16 w-24 rounded-full border border-orange-200 bg-white flex items-center justify-center overflow-hidden">
+            <Logo className="h-14 w-auto" />
           </div>
           <div className="text-sm font-semibold">Wolsey Tech Tracking System</div>
         </div>

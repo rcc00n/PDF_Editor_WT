@@ -23,6 +23,11 @@ export type Toast = {
   createdAt: string
 }
 
+export type OfflineFormMeta = {
+  versionId: Id
+  downloadedAt: string
+}
+
 const memoryStorage = new Map<string, string>()
 
 const safeStorage = {
@@ -120,6 +125,7 @@ type State = {
   activities: Activity[]
   employees: Employee[]
   groups: AccessGroup[]
+  offlineForms: Record<Id, OfflineFormMeta>
   lastSyncSuccess?: string
 
   toasts: Toast[]
@@ -137,6 +143,8 @@ type State = {
   uploadPdf: (formId: Id, versionId: Id, file: File) => Promise<void>
   publishVersion: (formId: Id, versionId: Id) => Promise<void>
   archiveForm: (formId: Id) => Promise<void>
+  downloadFormForOffline: (formId: Id) => Promise<void>
+  removeOfflineForm: (formId: Id) => void
 
   // Builder fields
   upsertField: (formId: Id, versionId: Id, field: FormVersion['fields'][number]) => Promise<void>
@@ -241,6 +249,7 @@ export const useAppStore = create<State>()(
           activities: [],
           employees: [],
           groups: [],
+          offlineForms: {},
           lastSyncSuccess: undefined
         })
       },
@@ -258,16 +267,19 @@ export const useAppStore = create<State>()(
           groups = []
         }
         const canvasByVersion = new Map<string, FormVersion['canvas']>()
+        const pdfDataByVersion = new Map<string, string>()
         for (const f of get().forms) {
           for (const v of f.versions) {
             if (v.canvas) canvasByVersion.set(v.id, v.canvas)
+            if (v.pdf?.dataUrl) pdfDataByVersion.set(v.id, v.pdf.dataUrl)
           }
         }
         const mergedForms = forms.map((f: FormTemplate) => ({
           ...f,
           versions: f.versions.map((v) => ({
             ...v,
-            canvas: canvasByVersion.get(v.id)
+            canvas: canvasByVersion.get(v.id),
+            pdf: v.pdf ? { ...v.pdf, dataUrl: pdfDataByVersion.get(v.id) ?? v.pdf.dataUrl } : v.pdf
           }))
         }))
         set({ forms: mergedForms, tickets, employees, groups, queue: [], activities: [], lastSyncSuccess: undefined })
@@ -298,6 +310,7 @@ export const useAppStore = create<State>()(
       activities: [],
       employees: [],
       groups: [],
+      offlineForms: {},
       lastSyncSuccess: undefined,
 
       toasts: [],
@@ -479,6 +492,82 @@ export const useAppStore = create<State>()(
         get().addActivity('Form archived', formId)
       },
 
+      downloadFormForOffline: async (formId) => {
+        const form = get().forms.find((f) => f.id === formId)
+        if (!form) throw new Error('Form not found')
+        const version = form.versions.find((v) => v.status === 'active') ?? form.versions[0]
+        if (!version) throw new Error('No version available')
+
+        const needsPdfFetch = Boolean(version.pdf?.url && !version.pdf?.dataUrl)
+        if (needsPdfFetch && !get().online) {
+          throw new Error('Connect to the internet to download this PDF')
+        }
+
+        let pdfDataUrl = version.pdf?.dataUrl
+        if (needsPdfFetch && version.pdf?.url) {
+          const token = getStoredAccessToken()
+          const headers = token ? { Authorization: `Bearer ${token}` } : undefined
+          const res = await fetch(version.pdf.url, { headers })
+          if (!res.ok) throw new Error('Unable to download PDF')
+          const blob = await res.blob()
+          pdfDataUrl = await blobToDataUrl(blob)
+        }
+
+        set((s) => ({
+          forms: s.forms.map((f) => {
+            if (f.id !== formId) return f
+            return {
+              ...f,
+              versions: f.versions.map((v) => {
+                if (v.id !== version.id) return v
+                if (!v.pdf) return v
+                return { ...v, pdf: { ...v.pdf, dataUrl: pdfDataUrl ?? v.pdf.dataUrl } }
+              })
+            }
+          }),
+          offlineForms: {
+            ...s.offlineForms,
+            [formId]: { versionId: version.id, downloadedAt: nowIso() }
+          }
+        }))
+
+        const hasPdf = Boolean(version.pdf?.url || version.pdf?.dataUrl)
+        get().pushToast({
+          title: 'Offline download ready',
+          message: hasPdf ? `${form.name} saved on this device.` : `${form.name} saved (no PDF attached).`,
+          variant: hasPdf ? 'success' : 'warning'
+        })
+      },
+
+      removeOfflineForm: (formId) => {
+        const form = get().forms.find((f) => f.id === formId)
+        const meta = get().offlineForms[formId]
+        set((s) => {
+          const { [formId]: _, ...rest } = s.offlineForms
+          const forms = meta
+            ? s.forms.map((f) => {
+                if (f.id !== formId) return f
+                return {
+                  ...f,
+                  versions: f.versions.map((v) => {
+                    if (v.id !== meta.versionId) return v
+                    if (!v.pdf?.dataUrl) return v
+                    return { ...v, pdf: { ...v.pdf, dataUrl: undefined } }
+                  })
+                }
+              })
+            : s.forms
+          return { offlineForms: rest, forms }
+        })
+        if (form) {
+          get().pushToast({
+            title: 'Offline copy removed',
+            message: `${form.name} removed from this device.`,
+            variant: 'warning'
+          })
+        }
+      },
+
       upsertField: async (formId, versionId, field) => {
         if (API_ENABLED) {
           const form = await apiJson(`/forms/${formId}/versions/${versionId}/fields/`, {
@@ -529,7 +618,8 @@ export const useAppStore = create<State>()(
       },
 
       createTicket: async (formId, versionId, title, assignedTo) => {
-        if (API_ENABLED) {
+        const online = get().online
+        if (API_ENABLED && online) {
           const ticket = await apiJson('/tickets/', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -543,6 +633,8 @@ export const useAppStore = create<State>()(
         const id = nextTicketId(get().tickets)
         const t: Ticket = {
           id,
+          serverId: undefined,
+          localOnly: API_ENABLED && !online,
           title,
           formId,
           versionId,
@@ -569,16 +661,34 @@ export const useAppStore = create<State>()(
       },
 
       saveDraft: async (ticketId) => {
+        const online = get().online
         get().updateTicket(ticketId, { status: 'queued' })
-        if (API_ENABLED && get().online) {
+        if (API_ENABLED && online) {
           const t = get().tickets.find((x) => x.id === ticketId)
           if (t) {
-            const updated = await apiJson(`/tickets/${ticketId}/`, {
+            let remoteId = t.serverId ?? t.id
+            if (t.localOnly && !t.serverId) {
+              const created = await apiJson('/tickets/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  formId: t.formId,
+                  versionId: t.versionId,
+                  title: t.title,
+                  assignedTo: t.assignedTo
+                })
+              })
+              remoteId = created.id
+              get().updateTicket(t.id, { serverId: created.id, localOnly: false })
+            }
+
+            const updated = await apiJson(`/tickets/${remoteId}/`, {
               method: 'PATCH',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ values: t.values, signature: t.signature, status: 'queued' })
             })
-            set((s) => ({ tickets: upsertById(s.tickets, updated) }))
+            const { id: serverId, ...rest } = updated
+            get().updateTicket(t.id, { ...rest, serverId })
           }
         }
         get().pushToast({ title: 'Draft saved', message: 'Saved locally on this device', variant: 'success' })
@@ -608,8 +718,15 @@ export const useAppStore = create<State>()(
 
       approveTicket: async (ticketId) => {
         if (API_ENABLED) {
-          const updated = await apiJson(`/tickets/${ticketId}/approve/`, { method: 'POST' })
-          set((s) => ({ tickets: upsertById(s.tickets, updated) }))
+          const local = get().tickets.find((t) => t.id === ticketId)
+          const remoteId = local?.serverId ?? ticketId
+          const updated = await apiJson(`/tickets/${remoteId}/approve/`, { method: 'POST' })
+          if (local) {
+            const { id: serverId, ...rest } = updated
+            get().updateTicket(local.id, { ...rest, serverId })
+          } else {
+            set((s) => ({ tickets: upsertById(s.tickets, updated) }))
+          }
           get().addActivity('Approved & Archived', ticketId)
           get().pushToast({ title: 'Approved', message: `${ticketId} archived`, variant: 'success' })
           return
@@ -621,22 +738,36 @@ export const useAppStore = create<State>()(
 
       uploadAttachment: async (ticketId, file) => {
         if (!API_ENABLED) return
+        const local = get().tickets.find((t) => t.id === ticketId)
+        const remoteId = local?.serverId ?? ticketId
         const formData = new FormData()
         formData.append('file', file)
-        const res = await apiFetch(`/tickets/${ticketId}/attachments/`, { method: 'POST', body: formData })
+        const res = await apiFetch(`/tickets/${remoteId}/attachments/`, { method: 'POST', body: formData })
         if (!res.ok) throw new Error('Attachment upload failed')
         const updated = await res.json()
-        set((s) => ({ tickets: upsertById(s.tickets, updated) }))
+        if (local) {
+          const { id: serverId, ...rest } = updated
+          get().updateTicket(local.id, { ...rest, serverId })
+        } else {
+          set((s) => ({ tickets: upsertById(s.tickets, updated) }))
+        }
       },
 
       uploadSignature: async (ticketId, dataUrl, signer) => {
         if (!API_ENABLED) return
-        const updated = await apiJson(`/tickets/${ticketId}/signature/`, {
+        const local = get().tickets.find((t) => t.id === ticketId)
+        const remoteId = local?.serverId ?? ticketId
+        const updated = await apiJson(`/tickets/${remoteId}/signature/`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ dataUrl, signer })
         })
-        set((s) => ({ tickets: upsertById(s.tickets, updated) }))
+        if (local) {
+          const { id: serverId, ...rest } = updated
+          get().updateTicket(local.id, { ...rest, serverId })
+        } else {
+          set((s) => ({ tickets: upsertById(s.tickets, updated) }))
+        }
       },
 
       retryFailed: () => {
@@ -800,6 +931,7 @@ export const useAppStore = create<State>()(
         activities: s.activities,
         employees: s.employees,
         groups: s.groups,
+        offlineForms: s.offlineForms,
         lastSyncSuccess: s.lastSyncSuccess
       })
     }
@@ -812,4 +944,13 @@ function bumpVersion(v: string) {
   const major = clamp(parseInt(m[1], 10), 0, 99)
   const minor = clamp(parseInt(m[2], 10), 0, 99)
   return `v${major}.${minor + 1}`
+}
+
+function blobToDataUrl(blob: Blob) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(String(reader.result || ''))
+    reader.onerror = () => reject(new Error('Unable to read file data'))
+    reader.readAsDataURL(blob)
+  })
 }

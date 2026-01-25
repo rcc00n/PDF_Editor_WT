@@ -11,7 +11,7 @@ import {
 import Badge from "@/shared/ui/Badge";
 import { useAppStore } from "@/shared/state/useAppStore";
 import { dateTimeShort } from "@/shared/lib/format";
-import { Plus } from "lucide-react";
+import { FileDown, Plus } from "lucide-react";
 import Modal from "@/shared/ui/Modal";
 import Input from "@/shared/ui/Input";
 import Select from "@/shared/ui/Select";
@@ -49,6 +49,10 @@ export default function FieldHomePage() {
   const role = useAppStore((s) => s.role);
   const createTicket = useAppStore((s) => s.createTicket);
   const pushToast = useAppStore((s) => s.pushToast);
+  const offlineForms = useAppStore((s) => s.offlineForms);
+  const downloadFormForOffline = useAppStore((s) => s.downloadFormForOffline);
+  const removeOfflineForm = useAppStore((s) => s.removeOfflineForm);
+  const online = useAppStore((s) => s.online);
 
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("Pending Forms");
@@ -58,6 +62,9 @@ export default function FieldHomePage() {
   const [toDate, setToDate] = useState("");
   const [rigQuery, setRigQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<TicketStatus | "all">("all");
+  const [downloadingFormId, setDownloadingFormId] = useState<string | null>(
+    null
+  );
 
   const activeEmployees = useMemo(
     () => employees.filter((e) => e.active),
@@ -163,6 +170,33 @@ export default function FieldHomePage() {
     }
   }, [activeVersions, createTicket, formId, title, assignedTo, nav, pushToast]);
 
+  const handleDownloadOffline = useCallback(
+    async (formId: string) => {
+      setDownloadingFormId(formId);
+      try {
+        await downloadFormForOffline(formId);
+      } catch (err: unknown) {
+        const message =
+          err instanceof Error ? err.message : "Unable to download form";
+        pushToast({
+          title: "Offline download failed",
+          message,
+          variant: "danger",
+        });
+      } finally {
+        setDownloadingFormId(null);
+      }
+    },
+    [downloadFormForOffline, pushToast]
+  );
+
+  const handleRemoveOffline = useCallback(
+    (formId: string) => {
+      removeOfflineForm(formId);
+    },
+    [removeOfflineForm]
+  );
+
   return (
     <div className="pb-10">
       <SectionHeader
@@ -182,6 +216,104 @@ export default function FieldHomePage() {
       />
 
       <div className="px-4 mt-4 sm:px-6 sm:mt-6 grid grid-cols-1 gap-4">
+        <Card>
+          <CardHeader>
+            <CardTitle>Offline forms</CardTitle>
+            <CardSub>
+              Download templates so you can fill them out offline.
+            </CardSub>
+          </CardHeader>
+          <CardBody>
+            <div className="space-y-3">
+              {availableForms.map((f) => {
+                const version =
+                  f.versions.find((v) => v.status === "active") ??
+                  f.versions[0];
+                const meta = offlineForms[f.id];
+                const isCurrent = Boolean(
+                  meta && version && meta.versionId === version.id
+                );
+                const isStale = Boolean(
+                  meta && version && meta.versionId !== version.id
+                );
+                const statusTone = isCurrent
+                  ? "success"
+                  : isStale
+                  ? "warning"
+                  : "neutral";
+                const statusLabel = isCurrent
+                  ? "Offline ready"
+                  : isStale
+                  ? "Update ready"
+                  : "Not downloaded";
+                const needsOnline = Boolean(
+                  version?.pdf?.url && !version.pdf?.dataUrl
+                );
+                const isBusy = downloadingFormId === f.id;
+                const downloadLabel = isBusy
+                  ? "Downloading..."
+                  : isCurrent
+                  ? "Re-download"
+                  : isStale
+                  ? "Update"
+                  : "Download";
+                const downloadDisabled =
+                  !version || isBusy || (needsOnline && !online);
+
+                return (
+                  <div
+                    key={f.id}
+                    className="flex flex-col gap-3 rounded-2xl border border-neutral-200 dark:border-neutral-800 p-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="min-w-0">
+                      <div className="font-medium truncate">{f.name}</div>
+                      <div className="text-xs text-neutral-500 dark:text-neutral-400">
+                        {version
+                          ? `${version.version} · ${version.status}`
+                          : "No version available"}
+                        {meta?.downloadedAt
+                          ? ` · Saved ${dateTimeShort(meta.downloadedAt)}`
+                          : ""}
+                      </div>
+                      {needsOnline && !online && (
+                        <div className="mt-1 text-xs text-orange-600">
+                          Connect to download the PDF.
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge tone={statusTone}>{statusLabel}</Badge>
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        disabled={downloadDisabled}
+                        onClick={() => handleDownloadOffline(f.id)}>
+                        <FileDown size={14} /> {downloadLabel}
+                      </Button>
+                      {meta && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleRemoveOffline(f.id)}>
+                          Remove
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+              {availableForms.length === 0 && (
+                <div className="py-6 text-center text-sm text-neutral-500 dark:text-neutral-400">
+                  No forms assigned to your group yet.
+                </div>
+              )}
+            </div>
+            <div className="mt-3 text-xs text-neutral-500 dark:text-neutral-400">
+              Downloaded forms stay on this device for offline work and sync
+              later.
+            </div>
+          </CardBody>
+        </Card>
+
         <Card>
           <CardHeader>
             <CardTitle>Daily Field Tickets</CardTitle>

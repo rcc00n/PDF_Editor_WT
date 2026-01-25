@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { cn } from '@/shared/ui/cn'
+import * as pdfjs from 'pdfjs-dist'
+import PdfWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?worker&inline'
 
 // pdfjs-dist is heavy; keep it isolated
 type Props = {
@@ -44,12 +46,7 @@ export default function PdfPageCanvas({ dataUrl, page, className, onMeta, refres
       if (!canvas || !wrap || !dataUrl || !wrapWidth) return
 
       try {
-        const pdfjs = await import('pdfjs-dist')
-        // Worker setup for Vite
-        // @ts-ignore
-        const workerSrc = (await import('pdfjs-dist/build/pdf.worker.min.mjs?url')).default
-        // @ts-ignore
-        pdfjs.GlobalWorkerOptions.workerSrc = workerSrc
+        ensurePdfWorker()
 
         const loadingTask = isData
           ? pdfjs.getDocument({ data: bytes })
@@ -99,6 +96,14 @@ export default function PdfPageCanvas({ dataUrl, page, className, onMeta, refres
       )}
     </div>
   )
+}
+
+let cachedWorker: Worker | null = null
+
+function ensurePdfWorker() {
+  if (cachedWorker) return
+  cachedWorker = new PdfWorker()
+  pdfjs.GlobalWorkerOptions.workerPort = cachedWorker
 }
 
 function dataUrlToBytes(dataUrl: string) {
