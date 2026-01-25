@@ -6,7 +6,7 @@ export function Card({ className, children }: PropsWithChildren<{ className?: st
   return (
     <div
       className={cn(
-        'rf-card border border-neutral-200 bg-white/80 backdrop-blur dark:border-neutral-800 dark:bg-neutral-950/60',
+        'rf-card border border-orange-100 bg-white',
         className
       )}
     >
@@ -16,13 +16,13 @@ export function Card({ className, children }: PropsWithChildren<{ className?: st
 }
 
 export function CardHeader({ className, children }: PropsWithChildren<{ className?: string }>) {
-  return <div className={cn('px-4 pt-4', className)}>{children}</div>
+  return <div className={cn('px-5 pt-5 sm:px-6 sm:pt-6', className)}>{children}</div>
 }
 
 export const CardBody = forwardRef<HTMLDivElement, PropsWithChildren<{ className?: string }>>(
   ({ className, children }, ref) => {
     return (
-      <div ref={ref} className={cn('px-4 pb-4', className)}>
+      <div ref={ref} className={cn('px-5 pb-5 sm:px-6 sm:pb-6', className)}>
         {children}
       </div>
     )
@@ -36,5 +36,5 @@ export function CardTitle({ className, children }: PropsWithChildren<{ className
 }
 
 export function CardSub({ className, children }: PropsWithChildren<{ className?: string }>) {
-  return <div className={cn('text-sm text-neutral-500 dark:text-neutral-400', className)}>{children}</div>
+  return <div className={cn('text-sm text-neutral-500', className)}>{children}</div>
 }

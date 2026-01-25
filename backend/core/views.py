@@ -1,6 +1,7 @@
 import base64
 import mimetypes
 import uuid
+from functools import wraps
 from django.utils import timezone
 from django.core.files.base import ContentFile
 from django.shortcuts import get_object_or_404
@@ -12,6 +13,16 @@ from rest_framework.parsers import JSONParser, MultiPartParser, FormParser
 from .models import FormTemplate, FormVersion, Ticket, Attachment, Employee, AccessGroup, uid
 from .serializers import FormTemplateSerializer, TicketSerializer, TicketUpdateSerializer, EmployeeSerializer, AccessGroupSerializer
 from .permissions import is_admin
+
+
+def admin_required(view_method):
+    """Decorator to enforce admin-only access on view methods."""
+    @wraps(view_method)
+    def wrapper(self, request, *args, **kwargs):
+        if not is_admin(request.user):
+            return Response({'detail': 'Admin only'}, status=status.HTTP_403_FORBIDDEN)
+        return view_method(self, request, *args, **kwargs)
+    return wrapper
 
 
 def bump_version(current: str) -> str:
@@ -56,18 +67,29 @@ def employee_for_user(user):
     return Employee.objects.filter(email__iexact=email).first()
 
 
-def group_includes_employee(group, employee_id: str) -> bool:
+def group_includes_employee(group, employee_id: str, prefetched: bool = False) -> bool:
     if group.include_all_employees:
-        excluded = {e.id for e in group.excluded_employees.all()}
+        # Use cached data if prefetched, otherwise use efficient values_list query
+        if prefetched:
+            excluded = {e.id for e in group.excluded_employees.all()}
+        else:
+            excluded = set(group.excluded_employees.values_list('id', flat=True))
         return employee_id not in excluded
-    return employee_id in {e.id for e in group.employees.all()}
+    if prefetched:
+        return employee_id in {e.id for e in group.employees.all()}
+    return group.employees.filter(id=employee_id).exists()
 
 
-def group_allowed_form_ids(group, all_form_ids):
+def group_allowed_form_ids(group, all_form_ids, prefetched: bool = False):
     if group.include_all_forms:
-        excluded = {f.id for f in group.excluded_forms.all()}
+        if prefetched:
+            excluded = {f.id for f in group.excluded_forms.all()}
+        else:
+            excluded = set(group.excluded_forms.values_list('id', flat=True))
         return set(all_form_ids) - excluded
-    return {f.id for f in group.forms.all()}
+    if prefetched:
+        return {f.id for f in group.forms.all()}
+    return set(group.forms.values_list('id', flat=True))
 
 
 def allowed_form_ids_for_employee(employee, forms_qs=None):
@@ -75,17 +97,32 @@ def allowed_form_ids_for_employee(employee, forms_qs=None):
     all_form_ids = set(all_forms_qs.values_list('id', flat=True))
     if not all_form_ids:
         return set()
-    groups = AccessGroup.objects.prefetch_related('employees', 'excluded_employees', 'forms', 'excluded_forms').all()
+    # Prefetch all related data in a single query
+    groups = AccessGroup.objects.prefetch_related(
+        'employees', 'excluded_employees', 'forms', 'excluded_forms'
+    ).all()
     allowed = set()
     for group in groups:
-        if group_includes_employee(group, employee.id):
-            allowed.update(group_allowed_form_ids(group, all_form_ids))
+        if group_includes_employee(group, employee.id, prefetched=True):
+            allowed.update(group_allowed_form_ids(group, all_form_ids, prefetched=True))
     return allowed
 
 
 def employee_has_form_access(employee, form) -> bool:
-    allowed_ids = allowed_form_ids_for_employee(employee, FormTemplate.objects.filter(id=form.id))
-    return form.id in allowed_ids
+    groups = AccessGroup.objects.prefetch_related(
+        'employees', 'excluded_employees', 'forms', 'excluded_forms'
+    ).all()
+    for group in groups:
+        if group_includes_employee(group, employee.id, prefetched=True):
+            if group.include_all_forms:
+                # Check if form is NOT in excluded
+                if not group.excluded_forms.filter(id=form.id).exists():
+                    return True
+            else:
+                # Check if form IS in included
+                if group.forms.filter(id=form.id).exists():
+                    return True
+    return False
 
 
 class HealthView(APIView):
@@ -115,44 +152,46 @@ class FormListCreateView(APIView):
             forms = forms.filter(id__in=allowed_ids)
         return Response(FormTemplateSerializer(forms, many=True, context={'request': request}).data)
 
+    @admin_required
     def post(self, request):
-        if not is_admin(request.user):
-            return Response({'detail': 'Admin only'}, status=status.HTTP_403_FORBIDDEN)
         name = (request.data.get('name') or 'New Form').strip()
         subtitle = (request.data.get('subtitle') or '').strip()
         form = FormTemplate.objects.create(name=name, subtitle=subtitle)
         FormVersion.objects.create(form=form, version='v1.0', status='draft', fields=[])
-        form.refresh_from_db()
+        # Prefetch versions for serialization instead of refresh_from_db
+        form = FormTemplate.objects.prefetch_related('versions').get(pk=form.pk)
         return Response(FormTemplateSerializer(form, context={'request': request}).data, status=status.HTTP_201_CREATED)
 
 
 class FormDetailView(APIView):
+    @admin_required
     def patch(self, request, form_id):
-        if not is_admin(request.user):
-            return Response({'detail': 'Admin only'}, status=status.HTTP_403_FORBIDDEN)
-        form = get_object_or_404(FormTemplate, pk=form_id)
+        form = get_object_or_404(FormTemplate.objects.prefetch_related('versions'), pk=form_id)
+        update_fields = []
         if 'name' in request.data:
             form.name = request.data['name']
+            update_fields.append('name')
         if 'subtitle' in request.data:
             form.subtitle = request.data['subtitle']
-        form.save()
+            update_fields.append('subtitle')
+        if update_fields:
+            form.save(update_fields=update_fields)
         return Response(FormTemplateSerializer(form, context={'request': request}).data)
 
 
 class FormArchiveView(APIView):
+    @admin_required
     def post(self, request, form_id):
-        if not is_admin(request.user):
-            return Response({'detail': 'Admin only'}, status=status.HTTP_403_FORBIDDEN)
         form = get_object_or_404(FormTemplate, pk=form_id)
         FormVersion.objects.filter(form=form).update(status='archived')
-        form.refresh_from_db()
+        # Re-fetch with prefetch for serialization
+        form = FormTemplate.objects.prefetch_related('versions').get(pk=form_id)
         return Response(FormTemplateSerializer(form, context={'request': request}).data)
 
 
 class FormVersionCreateView(APIView):
+    @admin_required
     def post(self, request, form_id):
-        if not is_admin(request.user):
-            return Response({'detail': 'Admin only'}, status=status.HTTP_403_FORBIDDEN)
         form = get_object_or_404(FormTemplate, pk=form_id)
         latest = FormVersion.objects.filter(form=form).order_by('-created_at').first()
         next_version = bump_version(latest.version if latest else 'v1.0')
@@ -167,25 +206,24 @@ class FormVersionCreateView(APIView):
 
 
 class FormVersionPublishView(APIView):
+    @admin_required
     def post(self, request, form_id, version_id):
-        if not is_admin(request.user):
-            return Response({'detail': 'Admin only'}, status=status.HTTP_403_FORBIDDEN)
         form = get_object_or_404(FormTemplate, pk=form_id)
         FormVersion.objects.filter(form=form, status='active').update(status='archived')
         version = get_object_or_404(FormVersion, pk=version_id, form=form)
         version.status = 'active'
         version.published_at = timezone.now()
-        version.save()
-        form.refresh_from_db()
+        version.save(update_fields=['status', 'published_at'])
+        # Re-fetch with prefetch for serialization
+        form = FormTemplate.objects.prefetch_related('versions').get(pk=form_id)
         return Response(FormTemplateSerializer(form, context={'request': request}).data)
 
 
 class FormVersionPdfUploadView(APIView):
     parser_classes = [MultiPartParser, FormParser]
 
+    @admin_required
     def post(self, request, form_id, version_id):
-        if not is_admin(request.user):
-            return Response({'detail': 'Admin only'}, status=status.HTTP_403_FORBIDDEN)
         version = get_object_or_404(FormVersion, pk=version_id, form_id=form_id)
         pdf = request.FILES.get('file')
         if not pdf:
@@ -193,17 +231,16 @@ class FormVersionPdfUploadView(APIView):
         version.pdf = pdf
         version.pdf_name = pdf.name
         version.pdf_mime = pdf.content_type or 'application/pdf'
-        version.save()
-        form = get_object_or_404(FormTemplate, pk=form_id)
+        version.save(update_fields=['pdf', 'pdf_name', 'pdf_mime'])
+        form = FormTemplate.objects.prefetch_related('versions').get(pk=form_id)
         return Response(FormTemplateSerializer(form, context={'request': request}).data)
 
 
 class FormVersionFieldUpsertView(APIView):
     parser_classes = [JSONParser]
 
+    @admin_required
     def post(self, request, form_id, version_id):
-        if not is_admin(request.user):
-            return Response({'detail': 'Admin only'}, status=status.HTTP_403_FORBIDDEN)
         version = get_object_or_404(FormVersion, pk=version_id, form_id=form_id)
         field = request.data.get('field')
         if not field or 'id' not in field:
@@ -215,19 +252,18 @@ class FormVersionFieldUpsertView(APIView):
         else:
             fields[idx] = field
         version.fields = fields
-        version.save()
-        form = get_object_or_404(FormTemplate, pk=form_id)
+        version.save(update_fields=['fields'])
+        form = FormTemplate.objects.prefetch_related('versions').get(pk=form_id)
         return Response(FormTemplateSerializer(form, context={'request': request}).data)
 
 
 class FormVersionFieldDeleteView(APIView):
+    @admin_required
     def delete(self, request, form_id, version_id, field_id):
-        if not is_admin(request.user):
-            return Response({'detail': 'Admin only'}, status=status.HTTP_403_FORBIDDEN)
         version = get_object_or_404(FormVersion, pk=version_id, form_id=form_id)
         version.fields = [f for f in (version.fields or []) if f.get('id') != field_id]
-        version.save()
-        form = get_object_or_404(FormTemplate, pk=form_id)
+        version.save(update_fields=['fields'])
+        form = FormTemplate.objects.prefetch_related('versions').get(pk=form_id)
         return Response(FormTemplateSerializer(form, context={'request': request}).data)
 
 
@@ -276,10 +312,15 @@ class TicketDetailView(APIView):
         return Response(TicketSerializer(ticket, context={'request': request}).data)
 
     def patch(self, request, ticket_id):
-        ticket = get_object_or_404(Ticket, pk=ticket_id)
+        ticket = get_object_or_404(
+            Ticket.objects.select_related('form', 'version').prefetch_related('attachments'),
+            pk=ticket_id
+        )
         serializer = TicketUpdateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        serializer.update(ticket, serializer.validated_data)
+        ticket = serializer.update(ticket, serializer.validated_data)
+        
+        # Handle signature update
         sig = request.data.get('signature')
         if sig and sig.get('dataUrl'):
             filename, content, mime = data_url_to_content(sig.get('dataUrl'), f"signature_{ticket.id}_{uuid.uuid4().hex}")
@@ -288,28 +329,36 @@ class TicketDetailView(APIView):
                 ticket.signature_mime = mime or ''
                 ticket.signature_name = filename
                 ticket.signature_signer = sig.get('signer', ticket.signature_signer)
-                ticket.save()
+                ticket.save(update_fields=['signature_file', 'signature_mime', 'signature_name', 'signature_signer'])
+        
+        # Refresh for serialization with all related data
+        ticket.refresh_from_db()
         return Response(TicketSerializer(ticket, context={'request': request}).data)
 
 
 class TicketSubmitView(APIView):
     def post(self, request, ticket_id):
-        ticket = get_object_or_404(Ticket, pk=ticket_id)
+        ticket = get_object_or_404(
+            Ticket.objects.select_related('form', 'version').prefetch_related('attachments'),
+            pk=ticket_id
+        )
         ticket.status = 'synced'
         ticket.last_error = ''
         ticket.updated_at = timezone.now()
-        ticket.save()
+        ticket.save(update_fields=['status', 'last_error', 'updated_at'])
         return Response(TicketSerializer(ticket, context={'request': request}).data)
 
 
 class TicketApproveView(APIView):
+    @admin_required
     def post(self, request, ticket_id):
-        if not is_admin(request.user):
-            return Response({'detail': 'Admin only'}, status=status.HTTP_403_FORBIDDEN)
-        ticket = get_object_or_404(Ticket, pk=ticket_id)
+        ticket = get_object_or_404(
+            Ticket.objects.select_related('form', 'version').prefetch_related('attachments'),
+            pk=ticket_id
+        )
         ticket.approval_state = 'approved'
         ticket.updated_at = timezone.now()
-        ticket.save()
+        ticket.save(update_fields=['approval_state', 'updated_at'])
         return Response(TicketSerializer(ticket, context={'request': request}).data)
 
 
@@ -321,13 +370,14 @@ class TicketAttachmentUploadView(APIView):
         upload = request.FILES.get('file')
         if not upload:
             return Response({'detail': 'No file provided'}, status=status.HTTP_400_BAD_REQUEST)
-        attachment = Attachment.objects.create(
+        Attachment.objects.create(
             ticket=ticket,
             file=upload,
             name=upload.name,
             mime=upload.content_type or 'application/octet-stream'
         )
-        ticket.refresh_from_db()
+        # Re-fetch with all related data for serialization
+        ticket = Ticket.objects.select_related('form', 'version').prefetch_related('attachments').get(pk=ticket_id)
         return Response(TicketSerializer(ticket, context={'request': request}).data)
 
 
@@ -335,7 +385,10 @@ class TicketSignatureUploadView(APIView):
     parser_classes = [JSONParser]
 
     def post(self, request, ticket_id):
-        ticket = get_object_or_404(Ticket, pk=ticket_id)
+        ticket = get_object_or_404(
+            Ticket.objects.select_related('form', 'version').prefetch_related('attachments'),
+            pk=ticket_id
+        )
         data_url = request.data.get('dataUrl')
         signer = request.data.get('signer', '')
         if not data_url:
@@ -348,7 +401,7 @@ class TicketSignatureUploadView(APIView):
         ticket.signature_name = filename
         ticket.signature_signer = signer
         ticket.updated_at = timezone.now()
-        ticket.save()
+        ticket.save(update_fields=['signature_file', 'signature_mime', 'signature_name', 'signature_signer', 'updated_at'])
         return Response(TicketSerializer(ticket, context={'request': request}).data)
 
 
@@ -357,9 +410,8 @@ class EmployeeListCreateView(APIView):
         employees = Employee.objects.all()
         return Response(EmployeeSerializer(employees, many=True).data)
 
+    @admin_required
     def post(self, request):
-        if not is_admin(request.user):
-            return Response({'detail': 'Admin only'}, status=status.HTTP_403_FORBIDDEN)
         serializer = EmployeeSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         employee = serializer.save()
@@ -371,33 +423,30 @@ class EmployeeDetailView(APIView):
         employee = get_object_or_404(Employee, pk=employee_id)
         return Response(EmployeeSerializer(employee).data)
 
+    @admin_required
     def patch(self, request, employee_id):
-        if not is_admin(request.user):
-            return Response({'detail': 'Admin only'}, status=status.HTTP_403_FORBIDDEN)
         employee = get_object_or_404(Employee, pk=employee_id)
         serializer = EmployeeSerializer(employee, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         employee = serializer.save()
         return Response(EmployeeSerializer(employee).data)
 
+    @admin_required
     def delete(self, request, employee_id):
-        if not is_admin(request.user):
-            return Response({'detail': 'Admin only'}, status=status.HTTP_403_FORBIDDEN)
         employee = get_object_or_404(Employee, pk=employee_id)
         employee.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
-
 class AccessGroupListCreateView(APIView):
-    def get(self, request):
-        if not is_admin(request.user):
-            return Response({'detail': 'Admin only'}, status=status.HTTP_403_FORBIDDEN)
-        groups = AccessGroup.objects.prefetch_related('employees', 'forms').all()
+    @admin_required
+    def get(self):
+        groups = AccessGroup.objects.prefetch_related(
+            'employees', 'excluded_employees', 'forms', 'excluded_forms'
+        ).all()
         return Response(AccessGroupSerializer(groups, many=True).data)
 
+    @admin_required
     def post(self, request):
-        if not is_admin(request.user):
-            return Response({'detail': 'Admin only'}, status=status.HTTP_403_FORBIDDEN)
         serializer = AccessGroupSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         group = serializer.save()
@@ -405,24 +454,26 @@ class AccessGroupListCreateView(APIView):
 
 
 class AccessGroupDetailView(APIView):
+    @admin_required
     def get(self, request, group_id):
-        if not is_admin(request.user):
-            return Response({'detail': 'Admin only'}, status=status.HTTP_403_FORBIDDEN)
-        group = get_object_or_404(AccessGroup, pk=group_id)
+        group = get_object_or_404(
+            AccessGroup.objects.prefetch_related(
+                'employees', 'excluded_employees', 'forms', 'excluded_forms'
+            ),
+            pk=group_id
+        )
         return Response(AccessGroupSerializer(group).data)
 
+    @admin_required
     def patch(self, request, group_id):
-        if not is_admin(request.user):
-            return Response({'detail': 'Admin only'}, status=status.HTTP_403_FORBIDDEN)
         group = get_object_or_404(AccessGroup, pk=group_id)
         serializer = AccessGroupSerializer(group, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         group = serializer.save()
         return Response(AccessGroupSerializer(group).data)
 
+    @admin_required
     def delete(self, request, group_id):
-        if not is_admin(request.user):
-            return Response({'detail': 'Admin only'}, status=status.HTTP_403_FORBIDDEN)
         group = get_object_or_404(AccessGroup, pk=group_id)
         group.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)

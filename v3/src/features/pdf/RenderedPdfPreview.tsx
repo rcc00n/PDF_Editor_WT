@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Maximize2, Minimize2 } from 'lucide-react'
-import type { Field, Ticket } from '@/entities/types'
+import type { Employee, Field, Ticket } from '@/entities/types'
 import PdfPageCanvas from '@/features/pdf/PdfPageCanvas'
 import Modal from '@/shared/ui/Modal'
 
@@ -10,12 +10,29 @@ type Props = {
   pdfUrl?: string
   fields: Field[]
   ticket: Ticket
+  interactive?: boolean
+  employees?: Employee[]
+  onValueChange?: (key: string, value: any) => void
+  onSignatureClick?: () => void
+  onPhotoClick?: () => void
 }
 
-export default function RenderedPdfPreview({ pdfUrl, fields, ticket }: Props) {
+export default function RenderedPdfPreview({
+  pdfUrl,
+  fields,
+  ticket,
+  interactive = false,
+  employees = [],
+  onValueChange,
+  onSignatureClick,
+  onPhotoClick
+}: Props) {
   const [page, setPage] = useState(1)
   const [numPages, setNumPages] = useState(1)
   const [fullOpen, setFullOpen] = useState(false)
+  const canEdit = interactive && typeof onValueChange === 'function'
+  const handleValueChange =
+    onValueChange ?? ((_: string, __: any) => {})
 
   const pageFields = useMemo(
     () => fields.filter((f) => f.page === page),
@@ -73,9 +90,21 @@ export default function RenderedPdfPreview({ pdfUrl, fields, ticket }: Props) {
           />
 
           <div className="absolute inset-0 pointer-events-none">
-            {pageFields.map((field) => (
-              <RenderedField key={field.id} field={field} ticket={ticket} />
-            ))}
+            {pageFields.map((field) =>
+              canEdit ? (
+                <EditableField
+                  key={field.id}
+                  field={field}
+                  ticket={ticket}
+                  employees={employees}
+                  onValueChange={handleValueChange}
+                  onSignatureClick={onSignatureClick}
+                  onPhotoClick={onPhotoClick}
+                />
+              ) : (
+                <RenderedField key={field.id} field={field} ticket={ticket} />
+              )
+            )}
           </div>
         </div>
       </div>
@@ -159,6 +188,160 @@ function RenderedField({ field, ticket }: { field: Field; ticket: Ticket }) {
       style={style}
     >
       {text}
+    </div>
+  )
+}
+
+function EditableField({
+  field,
+  ticket,
+  employees,
+  onValueChange,
+  onSignatureClick,
+  onPhotoClick
+}: {
+  field: Field
+  ticket: Ticket
+  employees: Employee[]
+  onValueChange: (key: string, value: any) => void
+  onSignatureClick?: () => void
+  onPhotoClick?: () => void
+}) {
+  const fontSize = field.fontSize ?? DEFAULT_FONT_SIZE
+  const value = ticket.values[field.key]
+  const signatureSrc = ticket.signature?.dataUrl ?? ticket.signature?.url
+  const signer = ticket.signature?.signer ?? ''
+  const readOnly = field.readOnly === true
+  const options = (field.options ?? []).map((opt) => opt.trim()).filter(Boolean)
+
+  const style = {
+    left: `${field.x * 100}%`,
+    top: `${field.y * 100}%`,
+    width: `${field.w * 100}%`,
+    height: `${field.h * 100}%`,
+    fontSize: `${fontSize}px`,
+    lineHeight: 1.15
+  } as const
+
+  const inputClass =
+    'w-full h-full rounded-md border border-orange-200 bg-white/85 px-1.5 py-0.5 text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-orange-200'
+
+  if (field.type === 'checkbox') {
+    return (
+      <div
+        className="absolute pointer-events-auto flex items-center justify-center"
+        style={style}
+      >
+        <input
+          type="checkbox"
+          checked={Boolean(value)}
+          onChange={(e) => onValueChange(field.key, e.target.checked)}
+          disabled={readOnly}
+          className="h-4 w-4 accent-orange-600"
+          aria-label={field.label}
+        />
+      </div>
+    )
+  }
+
+  if (field.type === 'select' || field.type === 'radio') {
+    return (
+      <div className="absolute pointer-events-auto" style={style}>
+        <select
+          className={inputClass}
+          value={value ?? ''}
+          onChange={(e) => onValueChange(field.key, e.target.value)}
+          disabled={readOnly || options.length === 0}
+          aria-label={field.label}
+        >
+          <option value="">{options.length ? field.label : 'No options'}</option>
+          {options.map((opt) => (
+            <option key={opt} value={opt}>
+              {opt}
+            </option>
+          ))}
+        </select>
+      </div>
+    )
+  }
+
+  if (field.type === 'employee') {
+    const activeEmployees = employees.filter((e) => e.active)
+    return (
+      <div className="absolute pointer-events-auto" style={style}>
+        <select
+          className={inputClass}
+          value={value ?? ''}
+          onChange={(e) => onValueChange(field.key, e.target.value)}
+          disabled={readOnly || activeEmployees.length === 0}
+          aria-label={field.label}
+        >
+          <option value="">
+            {activeEmployees.length ? field.label : 'No employees'}
+          </option>
+          {activeEmployees.map((emp) => (
+            <option key={emp.id} value={emp.name}>
+              {emp.name}
+            </option>
+          ))}
+        </select>
+      </div>
+    )
+  }
+
+  if (field.type === 'signature') {
+    return (
+      <button
+        type="button"
+        className="absolute pointer-events-auto flex items-center justify-center rounded-md border border-orange-200 bg-white/85 text-[11px] text-neutral-700 hover:bg-orange-50"
+        style={style}
+        onClick={onSignatureClick}
+        title={field.label}
+      >
+        {signatureSrc ? (
+          <img src={signatureSrc} alt="signature" className="h-full w-full object-contain" />
+        ) : (
+          <span>{signer || 'Tap to sign'}</span>
+        )}
+      </button>
+    )
+  }
+
+  if (field.type === 'photo') {
+    const label = ticket.attachments.length
+      ? `${ticket.attachments.length} photo(s)`
+      : 'Add photo'
+    return (
+      <button
+        type="button"
+        className="absolute pointer-events-auto flex items-center justify-center rounded-md border border-orange-200 bg-white/85 text-[11px] text-neutral-700 hover:bg-orange-50"
+        style={style}
+        onClick={onPhotoClick}
+        title={field.label}
+      >
+        {label}
+      </button>
+    )
+  }
+
+  const inputType =
+    field.type === 'numeric'
+      ? 'number'
+      : field.type === 'date'
+      ? 'date'
+      : 'text'
+
+  return (
+    <div className="absolute pointer-events-auto" style={style}>
+      <input
+        type={inputType}
+        className={inputClass}
+        value={value ?? ''}
+        onChange={(e) => onValueChange(field.key, e.target.value)}
+        disabled={readOnly}
+        placeholder={field.label}
+        aria-label={field.label}
+      />
     </div>
   )
 }
