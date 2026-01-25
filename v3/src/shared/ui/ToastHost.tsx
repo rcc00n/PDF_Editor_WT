@@ -20,8 +20,8 @@ export default function ToastHost() {
           key={t.id}
           onClick={() => dismiss(t.id)}
           className={cn(
-            'text-left w-[320px] rf-card border px-3 py-2.5 shadow-sm backdrop-blur',
-            'bg-white/90 border-neutral-200 dark:bg-neutral-950/80 dark:border-neutral-800',
+            'text-left w-[320px] rf-card border px-4 py-3 shadow-sm',
+            'bg-white border-neutral-200 dark:bg-neutral-950/90 dark:border-neutral-800',
             t.variant === 'success' && 'border-emerald-200 dark:border-emerald-900',
             t.variant === 'warning' && 'border-amber-200 dark:border-amber-900',
             t.variant === 'danger' && 'border-red-200 dark:border-red-900'

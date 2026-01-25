@@ -7,9 +7,8 @@ export default function Textarea(props: TextareaHTMLAttributes<HTMLTextAreaEleme
     <textarea
       {...rest}
       className={cn(
-        'rf-focus min-h-[90px] w-full rounded-2xl border border-neutral-200 bg-white px-3 py-2 text-sm',
+        'rf-focus min-h-[110px] w-full rounded-2xl border border-[var(--rf-border)] bg-[var(--rf-surface)] px-4 py-3 text-sm',
         'placeholder:text-neutral-400',
-        'dark:border-neutral-800 dark:bg-neutral-950',
         className
       )}
     />
