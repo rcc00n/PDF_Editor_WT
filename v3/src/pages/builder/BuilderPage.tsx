@@ -389,10 +389,6 @@ export default function BuilderPage() {
   const toolPaletteBody = (
     <>
       <div className="text-sm font-semibold">Tool Palette</div>
-      <div className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
-        Click a tool (or drag it) onto the canvas. Click it again for Hand
-        mode.
-      </div>
       {TOOL_SECTIONS.map((section, idx) => (
         <div
           key={section.title ?? `tools-${idx}`}
@@ -636,7 +632,7 @@ export default function BuilderPage() {
         {!canvasFocus && (
           <div className="hidden xl:block h-full min-h-0">
             <Card className="h-full min-h-0">
-              <CardBody className="h-full min-h-0 overflow-auto rf-scrollbar">
+              <CardBody className="h-full min-h-0 overflow-auto rf-scrollbar pt-5 sm:pt-6">
                 {toolPaletteBody}
               </CardBody>
             </Card>
@@ -646,7 +642,7 @@ export default function BuilderPage() {
         {/* Canvas */}
         <div className="flex flex-col min-h-0">
           <Card className="flex flex-col min-h-0 h-full">
-            <CardBody className="flex flex-col min-h-0 h-full">
+            <CardBody className="flex flex-col min-h-0 h-full pt-5 sm:pt-6">
               <div className="flex flex-wrap items-center justify-between gap-3 flex-shrink-0">
                 <div className="text-sm font-semibold">PDF Canvas</div>
                 <div className="flex flex-wrap items-center gap-2">
@@ -718,7 +714,7 @@ export default function BuilderPage() {
         {/* Properties */}
         <div className="hidden xl:block h-full min-h-0">
           <Card className="h-full min-h-0">
-            <CardBody className="h-full min-h-0 overflow-auto rf-scrollbar">
+            <CardBody className="h-full min-h-0 overflow-auto rf-scrollbar pt-5 sm:pt-6">
               {propertiesBody}
             </CardBody>
           </Card>

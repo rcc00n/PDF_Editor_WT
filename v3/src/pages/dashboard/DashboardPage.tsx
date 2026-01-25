@@ -212,7 +212,7 @@ export default function DashboardPage() {
 
       <div className="px-4 mt-4 sm:px-6 sm:mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Card>
-          <CardHeader>
+          <CardHeader className="pb-3 sm:pb-4">
             <div className="flex items-center justify-between gap-3">
               <div>
                 <CardTitle>Forms</CardTitle>
@@ -261,7 +261,7 @@ export default function DashboardPage() {
         </Card>
 
         <Card>
-          <CardHeader>
+          <CardHeader className="pb-3 sm:pb-4">
             <div className="flex items-center justify-between gap-3">
               <div>
                 <CardTitle>Recent Tickets</CardTitle>
