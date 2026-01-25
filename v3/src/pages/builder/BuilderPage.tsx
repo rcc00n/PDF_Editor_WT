@@ -207,6 +207,10 @@ export default function BuilderPage() {
   const pushToast = useAppStore((s) => s.pushToast);
   const pdfInputRef = useRef<HTMLInputElement | null>(null);
 
+  const [activeToolId, setActiveToolId] = useState<string | null>(DEFAULT_TOOL_ID)
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [numPages, setNumPages] = useState(1)
+  const canvasFocus = false
   const form = forms.find((f) => f.id === formId);
   const vFromQuery = new URLSearchParams(location.search).get("v");
 
@@ -711,8 +715,7 @@ export default function BuilderPage() {
                     </button>
                   ))}
                 </div>
-              </div>
-            ))}
+              ))}
 
             <div className="mt-4 flex items-center justify-between">
               <div className="text-xs text-neutral-500 dark:text-neutral-400">Status</div>
@@ -758,6 +761,14 @@ export default function BuilderPage() {
                   </div>
                 </div>
               </div>
+            )}
+
+            <div className="mt-3 text-xs text-neutral-500 dark:text-neutral-400">
+              Tip: drag fields to reposition, triple-click to duplicate. Hand mode prevents accidental adds.
+            </div>
+          </CardBody>
+        </Card>
+        )}
 
               <div className="mt-3 space-y-6 overflow-y-auto flex-1 min-h-0 rf-scrollbar">
                 {pageList.map((pageIndex) => (

@@ -54,6 +54,28 @@ function ticketStatusTone(
 }
 
 export default function FieldTicketPage() {
+  const { ticketId = '' } = useParams()
+  const nav = useNavigate()
+
+  const ticket = useAppStore(s => s.tickets.find(t => t.id === ticketId))
+  const forms = useAppStore(s => s.forms)
+  const updateTicket = useAppStore(s => s.updateTicket)
+  const employees = useAppStore(s => s.employees)
+  const saveDraft = useAppStore(s => s.saveDraft)
+  const submitTicket = useAppStore(s => s.submitTicket)
+  const apiEnabled = useAppStore(s => s.apiEnabled)
+  const user = useAppStore(s => s.user)
+  const role = useAppStore(s => s.role)
+  const uploadAttachment = useAppStore(s => s.uploadAttachment)
+  const pushToast = useAppStore(s => s.pushToast)
+  const attachmentInputRef = useRef<HTMLInputElement | null>(null)
+  const [renderOpen, setRenderOpen] = useState(false)
+  const scrollToSignature = () => {
+    document.getElementById('signature-panel')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }
+  const scrollToPhotos = () => {
+    document.getElementById('photos-panel')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }
   const { ticketId = "" } = useParams();
   const nav = useNavigate();
 
@@ -360,6 +382,32 @@ const cacheKey =
                       </div>
                     )}
 
+          <Card>
+            <CardBody>
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-sm font-semibold">Live PDF Overlay</div>
+                  <div className="text-xs text-neutral-500 dark:text-neutral-400">Fields are pinned to the PDF as you type.</div>
+                </div>
+                {!renderPdfUrl && <Badge tone="warning">No PDF</Badge>}
+              </div>
+              <div className="mt-3">
+                {renderPdfUrl ? (
+                  <RenderedPdfPreview
+                    pdfUrl={renderPdfUrl}
+                    fields={version.fields}
+                    ticket={ticket}
+                    interactive
+                    employees={employees}
+                    onFieldChange={(field, val) => {
+                      updateTicket(ticket.id, { values: { ...ticket.values, [field.key]: val } })
+                    }}
+                    onRequestSignaturePanel={scrollToSignature}
+                    onRequestPhotoPanel={scrollToPhotos}
+                  />
+                ) : (
+                  <div className="text-sm text-neutral-500 dark:text-neutral-400">
+                    Upload a PDF in the Builder to enable the overlay preview.
                     {fields.map((f) => (
                       <FieldInput
                         key={f.id}
@@ -437,6 +485,9 @@ const cacheKey =
         </div>
 
         <div className="flex flex-col gap-4">
+          <div id="photos-panel">
+            <Card>
+            <CardBody>
           <Card>
             <CardBody className="pt-5 sm:pt-6">
               <div className="text-sm font-semibold">Photo Attachments</div>
@@ -551,8 +602,12 @@ const cacheKey =
                 })}
               </div>
             </CardBody>
-          </Card>
+            </Card>
+          </div>
 
+          <div id="signature-panel">
+            <Card>
+            <CardBody>
           <Card>
             <CardBody className="pt-5 sm:pt-6">
               <div className="text-sm font-semibold">Signature</div>
@@ -610,7 +665,8 @@ const cacheKey =
                 />
               </div>
             </CardBody>
-          </Card>
+            </Card>
+          </div>
 
           {ticket.lastError && (
             <Card>

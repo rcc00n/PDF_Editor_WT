@@ -1,3 +1,16 @@
+import { useMemo, useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
+import { Card, CardBody, CardHeader, CardSub, CardTitle } from '@/shared/ui/Card'
+import SectionHeader from '@/shared/ui/SectionHeader'
+import Button from '@/shared/ui/Button'
+import Badge from '@/shared/ui/Badge'
+import { useAppStore } from '@/shared/state/useAppStore'
+import { dateTimeShort, timeHHMM } from '@/shared/lib/format'
+import { resolveAvailableForms } from '@/shared/lib/access'
+import { extractRig } from '@/shared/lib/ticketFilters'
+import { Plus, ArrowRight, ChevronDown } from 'lucide-react'
+import { cn } from '@/shared/ui/cn'
+import type { TicketStatus, FormTemplate } from '@/entities/types'
 import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
@@ -140,6 +153,13 @@ export default function DashboardPage() {
       if (submittedAt >= startOfMonth) submittedMonth += 1;
     }
 
+  const pendingTickets = dailyTickets.filter(t => t.status === 'pending' || t.status === 'queued' || t.status === 'in_progress')
+  const syncedTickets = dailyTickets.filter(t => t.status === 'synced')
+  const pendingVisible = dailyOpen ? pendingTickets : pendingTickets.slice(0, 2)
+  const syncedVisible = dailyOpen ? syncedTickets : syncedTickets.slice(0, 2)
+  const formsVisible: FormTemplate[] = formsOpen ? availableForms : availableForms.slice(0, 15)
+  const pendingReview = tickets.filter((t) => t.status === 'synced' && t.approvalState !== 'approved').slice(0, 6)
+  const attentionTickets = tickets.filter((t) => t.status === 'error' || t.status === 'queued' || t.status === 'pending').slice(0, 6)
     return { submittedToday, submittedWeek, submittedMonth };
   }, [scopedTickets]);
 
