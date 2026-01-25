@@ -4,7 +4,7 @@ import Modal from './Modal'
 import Input from './Input'
 import Kbd from './Kbd'
 import { useAppStore } from '@/shared/state/useAppStore'
-import { Search, Plus, LayoutGrid, FileText, Smartphone, RefreshCw, ClipboardCheck, Moon, Sun, Globe, WifiOff, Wifi, Shield, User, LogOut, Users } from 'lucide-react'
+import { Search, Plus, LayoutGrid, PencilRuler, Smartphone, ClipboardCheck, Shield, User, LogOut, Users } from 'lucide-react'
 
 type Action = {
   id: string
@@ -20,18 +20,12 @@ export default function CommandPalette() {
   const [q, setQ] = useState('')
   const nav = useNavigate()
 
-  const toggleTheme = useAppStore(s => s.toggleTheme)
-  const theme = useAppStore(s => s.theme)
   const role = useAppStore(s => s.role)
   const setRole = useAppStore(s => s.setRole)
   const apiEnabled = useAppStore(s => s.apiEnabled)
   const logout = useAppStore(s => s.logout)
-  const forcedOffline = useAppStore(s => s.forcedOffline)
-  const setForcedOffline = useAppStore(s => s.setForcedOffline)
   const createForm = useAppStore(s => s.createForm)
 
-  const nextTheme = theme === 'dark' ? 'light' : theme === 'light' ? 'planet' : 'dark'
-  const ThemeIcon = nextTheme === 'light' ? Sun : nextTheme === 'dark' ? Moon : Globe
   const isAdmin = role === 'admin'
 
   useEffect(() => {
@@ -52,12 +46,9 @@ export default function CommandPalette() {
   const actions: Action[] = useMemo(() => {
     const base: Action[] = [
       { id: 'dash', title: 'Dashboard', subtitle: 'Overview and activity', icon: LayoutGrid, run: () => nav('/dashboard') },
-      { id: 'forms', title: 'Forms', subtitle: 'Templates and versions', icon: FileText, run: () => nav('/forms') },
+      { id: 'builder', title: 'Builder', subtitle: 'Templates and versions', icon: PencilRuler, run: () => nav('/builder') },
       { id: 'field', title: 'Field App', subtitle: 'Offline tickets', icon: Smartphone, run: () => nav('/field') },
-      { id: 'queue', title: 'Sync Queue', subtitle: 'Pending / failed mutations', icon: RefreshCw, run: () => nav('/queue') },
-      { id: 'review', title: 'Admin Review', subtitle: 'Preview and export', icon: ClipboardCheck, run: () => nav('/review') },
-      { id: 'theme', title: `Switch to ${nextTheme}`, icon: ThemeIcon, run: () => toggleTheme(), keywords: 'theme dark light planet' },
-      { id: 'offline', title: forcedOffline ? 'Disable offline simulation' : 'Enable offline simulation', icon: forcedOffline ? Wifi : WifiOff, run: () => setForcedOffline(!forcedOffline), keywords: 'offline online network' }
+      { id: 'review', title: 'Admin Review', subtitle: 'Preview and export', icon: ClipboardCheck, run: () => nav('/review') }
     ]
 
     if (!apiEnabled) {
@@ -78,8 +69,11 @@ export default function CommandPalette() {
         subtitle: 'Start a template from scratch',
         icon: Plus,
         run: async () => {
-          const id = await createForm('New Form')
+          const name = window.prompt('Form name (optional). Leave blank for auto name.', '')
+          if (name === null) return
+          const id = await createForm(name)
           nav(`/builder/${id}`)
+          setOpen(false)
         },
         keywords: 'create new form template builder'
       })
@@ -90,6 +84,14 @@ export default function CommandPalette() {
         icon: Users,
         run: () => nav('/employees'),
         keywords: 'employees staff team directory'
+      })
+      base.splice(apiEnabled ? 7 : 8, 0, {
+        id: 'groups',
+        title: 'Groups',
+        subtitle: 'Access group assignments',
+        icon: Users,
+        run: () => nav('/groups'),
+        keywords: 'groups access forms permissions'
       })
     }
 
@@ -105,7 +107,7 @@ export default function CommandPalette() {
     }
 
     return base
-  }, [nav, createForm, nextTheme, ThemeIcon, toggleTheme, forcedOffline, setForcedOffline, isAdmin, setRole, apiEnabled, logout])
+  }, [nav, createForm, isAdmin, setRole, apiEnabled, logout])
 
   const filtered = actions.filter((a) => {
     const s = (a.title + ' ' + (a.subtitle ?? '') + ' ' + (a.keywords ?? '')).toLowerCase()

@@ -1,12 +1,12 @@
 import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
-import type { Activity, Employee, FormTemplate, FormVersion, Id, QueueItem, Ticket } from '@/entities/types'
+import type { Activity, AccessGroup, Employee, FormTemplate, FormVersion, Id, QueueItem, Ticket } from '@/entities/types'
 import { nowIso, uid, nextTicketId } from '@/shared/lib/ids'
 import { clamp } from '@/shared/lib/math'
 import { API_ENABLED } from '@/shared/api/config'
 import { apiFetch, apiJson, clearStoredTokens, getStoredAccessToken, getStoredRefreshToken, storeTokens } from '@/shared/api/client'
 
-export type Theme = 'light' | 'dark' | 'planet'
+export type Theme = 'light' | 'planet'
 export type UserRole = 'admin' | 'worker'
 export type AuthStatus = 'unknown' | 'authenticated' | 'unauthenticated'
 
@@ -50,24 +50,19 @@ const safeStorage = {
 }
 
 function normalizeTheme(value: string | null): Theme {
-  if (value === 'light' || value === 'dark' || value === 'planet') return value
-  return 'planet'
+  if (value === 'light') return 'light'
+  return 'light'
 }
 
 function getStoredTheme(): Theme {
-  try {
-    return normalizeTheme(localStorage.getItem('rf_theme'))
-  } catch {
-    return 'planet'
-  }
+  return 'light'
 }
 
 function applyTheme(theme: Theme) {
   if (typeof document === 'undefined') return
   const root = document.documentElement
-  const isDark = theme === 'dark' || theme === 'planet'
-  root.classList.toggle('dark', isDark)
-  root.classList.toggle('theme-planet', theme === 'planet')
+  root.classList.remove('dark')
+  root.classList.remove('theme-planet')
 }
 
 function upsertById<T extends { id: string }>(items: T[], next: T) {
@@ -76,6 +71,23 @@ function upsertById<T extends { id: string }>(items: T[], next: T) {
   const copy = items.slice()
   copy[idx] = next
   return copy
+}
+
+function defaultFormName(forms: FormTemplate[]) {
+  const existing = new Set(forms.map((f) => f.name.trim().toLowerCase()))
+  let idx = Math.max(1, forms.length + 1)
+  let name = `Form ${idx}`
+  while (existing.has(name.toLowerCase())) {
+    idx += 1
+    name = `Form ${idx}`
+  }
+  return name
+}
+
+function normalizeFormName(name: string | undefined, forms: FormTemplate[]) {
+  const trimmed = (name ?? '').trim()
+  if (trimmed) return trimmed
+  return defaultFormName(forms)
 }
 
 type State = {
@@ -107,6 +119,7 @@ type State = {
   queue: QueueItem[]
   activities: Activity[]
   employees: Employee[]
+  groups: AccessGroup[]
   lastSyncSuccess?: string
 
   toasts: Toast[]
@@ -116,7 +129,7 @@ type State = {
   boot: () => void
 
   // Forms
-  createForm: (name: string) => Promise<Id>
+  createForm: (name?: string) => Promise<Id>
   createVersion: (formId: Id) => Promise<Id>
   renameForm: (formId: Id, name: string) => Promise<void>
   setPdf: (formId: Id, versionId: Id, pdf: FormVersion['pdf']) => void
@@ -152,6 +165,11 @@ type State = {
   updateEmployee: (employeeId: Id, patch: Partial<Employee>) => Promise<void>
   deleteEmployee: (employeeId: Id) => Promise<void>
   importEmployees: (employees: Employee[]) => Promise<void>
+
+  // Groups
+  createGroup: (payload: Omit<AccessGroup, 'id'>) => Promise<Id>
+  updateGroup: (groupId: Id, patch: Partial<AccessGroup>) => Promise<void>
+  deleteGroup: (groupId: Id) => Promise<void>
 }
 
 export const useAppStore = create<State>()(
@@ -175,9 +193,7 @@ export const useAppStore = create<State>()(
         set({ theme })
       },
       toggleTheme: () => {
-        const current = get().theme
-        const next: Theme = current === 'dark' ? 'light' : current === 'light' ? 'planet' : 'dark'
-        get().setTheme(next)
+        get().setTheme('light')
       },
       role: 'admin',
       setRole: (role) => {
@@ -224,6 +240,7 @@ export const useAppStore = create<State>()(
           queue: [],
           activities: [],
           employees: [],
+          groups: [],
           lastSyncSuccess: undefined
         })
       },
@@ -234,6 +251,12 @@ export const useAppStore = create<State>()(
           apiJson('/tickets/'),
           apiJson('/employees/')
         ])
+        let groups: AccessGroup[] = []
+        try {
+          groups = await apiJson('/groups/')
+        } catch {
+          groups = []
+        }
         const canvasByVersion = new Map<string, FormVersion['canvas']>()
         for (const f of get().forms) {
           for (const v of f.versions) {
@@ -247,7 +270,7 @@ export const useAppStore = create<State>()(
             canvas: canvasByVersion.get(v.id)
           }))
         }))
-        set({ forms: mergedForms, tickets, employees, queue: [], activities: [], lastSyncSuccess: undefined })
+        set({ forms: mergedForms, tickets, employees, groups, queue: [], activities: [], lastSyncSuccess: undefined })
       },
 
       systemOnline: typeof navigator !== 'undefined' ? navigator.onLine : true,
@@ -274,6 +297,7 @@ export const useAppStore = create<State>()(
       queue: [],
       activities: [],
       employees: [],
+      groups: [],
       lastSyncSuccess: undefined,
 
       toasts: [],
@@ -297,14 +321,15 @@ export const useAppStore = create<State>()(
       },
 
       createForm: async (name) => {
+        const safeName = normalizeFormName(name, get().forms)
         if (API_ENABLED) {
           const form = await apiJson('/forms/', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name })
+            body: JSON.stringify({ name: safeName })
           })
           set((s) => ({ forms: upsertById(s.forms, form) }))
-          get().addActivity('Form template created', name)
+          get().addActivity('Form template created', safeName)
           return form.id
         }
         const id = uid('form')
@@ -318,11 +343,11 @@ export const useAppStore = create<State>()(
         }
         set((s) => ({
           forms: [
-            { id, name, subtitle: 'PDF locked | Schema v1.0', versions: [version] },
+            { id, name: safeName, subtitle: 'PDF locked | Schema v1.0', versions: [version] },
             ...s.forms
           ]
         }))
-        get().addActivity('Form template created', name)
+        get().addActivity('Form template created', safeName)
         return id
       },
 
@@ -510,7 +535,8 @@ export const useAppStore = create<State>()(
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ formId, versionId, title, assignedTo })
           })
-          set((s) => ({ tickets: upsertById(s.tickets, ticket) }))
+          const nextTicket = { ...ticket, signatureRole: ticket.signatureRole ?? 'employee' }
+          set((s) => ({ tickets: upsertById(s.tickets, nextTicket) }))
           get().addActivity('Ticket created', `${ticket.id} · ${ticket.title}`)
           return ticket.id
         }
@@ -526,6 +552,7 @@ export const useAppStore = create<State>()(
           approvalState: 'pending',
           values: {},
           attachments: [],
+          signatureRole: 'employee',
           updatedAt: nowIso()
         }
         set((s) => ({ tickets: [t, ...s.tickets] }))
@@ -707,6 +734,54 @@ export const useAppStore = create<State>()(
           }
           return { employees: merged }
         })
+      },
+
+      createGroup: async (payload) => {
+        if (API_ENABLED) {
+          const group = await apiJson('/groups/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          })
+          set((s) => ({ groups: upsertById(s.groups, group) }))
+          return group.id
+        }
+        const id = uid('grp')
+        const group: AccessGroup = {
+          id,
+          name: payload.name,
+          description: payload.description ?? '',
+          includeAllEmployees: payload.includeAllEmployees ?? false,
+          includeAllForms: payload.includeAllForms ?? false,
+          employeeIds: payload.employeeIds ?? [],
+          formIds: payload.formIds ?? [],
+          excludedEmployeeIds: payload.excludedEmployeeIds ?? [],
+          excludedFormIds: payload.excludedFormIds ?? []
+        }
+        set((s) => ({ groups: upsertById(s.groups, group) }))
+        return id
+      },
+
+      updateGroup: async (groupId, patch) => {
+        if (API_ENABLED) {
+          const group = await apiJson(`/groups/${groupId}/`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(patch)
+          })
+          set((s) => ({ groups: upsertById(s.groups, group) }))
+          return
+        }
+        set((s) => ({
+          groups: s.groups.map((g) => (g.id === groupId ? { ...g, ...patch } : g))
+        }))
+      },
+
+      deleteGroup: async (groupId) => {
+        if (API_ENABLED) {
+          await apiJson(`/groups/${groupId}/`, { method: 'DELETE' })
+        }
+        set((s) => ({ groups: s.groups.filter((g) => g.id !== groupId) }))
       }
     }),
     {
@@ -724,6 +799,7 @@ export const useAppStore = create<State>()(
         queue: s.queue,
         activities: s.activities,
         employees: s.employees,
+        groups: s.groups,
         lastSyncSuccess: s.lastSyncSuccess
       })
     }

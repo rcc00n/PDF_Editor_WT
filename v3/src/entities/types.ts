@@ -3,7 +3,8 @@ export type Id = string
 export type FormStatus = 'draft' | 'active' | 'archived'
 export type SyncState = 'offline_only' | 'synced' | 'has_queue' | 'failed' | 'unknown'
 
-export type FieldType = 'text' | 'numeric' | 'checkbox' | 'date' | 'signature' | 'photo' | 'employee'
+export type FieldType = 'text' | 'numeric' | 'checkbox' | 'date' | 'signature' | 'photo' | 'employee' | 'select' | 'radio'
+export type SignatureRole = 'employee' | 'client' | 'admin' | 'other'
 
 export type Validation =
   | { kind: 'none' }
@@ -19,6 +20,10 @@ export type Field = {
   hint?: string
   helpText?: string
   fontSize?: number
+  maxLength?: number
+  options?: string[]
+  autoValue?: 'today' | 'creator'
+  readOnly?: boolean
   validation: Validation
   page: number
   // normalized 0..1 relative to page box
@@ -35,6 +40,18 @@ export type Employee = {
   role?: string
   phone?: string
   active: boolean
+}
+
+export type AccessGroup = {
+  id: Id
+  name: string
+  description?: string
+  includeAllEmployees?: boolean
+  includeAllForms?: boolean
+  employeeIds: Id[]
+  formIds: Id[]
+  excludedEmployeeIds?: Id[]
+  excludedFormIds?: Id[]
 }
 
 export type FormVersion = {
@@ -64,6 +81,7 @@ export type FormTemplate = {
 }
 
 export type TicketStatus = 'pending' | 'in_progress' | 'synced' | 'error' | 'queued'
+export type ApprovalState = 'pending' | 'approved'
 
 export type Ticket = {
   id: Id // FT-xxxx
@@ -73,10 +91,11 @@ export type Ticket = {
   assignedTo: string
   assignedAt: string // ISO
   status: TicketStatus
-  approvalState: 'pending' | 'approved'
+  approvalState: ApprovalState
   values: Record<string, any>
   attachments: Array<{ id: Id; name: string; mime: string; dataUrl?: string; url?: string }>
   signature?: { signer: string; dataUrl?: string; url?: string }
+  signatureRole?: SignatureRole
   lastError?: string
   updatedAt: string // ISO
 }
