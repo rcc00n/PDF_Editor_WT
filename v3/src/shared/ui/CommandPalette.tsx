@@ -90,7 +90,7 @@ export default function CommandPalette() {
         title: 'Groups',
         subtitle: 'Access group assignments',
         icon: Users,
-        run: () => nav('/groups'),
+        run: () => nav('/employees#groups'),
         keywords: 'groups access forms permissions'
       })
     }

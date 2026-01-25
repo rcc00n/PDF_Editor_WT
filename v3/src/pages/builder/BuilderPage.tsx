@@ -30,7 +30,7 @@ import {
 import { useElementSize } from "@/shared/hooks/useElementSize";
 import PdfPageCanvas from "@/features/pdf/PdfPageCanvas";
 import { cn } from "@/shared/ui/cn";
-import { Eye, Upload, CheckCircle2, Trash2 } from "lucide-react";
+import { Eye, Upload, CheckCircle2, Trash2, Pencil } from "lucide-react";
 
 type ToolPreset = {
   id: string;
@@ -203,6 +203,7 @@ export default function BuilderPage() {
   const publishVersion = useAppStore((s) => s.publishVersion);
   const upsertField = useAppStore((s) => s.upsertField);
   const deleteField = useAppStore((s) => s.deleteField);
+  const renameForm = useAppStore((s) => s.renameForm);
   const pushToast = useAppStore((s) => s.pushToast);
   const pdfInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -265,6 +266,9 @@ export default function BuilderPage() {
   const [pendingPath, setPendingPath] = useState<string | null>(null);
   const [publishReady, setPublishReady] = useState(false);
   const [publishNext, setPublishNext] = useState<string | null>(null);
+  const [renameOpen, setRenameOpen] = useState(false);
+  const [renameValue, setRenameValue] = useState(form.name);
+  const [renaming, setRenaming] = useState(false);
   const shouldBlock = role === "admin" && Boolean(pdf) && !allowNavigate;
   const { navigator } = useContext(UNSAFE_NavigationContext);
   const [blockedTx, setBlockedTx] = useState<{
@@ -377,6 +381,40 @@ export default function BuilderPage() {
     },
     [form.id, publishVersion, pushToast, version.id]
   );
+
+  const handleRename = async () => {
+    const nextName = renameValue.trim();
+    if (!nextName) {
+      pushToast({
+        title: "Name required",
+        message: "Enter a form name before saving.",
+        variant: "warning",
+      });
+      return;
+    }
+    if (nextName === form.name) {
+      setRenameOpen(false);
+      return;
+    }
+    setRenaming(true);
+    try {
+      await renameForm(form.id, nextName);
+      pushToast({
+        title: "Form renamed",
+        message: nextName,
+        variant: "success",
+      });
+      setRenameOpen(false);
+    } catch (err: any) {
+      pushToast({
+        title: "Rename failed",
+        message: err?.message || "Unable to rename form",
+        variant: "danger",
+      });
+    } finally {
+      setRenaming(false);
+    }
+  };
 
   useEffect(() => {
     if (!publishReady) return;
@@ -559,6 +597,15 @@ export default function BuilderPage() {
           <>
             <Button variant="ghost" onClick={() => nav("/field")}>
               <Eye size={16} /> Preview Field App
+            </Button>
+
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setRenameValue(form.name);
+                setRenameOpen(true);
+              }}>
+              <Pencil size={16} /> Rename
             </Button>
 
             <input
@@ -762,6 +809,36 @@ export default function BuilderPage() {
           </Card>
         </div>
       </div>
+
+      <Modal
+        open={renameOpen}
+        onClose={() => setRenameOpen(false)}
+        title="Rename form"
+      >
+        <div className="space-y-3">
+          <div className="text-sm text-neutral-500">
+            Update the template name for this form.
+          </div>
+          <Input
+            value={renameValue}
+            onChange={(e) => setRenameValue(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                void handleRename();
+              }
+            }}
+          />
+          <div className="flex justify-end gap-2">
+            <Button variant="secondary" onClick={() => setRenameOpen(false)}>
+              Cancel
+            </Button>
+            <Button disabled={renaming} onClick={() => void handleRename()}>
+              Save
+            </Button>
+          </div>
+        </div>
+      </Modal>
 
       <Modal
         open={mobilePanel === "tools"}
@@ -1050,7 +1127,7 @@ const FieldEditor = React.memo(function FieldEditor({
           </div>
         </div>
 
-        <div>
+        <div className="hidden">
           <div className="text-xs text-neutral-500 dark:text-neutral-400 mb-1">
             Type
           </div>

@@ -121,42 +121,27 @@ export default function DashboardPage() {
 
   const summary = useMemo(() => {
     const now = new Date();
-    const sameDay = (iso: string) => {
-      const d = new Date(iso);
-      return (
-        d.getFullYear() === now.getFullYear() &&
-        d.getMonth() === now.getMonth() &&
-        d.getDate() === now.getDate()
-      );
-    };
+    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const startOfWeek = new Date(startOfDay);
+    const day = startOfWeek.getDay();
+    const weekOffset = (day + 6) % 7;
+    startOfWeek.setDate(startOfWeek.getDate() - weekOffset);
 
-    let pending = 0;
-    let attention = 0;
-    let syncedToday = 0;
-    let pendingReview = 0;
+    let submittedToday = 0;
+    let submittedWeek = 0;
+    let submittedMonth = 0;
 
     for (const t of scopedTickets) {
-      if (
-        t.status === "pending" ||
-        t.status === "queued" ||
-        t.status === "in_progress"
-      )
-        pending += 1;
-      if (t.status === "error" || t.status === "queued" || t.status === "pending") {
-        attention += 1;
-      }
-      if (t.status === "synced" && sameDay(t.updatedAt)) syncedToday += 1;
+      if (t.status !== "synced") continue;
+      const submittedAt = new Date(t.updatedAt);
+      if (submittedAt >= startOfDay) submittedToday += 1;
+      if (submittedAt >= startOfWeek) submittedWeek += 1;
+      if (submittedAt >= startOfMonth) submittedMonth += 1;
     }
 
-    const reviewSource = role === "admin" ? tickets : scopedTickets;
-    for (const t of reviewSource) {
-      if (t.status === "synced" && t.approvalState !== "approved") {
-        pendingReview += 1;
-      }
-    }
-
-    return { pending, attention, syncedToday, pendingReview };
-  }, [role, scopedTickets, tickets]);
+    return { submittedToday, submittedWeek, submittedMonth };
+  }, [scopedTickets]);
 
   const formsVisible = useMemo(() => availableForms.slice(0, 6), [availableForms]);
 
@@ -200,11 +185,10 @@ export default function DashboardPage() {
             </CardSub>
           </CardHeader>
           <CardBody className="pt-2">
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              <SummaryStat label="Pending" value={summary.pending} />
-              <SummaryStat label="Needs attention" value={summary.attention} />
-              <SummaryStat label="Synced today" value={summary.syncedToday} />
-              <SummaryStat label="Pending review" value={summary.pendingReview} />
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+              <SummaryStat label="Submitted today" value={summary.submittedToday} />
+              <SummaryStat label="Submitted this week" value={summary.submittedWeek} />
+              <SummaryStat label="Submitted this month" value={summary.submittedMonth} />
             </div>
           </CardBody>
         </Card>
@@ -233,7 +217,7 @@ export default function DashboardPage() {
                     <Link
                       key={form.id}
                       to={`/builder/${form.id}`}
-                      className="rf-focus flex items-center justify-between gap-3 rounded-2xl border border-orange-100 bg-white px-3 py-3 hover:bg-orange-50"
+                      className="rf-focus flex items-center justify-between gap-3 rounded-2xl border border-[var(--rf-border-soft)] bg-[var(--rf-surface)] px-3 py-3 hover:bg-[var(--rf-orange-50)]"
                     >
                       <div className="min-w-0">
                         <div className="font-medium truncate">{form.name}</div>
@@ -278,7 +262,7 @@ export default function DashboardPage() {
                   <Link
                     key={ticket.id}
                     to={`/field/ticket/${ticket.id}`}
-                    className="rf-focus flex items-center justify-between gap-3 rounded-2xl border border-orange-100 bg-white px-3 py-3 hover:bg-orange-50"
+                    className="rf-focus flex items-center justify-between gap-3 rounded-2xl border border-[var(--rf-border-soft)] bg-[var(--rf-surface)] px-3 py-3 hover:bg-[var(--rf-orange-50)]"
                   >
                     <div className="min-w-0">
                       <div className="font-medium truncate">
@@ -334,8 +318,8 @@ export default function DashboardPage() {
 
 function SummaryStat({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-2xl border border-orange-100 bg-orange-50/70 px-4 py-3">
-      <div className="text-xs text-orange-700/70">{label}</div>
+    <div className="rounded-2xl border border-[var(--rf-border-soft)] bg-[var(--rf-orange-50)] px-4 py-3">
+      <div className="text-xs text-[var(--rf-text-accent)] opacity-70">{label}</div>
       <div className="mt-1 text-2xl font-semibold">{value}</div>
     </div>
   );

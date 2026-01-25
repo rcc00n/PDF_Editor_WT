@@ -133,7 +133,7 @@ export default function BuilderHomePage() {
                     {filteredRows.map(({ form, version }) => (
                       <tr
                         key={form.id}
-                        className="border-t border-neutral-200 cursor-pointer transition-colors hover:bg-orange-50/40 focus-within:bg-orange-50/40"
+                        className="border-t border-neutral-200 cursor-pointer transition-colors hover:bg-[var(--rf-orange-50)] focus-within:bg-[var(--rf-orange-50)]"
                         role="button"
                         tabIndex={0}
                         onClick={() => nav(`/builder/${form.id}`)}
@@ -191,7 +191,7 @@ export default function BuilderHomePage() {
                             <Button
                               size="sm"
                               variant="ghost"
-                              className="w-full sm:w-auto border border-orange-200 bg-white hover:bg-orange-50"
+                              className="w-full sm:w-auto border border-[var(--rf-border)] bg-[var(--rf-surface)] hover:bg-[var(--rf-orange-50)]"
                               onClick={e => {
                                 e.stopPropagation()
                                 setVersionsFormId(form.id)
@@ -249,7 +249,7 @@ export default function BuilderHomePage() {
               {versionsForm.versions.map(version => (
                 <div
                   key={version.id}
-                  className="rounded-2xl border border-orange-100 bg-orange-50/40 p-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"
+                  className="rounded-2xl border border-[var(--rf-border-soft)] bg-[var(--rf-orange-50)] p-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"
                 >
                   <div>
                     <div className="text-sm font-semibold">{version.version}</div>

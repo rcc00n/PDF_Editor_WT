@@ -55,7 +55,7 @@ export default function BuilderCompletePage() {
         <Card>
           <CardBody className="py-8">
             <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
-              <div className="h-14 w-14 rounded-2xl border border-orange-200 bg-orange-50 flex items-center justify-center text-orange-600">
+              <div className="h-14 w-14 rounded-2xl border border-[var(--rf-border)] bg-[var(--rf-orange-50)] flex items-center justify-center text-[var(--rf-orange-600)]">
                 <CheckCircle2 size={26} />
               </div>
               <div className="min-w-0">
@@ -67,13 +67,13 @@ export default function BuilderCompletePage() {
             </div>
 
             <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div className="rounded-2xl border border-orange-100 bg-orange-50/70 p-4">
-                <div className="text-xs text-orange-700/70">Form</div>
+              <div className="rounded-2xl border border-[var(--rf-border-soft)] bg-[var(--rf-orange-50)] p-4">
+                <div className="text-xs text-[var(--rf-text-accent)] opacity-70">Form</div>
                 <div className="mt-1 font-semibold truncate">{form.name}</div>
                 <div className="text-xs text-neutral-500 truncate">{form.subtitle ?? 'Template'}</div>
               </div>
-              <div className="rounded-2xl border border-orange-100 bg-orange-50/70 p-4">
-                <div className="text-xs text-orange-700/70">Version</div>
+              <div className="rounded-2xl border border-[var(--rf-border-soft)] bg-[var(--rf-orange-50)] p-4">
+                <div className="text-xs text-[var(--rf-text-accent)] opacity-70">Version</div>
                 <div className="mt-1 font-semibold">{version.version}</div>
                 <div className="mt-1">
                   <Badge tone="success">{version.status}</Badge>
@@ -98,7 +98,7 @@ export default function BuilderCompletePage() {
               <Button variant="ghost" onClick={() => nav(`/builder/${form.id}`)}>
                 <PencilRuler size={16} /> Edit this form
               </Button>
-              <Link to="/builder" className="text-sm text-orange-700 hover:underline">
+              <Link to="/builder" className="text-sm text-[var(--rf-text-accent)] hover:underline">
                 Go to builder home
               </Link>
             </div>

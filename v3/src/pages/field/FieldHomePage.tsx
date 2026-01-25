@@ -246,8 +246,12 @@ export default function FieldHomePage() {
                   : isStale
                   ? "Update ready"
                   : "Not downloaded";
+                const hasCachedPdf = Boolean(
+                  (meta?.versionId === version?.id ? meta.pdfKey : undefined) ||
+                    version?.pdf?.cacheKey
+                );
                 const needsOnline = Boolean(
-                  version?.pdf?.url && !version.pdf?.dataUrl
+                  version?.pdf?.url && !version.pdf?.dataUrl && !hasCachedPdf
                 );
                 const isBusy = downloadingFormId === f.id;
                 const downloadLabel = isBusy
@@ -275,7 +279,7 @@ export default function FieldHomePage() {
                           : ""}
                       </div>
                       {needsOnline && !online && (
-                        <div className="mt-1 text-xs text-orange-600">
+                        <div className="mt-1 text-xs text-[var(--rf-orange-600)]">
                           Connect to download the PDF.
                         </div>
                       )}

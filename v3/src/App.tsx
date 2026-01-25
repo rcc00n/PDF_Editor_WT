@@ -9,9 +9,7 @@ import FieldHomePage from './pages/field/FieldHomePage'
 import FieldTicketPage from './pages/field/FieldTicketPage'
 import ReviewPage from './pages/review/ReviewPage'
 import ReviewTicketPage from './pages/review/ReviewTicketPage'
-import ReviewApprovedPage from './pages/review/ReviewApprovedPage'
 import EmployeesPage from './pages/employees/EmployeesPage'
-import GroupsPage from './pages/groups/GroupsPage'
 import LoginPage from './pages/auth/LoginPage'
 import { useAppStore } from './shared/state/useAppStore'
 import ToastHost from './shared/ui/ToastHost'
@@ -21,6 +19,7 @@ import { API_ENABLED } from './shared/api/config'
 
 export default function App() {
   const boot = useAppStore(s => s.boot)
+  const primePdfCache = useAppStore(s => s.primePdfCache)
   const online = useAppStore(s => s.online)
   const setSystemOnline = useAppStore(s => s.setSystemOnline)
   const initAuth = useAppStore(s => s.initAuth)
@@ -31,8 +30,9 @@ export default function App() {
   useEffect(() => {
     if (!API_ENABLED) seedIfEmpty()
     boot()
+    void primePdfCache()
     if (API_ENABLED) void initAuth()
-  }, [boot, initAuth])
+  }, [boot, initAuth, primePdfCache])
 
   useEffect(() => {
     const on = () => setSystemOnline(true)
@@ -75,9 +75,8 @@ export default function App() {
           <Route path="/field/ticket/:ticketId" element={<FieldTicketPage />} />
           <Route path="/review" element={<ReviewPage />} />
           <Route path="/review/:ticketId" element={<ReviewTicketPage />} />
-          <Route path="/review/approved/:ticketId" element={<ReviewApprovedPage />} />
           <Route path="/employees" element={<EmployeesPage />} />
-          <Route path="/groups" element={<GroupsPage />} />
+          <Route path="/groups" element={<Navigate to="/employees#groups" replace />} />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Route>
       </Routes>

@@ -17,6 +17,7 @@ import type {
 } from "@/entities/types";
 import { dateTimeShort } from "@/shared/lib/format";
 import { downloadDataUrl } from "@/shared/lib/download";
+import { getCachedPdf } from "@/shared/lib/pdfCache";
 import { exportRenderedFormPdf } from "@/features/export/exporters";
 import RenderedPdfPreview from "@/features/pdf/RenderedPdfPreview";
 import SignaturePad from "@/features/field/SignaturePad";
@@ -25,7 +26,15 @@ import {
   signatureRoleLabel,
   signatureRoles,
 } from "@/shared/lib/signatureRoles";
-import { ArrowLeft, Save, Send, ImagePlus, FileDown, Eye } from "lucide-react";
+import {
+  ArrowLeft,
+  Save,
+  Send,
+  ImagePlus,
+  FileDown,
+  Eye,
+  Lock,
+} from "lucide-react";
 
 const DEFAULT_FONT_SIZE = 12;
 
@@ -50,11 +59,13 @@ export default function FieldTicketPage() {
 
   const ticket = useAppStore((s) => s.tickets.find((t) => t.id === ticketId));
   const forms = useAppStore((s) => s.forms);
+  const offlineForms = useAppStore((s) => s.offlineForms);
   const updateTicket = useAppStore((s) => s.updateTicket);
   const employees = useAppStore((s) => s.employees);
   const saveDraft = useAppStore((s) => s.saveDraft);
   const submitTicket = useAppStore((s) => s.submitTicket);
   const apiEnabled = useAppStore((s) => s.apiEnabled);
+  const online = useAppStore((s) => s.online);
   const user = useAppStore((s) => s.user);
   const role = useAppStore((s) => s.role);
   const uploadAttachment = useAppStore((s) => s.uploadAttachment);
@@ -62,6 +73,9 @@ export default function FieldTicketPage() {
   const attachmentInputRef = useRef<HTMLInputElement | null>(null);
   const [renderOpen, setRenderOpen] = useState(false);
   const [signatureOpen, setSignatureOpen] = useState(false);
+  const [activeView, setActiveView] = useState<"fields" | "overlay">("fields");
+  const [cachedPdfUrl, setCachedPdfUrl] = useState<string | null>(null);
+  const cachedPdfRef = useRef<string | null>(null);
 
   const ctx = useMemo(() => {
     if (!ticket) return null;
@@ -74,6 +88,44 @@ export default function FieldTicketPage() {
       .sort((a, b) => a.page - b.page || a.y - b.y || a.x - b.x);
     return { form, version, fields };
   }, [ticket, forms]);
+
+const offlineMeta = ctx?.form ? offlineForms[ctx.form.id] : undefined;
+const cacheKey =
+  ctx?.version?.pdf?.cacheKey ??
+  (offlineMeta?.versionId === ctx?.version?.id ? offlineMeta?.pdfKey : undefined);
+
+  useEffect(() => {
+    let active = true;
+    if (!cacheKey || ctx?.version?.pdf?.dataUrl) {
+      if (cachedPdfRef.current) {
+        URL.revokeObjectURL(cachedPdfRef.current);
+        cachedPdfRef.current = null;
+      }
+      setCachedPdfUrl(null);
+      return;
+    }
+    void (async () => {
+      const blob = await getCachedPdf(cacheKey);
+      if (!active) return;
+      if (!blob) {
+        setCachedPdfUrl(null);
+        return;
+      }
+      const objectUrl = URL.createObjectURL(blob);
+      if (cachedPdfRef.current) URL.revokeObjectURL(cachedPdfRef.current);
+      cachedPdfRef.current = objectUrl;
+      setCachedPdfUrl(objectUrl);
+    })();
+    return () => {
+      active = false;
+    };
+  }, [cacheKey, ctx?.version?.pdf?.dataUrl]);
+
+  useEffect(() => {
+    return () => {
+      if (cachedPdfRef.current) URL.revokeObjectURL(cachedPdfRef.current);
+    };
+  }, []);
 
   if (!ticket || !ctx?.form || !ctx?.version) {
     return (
@@ -91,7 +143,12 @@ export default function FieldTicketPage() {
   }
 
   const { form, version, fields } = ctx;
-  const renderPdfUrl = version.pdf?.dataUrl ?? version.pdf?.url;
+  const renderPdfUrl =
+    cachedPdfUrl ?? version.pdf?.dataUrl ?? (online ? version.pdf?.url : undefined);
+  const signatureLocked = Boolean(
+    ticket.signature?.dataUrl || ticket.signature?.url
+  );
+  const isLocked = signatureLocked;
   const fallbackRole: SignatureRole =
     user?.role === "admin" || role === "admin" ? "admin" : "employee";
   const signatureRole = (ticket.signatureRole ?? fallbackRole) as SignatureRole;
@@ -110,6 +167,36 @@ export default function FieldTicketPage() {
       updateTicket(ticket.id, { signatureRole: signatureRole });
     }
   }, [signatureRole, ticket.id, ticket.signatureRole, updateTicket]);
+
+  useEffect(() => {
+    if (!renderPdfUrl && activeView === "overlay") {
+      setActiveView("fields");
+    }
+  }, [activeView, renderPdfUrl]);
+
+  const lockNoticeRef = useRef<{
+    ticketId?: string;
+    locked: boolean;
+  }>({
+    ticketId: ticket.id,
+    locked: signatureLocked,
+  });
+
+  useEffect(() => {
+    const ref = lockNoticeRef.current;
+    if (ref.ticketId !== ticket.id) {
+      lockNoticeRef.current = { ticketId: ticket.id, locked: signatureLocked };
+      return;
+    }
+    if (!ref.locked && signatureLocked) {
+      pushToast({
+        title: "Form locked",
+        message: "Signature captured. This form is now read-only.",
+        variant: "warning",
+      });
+    }
+    lockNoticeRef.current.locked = signatureLocked;
+  }, [pushToast, signatureLocked, ticket.id]);
 
   const updateSignatureRole = (nextRole: SignatureRole) => {
     const currentSigner = ticket.signature?.signer ?? "";
@@ -137,7 +224,7 @@ export default function FieldTicketPage() {
 
   const handleExportPdf = useCallback(async () => {
     try {
-      await exportRenderedFormPdf(ticket, version);
+      await exportRenderedFormPdf(ticket, version, renderPdfUrl);
     } catch (err: unknown) {
       const message =
         err instanceof Error ? err.message : "Unable to export rendered PDF";
@@ -147,131 +234,204 @@ export default function FieldTicketPage() {
         variant: "danger",
       });
     }
-  }, [ticket, version, pushToast]);
+  }, [ticket, version, renderPdfUrl, pushToast]);
 
   const handleOverlayValueChange = useCallback(
     (key: string, value: any) => {
+      if (isLocked) return;
       updateTicket(ticket.id, {
         values: { ...ticket.values, [key]: value },
       });
     },
-    [ticket.id, ticket.values, updateTicket]
+    [isLocked, ticket.id, ticket.values, updateTicket]
   );
 
   return (
-    <div className="pb-10">
-      <SectionHeader
-        title={`${form.name}`}
-        subtitle={`${ticket.id} · ${ticket.title} · ${
-          ticket.assignedTo
-        } · ${dateTimeShort(ticket.assignedAt)} · ${version.version}`}
-        right={
-          <>
-            <Button variant="ghost" onClick={() => nav("/field")}>
-              <ArrowLeft size={16} /> Back
-            </Button>
+    <div className="pb-28 sm:pb-10">
+      <div className="sticky top-0 z-30 border-b border-neutral-200/80 bg-white/95 backdrop-blur dark:border-neutral-800/80 dark:bg-neutral-950/95">
+        <SectionHeader
+          title={`${form.name}`}
+          subtitle={`${ticket.id} · ${ticket.title} · ${
+            ticket.assignedTo
+          } · ${dateTimeShort(ticket.assignedAt)} · ${version.version}`}
+          right={
+            <>
+              <Button variant="ghost" onClick={() => nav("/field")}>
+                <ArrowLeft size={16} /> Back
+              </Button>
+              <Button
+                variant="secondary"
+                className="hidden sm:inline-flex"
+                onClick={() => void saveDraft(ticket.id)}>
+                <Save size={16} /> Save Draft
+              </Button>
+              <Button
+                variant="secondary"
+                className="hidden sm:inline-flex bg-[var(--rf-orange-100)] border-[var(--rf-orange-300)]"
+                disabled={!renderPdfUrl}
+                onClick={() => setRenderOpen(true)}
+                title={
+                  renderPdfUrl ? "View rendered PDF" : "No PDF uploaded yet"
+                }>
+                <Eye size={16} /> View Rendered PDF
+              </Button>
+              <Button className="hidden sm:inline-flex" onClick={() => void handleSubmit()}>
+                <Send size={16} /> Submit (Queued)
+              </Button>
+            </>
+          }
+        />
+      </div>
+
+      <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-neutral-200/80 bg-white/95 backdrop-blur sm:hidden">
+        <div className="px-4 py-3">
+          <div className="grid grid-cols-2 gap-2">
             <Button
+              size="sm"
               variant="secondary"
               onClick={() => void saveDraft(ticket.id)}>
               <Save size={16} /> Save Draft
             </Button>
             <Button
+              size="sm"
               variant="secondary"
-              className="bg-orange-100 border-orange-300"
+              className="bg-[var(--rf-orange-100)] border-[var(--rf-orange-300)]"
               disabled={!renderPdfUrl}
               onClick={() => setRenderOpen(true)}
-              title={
-                renderPdfUrl ? "View rendered PDF" : "No PDF uploaded yet"
-              }>
-              <Eye size={16} /> View Rendered PDF
+              title={renderPdfUrl ? "View rendered PDF" : "No PDF uploaded yet"}>
+              <Eye size={16} /> View PDF
             </Button>
-            <Button onClick={() => void handleSubmit()}>
-              <Send size={16} /> Submit (Queued)
-            </Button>
-          </>
-        }
-      />
+          </div>
+          <Button className="mt-2 w-full" onClick={() => void handleSubmit()}>
+            <Send size={16} /> Submit (Queued)
+          </Button>
+        </div>
+      </div>
 
       <div className="px-4 mt-4 sm:px-6 sm:mt-6 grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-4 items-start">
         <div className="flex flex-col gap-4">
-          <Card>
-            <CardBody className="pt-5 sm:pt-6">
-              <div className="flex items-center justify-between gap-3">
-                <div className="text-sm font-semibold">Fields</div>
-                <Badge tone={ticketStatusTone(ticket.status)}>
-                  {ticket.status}
-                </Badge>
-              </div>
-
-              <div className="mt-4 space-y-4">
-                {fields.length === 0 && (
-                  <div className="text-sm text-neutral-500 dark:text-neutral-400">
-                    This version has no mapped fields yet. Open the Builder and
-                    add fields.
-                  </div>
-                )}
-
-                {fields.map((f) => (
-                  <FieldInput
-                    key={f.id}
-                    field={f}
-                    value={ticket.values[f.key]}
-                    employees={employees}
-                    creatorName={ticket.assignedTo}
-                    signature={ticket.signature}
-                    onChange={(val) => {
-                      updateTicket(ticket.id, {
-                        values: { ...ticket.values, [f.key]: val },
-                      });
-                    }}
-                    onSignature={(sig) =>
-                      updateTicket(ticket.id, {
-                        signature: { signer: signatureSigner, dataUrl: sig },
-                      })
-                    }
-                    onSigner={(name) =>
-                      updateTicket(ticket.id, {
-                        signature: {
-                          signer: name,
-                          dataUrl: ticket.signature?.dataUrl,
-                        },
-                      })
-                    }
-                  />
-                ))}
-              </div>
-            </CardBody>
-          </Card>
-
-          <Card>
-            <CardBody className="pt-5 sm:pt-6">
-              <div className="flex items-center justify-between gap-3">
+          {isLocked && (
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-100">
+              <div className="flex items-start gap-2">
+                <Lock size={16} className="mt-0.5" />
                 <div>
-                  <div className="text-sm font-semibold">Live PDF Overlay</div>
-                  <div className="text-xs text-neutral-500 dark:text-neutral-400">
-                    Fields are pinned to the PDF as you type.
+                  <div className="font-semibold">Signed and locked</div>
+                  <div className="text-xs text-amber-800 dark:text-amber-200 mt-1">
+                    Signature captured. This form is now read-only.
                   </div>
                 </div>
-                {!renderPdfUrl && <Badge tone="warning">No PDF</Badge>}
               </div>
-              <div className="mt-3">
-                {renderPdfUrl ? (
-                  <RenderedPdfPreview
-                    pdfUrl={renderPdfUrl}
-                    fields={version.fields}
-                    ticket={ticket}
-                    interactive
-                    employees={employees}
-                    onValueChange={handleOverlayValueChange}
-                    onSignatureClick={() => setSignatureOpen(true)}
-                    onPhotoClick={() => attachmentInputRef.current?.click()}
-                  />
-                ) : (
-                  <div className="text-sm text-neutral-500 dark:text-neutral-400">
-                    Upload a PDF in the Builder to enable the overlay preview.
+            </div>
+          )}
+
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              size="sm"
+              variant={activeView === "fields" ? "secondary" : "ghost"}
+              onClick={() => setActiveView("fields")}>
+              Fields
+            </Button>
+            <Button
+              size="sm"
+              variant={activeView === "overlay" ? "secondary" : "ghost"}
+              disabled={!renderPdfUrl}
+              onClick={() => setActiveView("overlay")}
+              title={renderPdfUrl ? "PDF overlay view" : "No PDF uploaded yet"}>
+              PDF Overlay
+            </Button>
+          </div>
+
+          <Card>
+            <CardBody className="pt-5 sm:pt-6">
+              {activeView === "fields" ? (
+                <>
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="text-sm font-semibold">Fields</div>
+                    <Badge tone={ticketStatusTone(ticket.status)}>
+                      {ticket.status}
+                    </Badge>
                   </div>
-                )}
-              </div>
+
+                  <div className="mt-4 space-y-4">
+                    {fields.length === 0 && (
+                      <div className="text-sm text-neutral-500 dark:text-neutral-400">
+                        This version has no mapped fields yet. Open the Builder
+                        and add fields.
+                      </div>
+                    )}
+
+                    {fields.map((f) => (
+                      <FieldInput
+                        key={f.id}
+                        field={f}
+                        value={ticket.values[f.key]}
+                        employees={employees}
+                        creatorName={ticket.assignedTo}
+                        signature={ticket.signature}
+                        locked={isLocked}
+                        onChange={(val) => {
+                          updateTicket(ticket.id, {
+                            values: { ...ticket.values, [f.key]: val },
+                          });
+                        }}
+                        onSignature={(sig) =>
+                          updateTicket(ticket.id, {
+                            signature: { signer: signatureSigner, dataUrl: sig },
+                          })
+                        }
+                        onSigner={(name) =>
+                          updateTicket(ticket.id, {
+                            signature: {
+                              signer: name,
+                              dataUrl: ticket.signature?.dataUrl,
+                            },
+                          })
+                        }
+                      />
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <div className="text-sm font-semibold">
+                        Live PDF Overlay
+                      </div>
+                      <div className="text-xs text-neutral-500 dark:text-neutral-400">
+                        Fields are pinned to the PDF as you type.
+                      </div>
+                    </div>
+                    {!renderPdfUrl && <Badge tone="warning">No PDF</Badge>}
+                  </div>
+                  <div className="mt-3">
+                    {renderPdfUrl ? (
+                      <RenderedPdfPreview
+                        pdfUrl={renderPdfUrl}
+                        fields={version.fields}
+                        ticket={ticket}
+                        interactive={!isLocked}
+                        pageMode="scroll"
+                        employees={employees}
+                        onValueChange={handleOverlayValueChange}
+                        onSignatureClick={
+                          isLocked ? undefined : () => setSignatureOpen(true)
+                        }
+                        onPhotoClick={
+                          isLocked
+                            ? undefined
+                            : () => attachmentInputRef.current?.click()
+                        }
+                      />
+                    ) : (
+                      <div className="text-sm text-neutral-500 dark:text-neutral-400">
+                        Upload a PDF in the Builder to enable the overlay
+                        preview.
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
             </CardBody>
           </Card>
         </div>
@@ -289,6 +449,7 @@ export default function FieldTicketPage() {
                 type="file"
                 accept="image/*"
                 className="hidden"
+                disabled={isLocked}
                 onChange={(e) => {
                   const file = e.target.files?.[0];
                   if (!file) return;
@@ -337,7 +498,8 @@ export default function FieldTicketPage() {
               <Button
                 variant="secondary"
                 type="button"
-                onClick={() => attachmentInputRef.current?.click()}>
+                onClick={() => attachmentInputRef.current?.click()}
+                disabled={isLocked}>
                 <ImagePlus size={16} /> Add photo
               </Button>
 
@@ -403,7 +565,8 @@ export default function FieldTicketPage() {
                     value={signatureRole}
                     onChange={(e) =>
                       updateSignatureRole(e.target.value as SignatureRole)
-                    }>
+                    }
+                    disabled={isLocked}>
                     {signatureRoles.map((role) => (
                       <option key={role.value} value={role.value}>
                         {role.label}
@@ -430,6 +593,7 @@ export default function FieldTicketPage() {
                         },
                       })
                     }
+                    readOnly={isLocked}
                   />
                   <div className="text-[11px] text-neutral-500 dark:text-neutral-400 mt-1">
                     Displayed as {signatureRoleLabel(signatureRole)}.
@@ -442,6 +606,7 @@ export default function FieldTicketPage() {
                       signature: { signer: signatureSigner, dataUrl: sig },
                     })
                   }
+                  disabled={isLocked}
                 />
               </div>
             </CardBody>
@@ -480,6 +645,7 @@ export default function FieldTicketPage() {
                   },
                 })
               }
+              readOnly={isLocked}
             />
           </div>
           <SignaturePad
@@ -489,6 +655,7 @@ export default function FieldTicketPage() {
                 signature: { signer: signatureSigner, dataUrl: sig },
               })
             }
+            disabled={isLocked}
           />
         </div>
       </Modal>
@@ -563,6 +730,7 @@ function FieldInput({
   employees,
   creatorName,
   signature,
+  locked = false,
   onChange,
   onSignature,
   onSigner,
@@ -572,6 +740,7 @@ function FieldInput({
   employees: Employee[];
   creatorName: string;
   signature?: { signer: string; dataUrl?: string };
+  locked?: boolean;
   onChange: (v: any) => void;
   onSignature: (dataUrl?: string) => void;
   onSigner: (name: string) => void;
@@ -582,6 +751,7 @@ function FieldInput({
   const [expanded, setExpanded] = useState(false);
   const fontSize = field.fontSize ?? DEFAULT_FONT_SIZE;
   const readOnly = field.readOnly === true;
+  const isLocked = readOnly || locked;
   const autoNote =
     field.autoValue === "today" && field.type === "date"
       ? "Auto-filled with today's date."
@@ -595,6 +765,7 @@ function FieldInput({
 
   useEffect(() => {
     if (!field.autoValue) return;
+    if (isLocked) return;
     if (value !== undefined && value !== null && value !== "") return;
     if (field.autoValue === "today" && field.type === "date") {
       const today = localIsoDate();
@@ -626,7 +797,7 @@ function FieldInput({
             className="h-5 w-5"
             checked={!!value}
             onChange={(e) => onChange(e.target.checked)}
-            disabled={readOnly}
+            disabled={isLocked}
           />
         </div>
       </div>
@@ -678,7 +849,7 @@ function FieldInput({
             className="rf-focus h-10 w-full rounded-2xl border border-neutral-200 bg-white px-3 text-sm dark:border-neutral-800 dark:bg-neutral-950"
             value={value ?? ""}
             onChange={(e) => onChange(e.target.value)}
-            disabled={readOnly || options.length === 0}
+            disabled={isLocked || options.length === 0}
             style={{ fontSize }}>
             <option value="">
               {options.length ? "Select option" : "No options"}
@@ -730,7 +901,7 @@ function FieldInput({
                   value={opt}
                   checked={value === opt}
                   onChange={(e) => onChange(e.target.value)}
-                  disabled={readOnly}
+                  disabled={isLocked}
                 />
                 <span>{opt}</span>
               </label>
@@ -779,14 +950,14 @@ function FieldInput({
               setExpanded(false);
             }}
             style={{ fontSize }}
-            disabled={readOnly}
+            disabled={isLocked}
           />
           <select
             className="rf-focus h-10 w-full rounded-2xl border border-neutral-200 bg-white px-3 text-sm dark:border-neutral-800 dark:bg-neutral-950"
             value={value ?? ""}
             onChange={(e) => onChange(e.target.value)}
             style={{ fontSize }}
-            disabled={readOnly}>
+            disabled={isLocked}>
             <option value="">Select employee</option>
             {visible.map((e) => (
               <option key={e.id} value={e.name}>
@@ -841,7 +1012,7 @@ function FieldInput({
             value={value ?? ""}
             onChange={(e) => onChange(e.target.value)}
             style={{ fontSize }}
-            readOnly={readOnly}
+            readOnly={isLocked}
           />
         ) : field.type === "numeric" ? (
           <Input
@@ -853,7 +1024,7 @@ function FieldInput({
               onChange(trimmed === "" ? "" : Number(trimmed));
             }}
             style={{ fontSize }}
-            readOnly={readOnly}
+            readOnly={isLocked}
             maxLength={maxLength}
           />
         ) : (
@@ -861,7 +1032,7 @@ function FieldInput({
             value={value ?? ""}
             onChange={(e) => onChange(e.target.value)}
             style={{ fontSize }}
-            readOnly={readOnly}
+            readOnly={isLocked}
             maxLength={maxLength}
           />
         )}
@@ -875,7 +1046,7 @@ function FieldInput({
       {autoNote && (
         <div className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
           {autoNote}
-          {readOnly ? "" : " (editable)"}
+          {isLocked ? "" : " (editable)"}
         </div>
       )}
       {field.type === "numeric" &&
@@ -903,7 +1074,7 @@ function FieldInput({
             value={value ?? ""}
             onChange={(e) => onChange(e.target.value)}
             style={{ fontSize }}
-            readOnly={readOnly}
+            readOnly={isLocked}
             maxLength={maxLength}
           />
         </div>
@@ -915,7 +1086,7 @@ function FieldInput({
         {autoNote && (
           <div className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
             {autoNote}
-            {readOnly ? "" : " (editable)"}
+            {isLocked ? "" : " (editable)"}
           </div>
         )}
       </div>

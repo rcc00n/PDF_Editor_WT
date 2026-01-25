@@ -78,8 +78,8 @@ export async function exportTicketPdf(ticket: Ticket, form: FormTemplate, versio
   doc.save(`${ticket.id}.pdf`)
 }
 
-export async function exportRenderedFormPdf(ticket: Ticket, version: FormVersion) {
-  const source = version.pdf?.dataUrl ?? version.pdf?.url
+export async function exportRenderedFormPdf(ticket: Ticket, version: FormVersion, sourceOverride?: string) {
+  const source = sourceOverride ?? version.pdf?.dataUrl ?? version.pdf?.url
   if (!source) {
     throw new Error('No PDF available for this version')
   }

@@ -6,7 +6,7 @@ export function Card({ className, children }: PropsWithChildren<{ className?: st
   return (
     <div
       className={cn(
-        'rf-card border border-orange-100 bg-white',
+        'rf-card border border-[var(--rf-border-soft)] bg-[var(--rf-surface)]',
         className
       )}
     >
