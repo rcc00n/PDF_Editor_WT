@@ -3,10 +3,11 @@ import { createJSONStorage, persist } from 'zustand/middleware'
 import type { Activity, AccessGroup, Employee, FormTemplate, FormVersion, Id, QueueItem, Ticket } from '@/entities/types'
 import { nowIso, uid, nextTicketId } from '@/shared/lib/ids'
 import { clamp } from '@/shared/lib/math'
+import { buildPdfCacheKey, deleteCachedPdf, setCachedPdf } from '@/shared/lib/pdfCache'
 import { API_ENABLED } from '@/shared/api/config'
 import { apiFetch, apiJson, clearStoredTokens, getStoredAccessToken, getStoredRefreshToken, storeTokens } from '@/shared/api/client'
 
-export type Theme = 'light' | 'planet'
+export type Theme = 'default' | 'slate' | 'ocean' | 'meadow'
 export type UserRole = 'admin' | 'worker'
 export type AuthStatus = 'unknown' | 'authenticated' | 'unauthenticated'
 
@@ -21,6 +22,12 @@ export type Toast = {
   message?: string
   variant?: 'default' | 'success' | 'warning' | 'danger'
   createdAt: string
+}
+
+export type OfflineFormMeta = {
+  versionId: Id
+  downloadedAt: string
+  pdfKey?: string
 }
 
 const memoryStorage = new Map<string, string>()
@@ -49,26 +56,40 @@ const safeStorage = {
   }
 }
 
+const THEME_CLASSES: Record<Theme, string | null> = {
+  default: null,
+  slate: 'theme-slate',
+  ocean: 'theme-ocean',
+  meadow: 'theme-meadow'
+}
+
 function normalizeTheme(value: string | null): Theme {
-  if (value === 'light' || value === 'planet') return value
-  if (value === 'dark') return 'planet'
-  return 'planet'
+  if (!value) return 'default'
+  if (value === 'light' || value === 'planet') return 'default'
+  if (value === 'slate' || value === 'ocean' || value === 'meadow' || value === 'default') {
+    return value
+  }
+  return 'default'
 }
 
 function getStoredTheme(): Theme {
   try {
     return normalizeTheme(localStorage.getItem('rf_theme'))
   } catch {
-    return 'planet'
+    return normalizeTheme(memoryStorage.get('rf_theme') ?? null)
   }
 }
 
 function applyTheme(theme: Theme) {
   if (typeof document === 'undefined') return
   const root = document.documentElement
-  const isDark = theme === 'planet'
-  root.classList.toggle('dark', isDark)
-  root.classList.toggle('theme-planet', theme === 'planet')
+  root.classList.remove('dark')
+  root.classList.remove('theme-planet')
+  Object.values(THEME_CLASSES).forEach((cls) => {
+    if (cls) root.classList.remove(cls)
+  })
+  const nextClass = THEME_CLASSES[theme]
+  if (nextClass) root.classList.add(nextClass)
 }
 
 function upsertById<T extends { id: string }>(items: T[], next: T) {
@@ -77,6 +98,23 @@ function upsertById<T extends { id: string }>(items: T[], next: T) {
   const copy = items.slice()
   copy[idx] = next
   return copy
+}
+
+function defaultFormName(forms: FormTemplate[]) {
+  const existing = new Set(forms.map((f) => f.name.trim().toLowerCase()))
+  let idx = Math.max(1, forms.length + 1)
+  let name = `Form ${idx}`
+  while (existing.has(name.toLowerCase())) {
+    idx += 1
+    name = `Form ${idx}`
+  }
+  return name
+}
+
+function normalizeFormName(name: string | undefined, forms: FormTemplate[]) {
+  const trimmed = (name ?? '').trim()
+  if (trimmed) return trimmed
+  return defaultFormName(forms)
 }
 
 type State = {
@@ -109,6 +147,7 @@ type State = {
   activities: Activity[]
   employees: Employee[]
   groups: AccessGroup[]
+  offlineForms: Record<Id, OfflineFormMeta>
   lastSyncSuccess?: string
 
   toasts: Toast[]
@@ -116,9 +155,10 @@ type State = {
   dismissToast: (id: Id) => void
 
   boot: () => void
+  primePdfCache: () => Promise<void>
 
   // Forms
-  createForm: (name: string) => Promise<Id>
+  createForm: (name?: string) => Promise<Id>
   createVersion: (formId: Id) => Promise<Id>
   renameForm: (formId: Id, name: string) => Promise<void>
   setPdf: (formId: Id, versionId: Id, pdf: FormVersion['pdf']) => void
@@ -126,6 +166,8 @@ type State = {
   uploadPdf: (formId: Id, versionId: Id, file: File) => Promise<void>
   publishVersion: (formId: Id, versionId: Id) => Promise<void>
   archiveForm: (formId: Id) => Promise<void>
+  downloadFormForOffline: (formId: Id) => Promise<void>
+  removeOfflineForm: (formId: Id) => void
 
   // Builder fields
   upsertField: (formId: Id, versionId: Id, field: FormVersion['fields'][number]) => Promise<void>
@@ -182,8 +224,10 @@ export const useAppStore = create<State>()(
         set({ theme })
       },
       toggleTheme: () => {
+        const order: Theme[] = ['default', 'slate', 'ocean', 'meadow']
         const current = get().theme
-        const next: Theme = current === 'light' ? 'planet' : 'light'
+        const idx = order.indexOf(current)
+        const next = order[(idx + 1) % order.length]
         get().setTheme(next)
       },
       role: 'admin',
@@ -232,6 +276,7 @@ export const useAppStore = create<State>()(
           activities: [],
           employees: [],
           groups: [],
+          offlineForms: {},
           lastSyncSuccess: undefined
         })
       },
@@ -249,16 +294,27 @@ export const useAppStore = create<State>()(
           groups = []
         }
         const canvasByVersion = new Map<string, FormVersion['canvas']>()
+        const pdfDataByVersion = new Map<string, string>()
+        const pdfCacheByVersion = new Map<string, string>()
         for (const f of get().forms) {
           for (const v of f.versions) {
             if (v.canvas) canvasByVersion.set(v.id, v.canvas)
+            if (v.pdf?.dataUrl) pdfDataByVersion.set(v.id, v.pdf.dataUrl)
+            if (v.pdf?.cacheKey) pdfCacheByVersion.set(v.id, v.pdf.cacheKey)
           }
         }
         const mergedForms = forms.map((f: FormTemplate) => ({
           ...f,
           versions: f.versions.map((v) => ({
             ...v,
-            canvas: canvasByVersion.get(v.id)
+            canvas: canvasByVersion.get(v.id),
+            pdf: v.pdf
+              ? {
+                  ...v.pdf,
+                  dataUrl: pdfDataByVersion.get(v.id) ?? v.pdf.dataUrl,
+                  cacheKey: pdfCacheByVersion.get(v.id) ?? v.pdf.cacheKey
+                }
+              : v.pdf
           }))
         }))
         set({ forms: mergedForms, tickets, employees, groups, queue: [], activities: [], lastSyncSuccess: undefined })
@@ -289,6 +345,7 @@ export const useAppStore = create<State>()(
       activities: [],
       employees: [],
       groups: [],
+      offlineForms: {},
       lastSyncSuccess: undefined,
 
       toasts: [],
@@ -311,15 +368,54 @@ export const useAppStore = create<State>()(
         set({ booted: true })
       },
 
+      primePdfCache: async () => {
+        const updates = new Map<string, string>()
+        for (const form of get().forms) {
+          for (const version of form.versions) {
+            if (!version.pdf?.dataUrl || version.pdf.cacheKey) continue
+            const key = buildPdfCacheKey(form.id, version.id)
+            try {
+              const res = await fetch(version.pdf.dataUrl)
+              if (!res.ok) continue
+              const blob = await res.blob()
+              const cached = await setCachedPdf(key, blob)
+              if (!cached) continue
+              updates.set(`${form.id}:${version.id}`, key)
+            } catch {
+              // ignore cache failures
+            }
+          }
+        }
+        if (!updates.size) return
+
+        set((s) => {
+          const nextForms = s.forms.map((form) => ({
+            ...form,
+            versions: form.versions.map((version) => {
+              const cacheKey = updates.get(`${form.id}:${version.id}`)
+              if (!cacheKey || !version.pdf) return version
+              return { ...version, pdf: { ...version.pdf, cacheKey } }
+            })
+          }))
+          const nextOffline = { ...s.offlineForms }
+          for (const [formId, meta] of Object.entries(nextOffline)) {
+            const cacheKey = updates.get(`${formId}:${meta.versionId}`)
+            if (cacheKey) nextOffline[formId] = { ...meta, pdfKey: cacheKey }
+          }
+          return { forms: nextForms, offlineForms: nextOffline }
+        })
+      },
+
       createForm: async (name) => {
+        const safeName = normalizeFormName(name, get().forms)
         if (API_ENABLED) {
           const form = await apiJson('/forms/', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name })
+            body: JSON.stringify({ name: safeName })
           })
           set((s) => ({ forms: upsertById(s.forms, form) }))
-          get().addActivity('Form template created', name)
+          get().addActivity('Form template created', safeName)
           return form.id
         }
         const id = uid('form')
@@ -333,11 +429,11 @@ export const useAppStore = create<State>()(
         }
         set((s) => ({
           forms: [
-            { id, name, subtitle: 'PDF locked | Schema v1.0', versions: [version] },
+            { id, name: safeName, subtitle: 'PDF locked | Schema v1.0', versions: [version] },
             ...s.forms
           ]
         }))
-        get().addActivity('Form template created', name)
+        get().addActivity('Form template created', safeName)
         return id
       },
 
@@ -361,7 +457,8 @@ export const useAppStore = create<State>()(
               status: 'draft',
               fieldCount: 0,
               fields: latest ? latest.fields.map((x) => ({ ...x, id: uid('fld') })) : [],
-              canvas: latest?.canvas
+              canvas: latest?.canvas,
+              pdf: latest?.pdf ? { ...latest.pdf, cacheKey: undefined } : undefined
             }
             newV.fieldCount = newV.fields.length
             return { ...f, versions: [newV, ...f.versions] }
@@ -469,6 +566,113 @@ export const useAppStore = create<State>()(
         get().addActivity('Form archived', formId)
       },
 
+      downloadFormForOffline: async (formId) => {
+        const form = get().forms.find((f) => f.id === formId)
+        if (!form) throw new Error('Form not found')
+        const version = form.versions.find((v) => v.status === 'active') ?? form.versions[0]
+        if (!version) throw new Error('No version available')
+
+        const meta = get().offlineForms[formId]
+        const metaKey = meta?.versionId === version.id ? meta.pdfKey : undefined
+        const existingKey = version.pdf?.cacheKey ?? metaKey
+        const needsPdfFetch = Boolean(version.pdf?.url && !version.pdf?.dataUrl && !existingKey)
+        if (needsPdfFetch && !get().online) {
+          throw new Error('Connect to the internet to download this PDF')
+        }
+
+        let pdfDataUrl = version.pdf?.dataUrl
+        let cacheKey = existingKey
+        if (version.pdf && !existingKey) {
+          const nextKey = buildPdfCacheKey(formId, version.id)
+          let blob: Blob | null = null
+          if (version.pdf.dataUrl) {
+            try {
+              const res = await fetch(version.pdf.dataUrl)
+              if (res.ok) blob = await res.blob()
+            } catch {
+              blob = null
+            }
+          }
+          if (!blob && version.pdf.url) {
+            const token = getStoredAccessToken()
+            const headers = token ? { Authorization: `Bearer ${token}` } : undefined
+            const res = await fetch(version.pdf.url, { headers })
+            if (!res.ok) throw new Error('Unable to download PDF')
+            blob = await res.blob()
+          }
+          if (blob) {
+            const cached = await setCachedPdf(nextKey, blob)
+            if (cached) cacheKey = nextKey
+            if (!pdfDataUrl) {
+              pdfDataUrl = await blobToDataUrl(blob)
+            }
+          }
+        }
+
+        set((s) => ({
+          forms: s.forms.map((f) => {
+            if (f.id !== formId) return f
+            return {
+              ...f,
+              versions: f.versions.map((v) => {
+                if (v.id !== version.id) return v
+                if (!v.pdf) return v
+                return {
+                  ...v,
+                  pdf: {
+                    ...v.pdf,
+                    dataUrl: pdfDataUrl ?? v.pdf.dataUrl,
+                    cacheKey: cacheKey ?? v.pdf.cacheKey
+                  }
+                }
+              })
+            }
+          }),
+          offlineForms: {
+            ...s.offlineForms,
+            [formId]: { versionId: version.id, downloadedAt: nowIso(), pdfKey: cacheKey }
+          }
+        }))
+
+        const hasPdf = Boolean(version.pdf?.url || version.pdf?.dataUrl || cacheKey)
+        get().pushToast({
+          title: 'Offline download ready',
+          message: hasPdf ? `${form.name} saved on this device.` : `${form.name} saved (no PDF attached).`,
+          variant: hasPdf ? 'success' : 'warning'
+        })
+      },
+
+      removeOfflineForm: (formId) => {
+        const form = get().forms.find((f) => f.id === formId)
+        const meta = get().offlineForms[formId]
+        const cachedKey = meta?.pdfKey ?? form?.versions.find((v) => v.id === meta?.versionId)?.pdf?.cacheKey
+        if (cachedKey) void deleteCachedPdf(cachedKey)
+        set((s) => {
+          const { [formId]: _, ...rest } = s.offlineForms
+          const forms = meta
+            ? s.forms.map((f) => {
+                if (f.id !== formId) return f
+                return {
+                  ...f,
+                  versions: f.versions.map((v) => {
+                    if (v.id !== meta.versionId) return v
+                    if (!v.pdf) return v
+                    return { ...v, pdf: { ...v.pdf, dataUrl: undefined, cacheKey: undefined } }
+                  })
+                }
+              })
+            : s.forms
+          return { offlineForms: rest, forms }
+        })
+        if (form) {
+          get().pushToast({
+            title: 'Offline copy removed',
+            message: `${form.name} removed from this device.`,
+            variant: 'warning'
+          })
+        }
+      },
+
       upsertField: async (formId, versionId, field) => {
         if (API_ENABLED) {
           const form = await apiJson(`/forms/${formId}/versions/${versionId}/fields/`, {
@@ -519,27 +723,35 @@ export const useAppStore = create<State>()(
       },
 
       createTicket: async (formId, versionId, title, assignedTo) => {
-        if (API_ENABLED) {
-          const ticket = await apiJson('/tickets/', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ formId, versionId, title, assignedTo })
-          })
-          const nextTicket = { ...ticket, signatureRole: ticket.signatureRole ?? 'employee' }
-          set((s) => ({ tickets: upsertById(s.tickets, nextTicket) }))
-          get().addActivity('Ticket created', `${ticket.id} · ${ticket.title}`)
-          return ticket.id
+        const online = get().online
+        if (API_ENABLED && online) {
+          try {
+            const ticket = await apiJson('/tickets/', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ formId, versionId, title, assignedTo })
+            })
+            const nextTicket = { ...ticket, signatureRole: ticket.signatureRole ?? 'employee' }
+            set((s) => ({ tickets: upsertById(s.tickets, nextTicket) }))
+            get().addActivity('Ticket created', `${ticket.id} · ${ticket.title}`)
+            return ticket.id
+          } catch (err) {
+            if (!isOfflineError(err)) throw err
+            get().setSystemOnline(false)
+          }
         }
         const id = nextTicketId(get().tickets)
         const t: Ticket = {
           id,
+          serverId: undefined,
+          localOnly: API_ENABLED && !online,
           title,
           formId,
           versionId,
           assignedTo,
           assignedAt: nowIso(),
           status: 'pending',
-          approvalState: 'pending',
+          approvalState: 'approved',
           values: {},
           attachments: [],
           signatureRole: 'employee',
@@ -559,16 +771,34 @@ export const useAppStore = create<State>()(
       },
 
       saveDraft: async (ticketId) => {
+        const online = get().online
         get().updateTicket(ticketId, { status: 'queued' })
-        if (API_ENABLED && get().online) {
+        if (API_ENABLED && online) {
           const t = get().tickets.find((x) => x.id === ticketId)
           if (t) {
-            const updated = await apiJson(`/tickets/${ticketId}/`, {
+            let remoteId = t.serverId ?? t.id
+            if (t.localOnly && !t.serverId) {
+              const created = await apiJson('/tickets/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  formId: t.formId,
+                  versionId: t.versionId,
+                  title: t.title,
+                  assignedTo: t.assignedTo
+                })
+              })
+              remoteId = created.id
+              get().updateTicket(t.id, { serverId: created.id, localOnly: false })
+            }
+
+            const updated = await apiJson(`/tickets/${remoteId}/`, {
               method: 'PATCH',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ values: t.values, signature: t.signature, status: 'queued' })
             })
-            set((s) => ({ tickets: upsertById(s.tickets, updated) }))
+            const { id: serverId, ...rest } = updated
+            get().updateTicket(t.id, { ...rest, serverId })
           }
         }
         get().pushToast({ title: 'Draft saved', message: 'Saved locally on this device', variant: 'success' })
@@ -598,8 +828,15 @@ export const useAppStore = create<State>()(
 
       approveTicket: async (ticketId) => {
         if (API_ENABLED) {
-          const updated = await apiJson(`/tickets/${ticketId}/approve/`, { method: 'POST' })
-          set((s) => ({ tickets: upsertById(s.tickets, updated) }))
+          const local = get().tickets.find((t) => t.id === ticketId)
+          const remoteId = local?.serverId ?? ticketId
+          const updated = await apiJson(`/tickets/${remoteId}/approve/`, { method: 'POST' })
+          if (local) {
+            const { id: serverId, ...rest } = updated
+            get().updateTicket(local.id, { ...rest, serverId })
+          } else {
+            set((s) => ({ tickets: upsertById(s.tickets, updated) }))
+          }
           get().addActivity('Approved & Archived', ticketId)
           get().pushToast({ title: 'Approved', message: `${ticketId} archived`, variant: 'success' })
           return
@@ -611,22 +848,36 @@ export const useAppStore = create<State>()(
 
       uploadAttachment: async (ticketId, file) => {
         if (!API_ENABLED) return
+        const local = get().tickets.find((t) => t.id === ticketId)
+        const remoteId = local?.serverId ?? ticketId
         const formData = new FormData()
         formData.append('file', file)
-        const res = await apiFetch(`/tickets/${ticketId}/attachments/`, { method: 'POST', body: formData })
+        const res = await apiFetch(`/tickets/${remoteId}/attachments/`, { method: 'POST', body: formData })
         if (!res.ok) throw new Error('Attachment upload failed')
         const updated = await res.json()
-        set((s) => ({ tickets: upsertById(s.tickets, updated) }))
+        if (local) {
+          const { id: serverId, ...rest } = updated
+          get().updateTicket(local.id, { ...rest, serverId })
+        } else {
+          set((s) => ({ tickets: upsertById(s.tickets, updated) }))
+        }
       },
 
       uploadSignature: async (ticketId, dataUrl, signer) => {
         if (!API_ENABLED) return
-        const updated = await apiJson(`/tickets/${ticketId}/signature/`, {
+        const local = get().tickets.find((t) => t.id === ticketId)
+        const remoteId = local?.serverId ?? ticketId
+        const updated = await apiJson(`/tickets/${remoteId}/signature/`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ dataUrl, signer })
         })
-        set((s) => ({ tickets: upsertById(s.tickets, updated) }))
+        if (local) {
+          const { id: serverId, ...rest } = updated
+          get().updateTicket(local.id, { ...rest, serverId })
+        } else {
+          set((s) => ({ tickets: upsertById(s.tickets, updated) }))
+        }
       },
 
       retryFailed: () => {
@@ -647,7 +898,7 @@ export const useAppStore = create<State>()(
       },
 
       markSynced: (ticketId) => {
-        get().updateTicket(ticketId, { status: 'synced', lastError: undefined })
+        get().updateTicket(ticketId, { status: 'synced', approvalState: 'approved', lastError: undefined })
         get().addActivity('Sync completed', ticketId)
       },
 
@@ -784,12 +1035,13 @@ export const useAppStore = create<State>()(
         systemOnline: s.systemOnline,
         forcedOffline: s.forcedOffline,
         online: s.online,
-        forms: s.forms,
+        forms: stripPdfDataUrls(s.forms),
         tickets: s.tickets,
         queue: s.queue,
         activities: s.activities,
         employees: s.employees,
         groups: s.groups,
+        offlineForms: s.offlineForms,
         lastSyncSuccess: s.lastSyncSuccess
       })
     }
@@ -802,4 +1054,36 @@ function bumpVersion(v: string) {
   const major = clamp(parseInt(m[1], 10), 0, 99)
   const minor = clamp(parseInt(m[2], 10), 0, 99)
   return `v${major}.${minor + 1}`
+}
+
+function blobToDataUrl(blob: Blob) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(String(reader.result || ''))
+    reader.onerror = () => reject(new Error('Unable to read file data'))
+    reader.readAsDataURL(blob)
+  })
+}
+
+function stripPdfDataUrls(forms: FormTemplate[]) {
+  return forms.map((form) => ({
+    ...form,
+    versions: form.versions.map((version) => {
+      if (!version.pdf?.dataUrl || !version.pdf?.cacheKey) return version
+      return {
+        ...version,
+        pdf: {
+          ...version.pdf,
+          dataUrl: undefined
+        }
+      }
+    })
+  }))
+}
+
+function isOfflineError(err: unknown) {
+  if (err instanceof TypeError) return true
+  if (!err || typeof err !== 'object') return false
+  const message = 'message' in err ? String((err as { message?: unknown }).message || '') : ''
+  return /failed to fetch|networkerror|network request failed|load failed/i.test(message)
 }

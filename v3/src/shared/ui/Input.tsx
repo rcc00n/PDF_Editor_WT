@@ -7,9 +7,8 @@ export default function Input(props: InputHTMLAttributes<HTMLInputElement>) {
     <input
       {...rest}
       className={cn(
-        'rf-focus h-11 w-full rounded-2xl border border-neutral-200 bg-white px-4 text-sm',
+        'rf-focus h-11 w-full rounded-2xl border border-[var(--rf-border)] bg-[var(--rf-surface)] px-4 text-sm',
         'placeholder:text-neutral-400',
-        'dark:border-neutral-800 dark:bg-neutral-950',
         className
       )}
     />

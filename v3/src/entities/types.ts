@@ -69,6 +69,7 @@ export type FormVersion = {
     mime: string
     dataUrl?: string // base64 data url (demo)
     url?: string // API media URL
+    cacheKey?: string
   }
   fields: Field[]
 }
@@ -81,16 +82,19 @@ export type FormTemplate = {
 }
 
 export type TicketStatus = 'pending' | 'in_progress' | 'synced' | 'error' | 'queued'
+export type ApprovalState = 'pending' | 'approved'
 
 export type Ticket = {
   id: Id // FT-xxxx
+  serverId?: Id
+  localOnly?: boolean
   title: string
   formId: Id
   versionId: Id
   assignedTo: string
   assignedAt: string // ISO
   status: TicketStatus
-  approvalState: 'pending' | 'approved'
+  approvalState: ApprovalState
   values: Record<string, any>
   attachments: Array<{ id: Id; name: string; mime: string; dataUrl?: string; url?: string }>
   signature?: { signer: string; dataUrl?: string; url?: string }
