@@ -1,16 +1,8 @@
 import type { Ticket, FormTemplate, FormVersion } from '@/entities/types'
-import { downloadText } from '@/shared/lib/download'
 import { jsPDF } from 'jspdf'
+import { signatureRoleLabel } from '@/shared/lib/signatureRoles'
 
 const DEFAULT_FONT_SIZE = 12
-
-export function exportTicketCsv(ticket: Ticket, form: FormTemplate, version: FormVersion) {
-  const keys = version.fields.map(f => f.key)
-  const header = ['ticket_id', ...keys]
-  const row = [ticket.id, ...keys.map(k => safeCsv(ticket.values[k]))]
-  const csv = [header.join(','), row.join(',')].join('\n')
-  downloadText(`${ticket.id}.csv`, csv, 'text/csv')
-}
 
 export async function exportTicketPdf(ticket: Ticket, form: FormTemplate, version: FormVersion) {
   const doc = new jsPDF({ unit: 'pt', format: 'a4' })
@@ -67,7 +59,7 @@ export async function exportTicketPdf(ticket: Ticket, form: FormTemplate, versio
 
   y += 10
   doc.setFont('helvetica', 'bold')
-  doc.text('Signature', 40, y)
+  doc.text(`Signature (${signatureRoleLabel(ticket.signatureRole ?? 'employee')})`, 40, y)
   y += 14
   doc.setFont('helvetica', 'normal')
   doc.text(ticket.signature?.signer ?? '—', 40, y)
@@ -86,8 +78,8 @@ export async function exportTicketPdf(ticket: Ticket, form: FormTemplate, versio
   doc.save(`${ticket.id}.pdf`)
 }
 
-export async function exportRenderedFormPdf(ticket: Ticket, version: FormVersion) {
-  const source = version.pdf?.dataUrl ?? version.pdf?.url
+export async function exportRenderedFormPdf(ticket: Ticket, version: FormVersion, sourceOverride?: string) {
+  const source = sourceOverride ?? version.pdf?.dataUrl ?? version.pdf?.url
   if (!source) {
     throw new Error('No PDF available for this version')
   }
@@ -180,15 +172,6 @@ export async function exportRenderedFormPdf(ticket: Ticket, version: FormVersion
   }
 
   doc.save(`${ticket.id}-rendered.pdf`)
-}
-
-function safeCsv(v: any) {
-  if (v == null) return ''
-  const s = String(v)
-  if (s.includes(',') || s.includes('\n') || s.includes('"')) {
-    return `"${s.replaceAll('"', '""')}"`
-  }
-  return s
 }
 
 function writeWrap(doc: jsPDF, text: string, x: number, y: number, width: number) {

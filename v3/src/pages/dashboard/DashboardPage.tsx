@@ -1,311 +1,335 @@
-import { useMemo, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
-import { Card, CardBody, CardHeader, CardSub, CardTitle } from '@/shared/ui/Card'
-import SectionHeader from '@/shared/ui/SectionHeader'
-import Button from '@/shared/ui/Button'
-import Badge from '@/shared/ui/Badge'
-import { useAppStore } from '@/shared/state/useAppStore'
-import { dateTimeShort, timeHHMM } from '@/shared/lib/format'
-import { Plus, ArrowRight, ChevronDown } from 'lucide-react'
-import { cn } from '@/shared/ui/cn'
-import type { TicketStatus } from '@/entities/types'
+import { useMemo, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import {
+  Card,
+  CardBody,
+  CardHeader,
+  CardSub,
+  CardTitle,
+} from "@/shared/ui/Card";
+import SectionHeader from "@/shared/ui/SectionHeader";
+import Button from "@/shared/ui/Button";
+import Badge from "@/shared/ui/Badge";
+import Input from "@/shared/ui/Input";
+import Modal from "@/shared/ui/Modal";
+import { useAppStore } from "@/shared/state/useAppStore";
+import { dateTimeShort } from "@/shared/lib/format";
+import { ArrowRight, Plus } from "lucide-react";
+import type {
+  AccessGroup,
+  Employee,
+  FormTemplate,
+  TicketStatus,
+} from "@/entities/types";
+
+type ResolveAvailableFormsArgs = {
+  forms: FormTemplate[];
+  groups: AccessGroup[];
+  employees: Employee[];
+  role: string;
+  userEmail?: string | null;
+};
+
+function resolveAvailableForms({
+  forms,
+  groups,
+  employees,
+  role,
+  userEmail,
+}: ResolveAvailableFormsArgs): FormTemplate[] {
+  if (role === "admin") return forms;
+  const email = userEmail?.trim().toLowerCase();
+  if (!email) return forms;
+  const employee =
+    employees.find((e) => (e.email ?? "").trim().toLowerCase() === email) ??
+    null;
+  if (!employee) return forms;
+  const allowed = new Set<string>();
+  for (const group of groups) {
+    if (group.employeeIds.includes(employee.id)) {
+      for (const formId of group.formIds) allowed.add(formId);
+    }
+  }
+  if (!allowed.size) return forms;
+  return forms.filter((form) => allowed.has(form.id));
+}
 
 export default function DashboardPage() {
-  const nav = useNavigate()
-  const forms = useAppStore(s => s.forms)
-  const role = useAppStore(s => s.role)
-  const createForm = useAppStore(s => s.createForm)
-  const pushToast = useAppStore(s => s.pushToast)
-  const tickets = useAppStore(s => s.tickets)
-  const queue = useAppStore(s => s.queue)
-  const lastSync = useAppStore(s => s.lastSyncSuccess)
-  const canEdit = role === 'admin'
-  const [pendingOpen, setPendingOpen] = useState(false)
-  const [syncedOpen, setSyncedOpen] = useState(false)
-  const [formsOpen, setFormsOpen] = useState(false)
+  const nav = useNavigate();
+  const forms = useAppStore((s) => s.forms);
+  const groups = useAppStore((s) => s.groups);
+  const role = useAppStore((s) => s.role);
+  const employees = useAppStore((s) => s.employees);
+  const user = useAppStore((s) => s.user);
+  const createForm = useAppStore((s) => s.createForm);
+  const pushToast = useAppStore((s) => s.pushToast);
+  const tickets = useAppStore((s) => s.tickets);
+  const lastSync = useAppStore((s) => s.lastSyncSuccess);
+  const canEdit = role === "admin";
+  const [newFormOpen, setNewFormOpen] = useState(false);
+  const [newFormName, setNewFormName] = useState("");
+  const [creatingForm, setCreatingForm] = useState(false);
 
-  const stats = useMemo(() => {
-    const pending = queue.filter(q => q.status === 'pending').length
-    const inProgress = queue.filter(q => q.status === 'in_progress').length
-    const failed = queue.filter(q => q.status === 'failed').length
-    const now = new Date()
-    const sameDay = (iso: string) => {
-      const d = new Date(iso)
-      return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate()
+  const handleCreateForm = async () => {
+    if (creatingForm) return;
+    setCreatingForm(true);
+    try {
+      const id = await createForm(newFormName);
+      setNewFormOpen(false);
+      setNewFormName("");
+      nav(`/builder/${id}`);
+    } catch (err: any) {
+      pushToast({
+        title: "Create failed",
+        message: err?.message || "Unable to create form",
+        variant: "danger",
+      });
+    } finally {
+      setCreatingForm(false);
     }
-    const syncedToday = tickets.filter(t => t.status === 'synced' && sameDay(t.updatedAt)).length
-    return { pending, inProgress, failed, syncedToday }
-  }, [queue, tickets])
+  };
 
-  const dailyTickets = useMemo(() => {
-    const now = new Date()
-    const sameDay = (iso: string) => {
-      const d = new Date(iso)
-      return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate()
+  const currentEmployee = useMemo(() => {
+    const email = user?.email?.trim().toLowerCase();
+    if (!email) return null;
+    return (
+      employees.find((e) => (e.email ?? "").trim().toLowerCase() === email) ??
+      null
+    );
+  }, [employees, user?.email]);
+
+  const availableForms = useMemo(() => {
+    return resolveAvailableForms({
+      forms,
+      groups,
+      employees,
+      role,
+      userEmail: user?.email,
+    });
+  }, [employees, forms, groups, role, user?.email]);
+
+  const scopedTickets = useMemo(() => {
+    if (role === "admin") return tickets;
+    const matched = currentEmployee?.name?.trim().toLowerCase();
+    const email = user?.email?.trim().toLowerCase();
+    if (!matched && !email) return tickets;
+    return tickets.filter((t) => {
+      const assigned = t.assignedTo.trim().toLowerCase();
+      return (matched && assigned === matched) || (email && assigned === email);
+    });
+  }, [currentEmployee?.name, role, tickets, user?.email]);
+
+  const summary = useMemo(() => {
+    const now = new Date();
+    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const startOfWeek = new Date(startOfDay);
+    const day = startOfWeek.getDay();
+    const weekOffset = (day + 6) % 7;
+    startOfWeek.setDate(startOfWeek.getDate() - weekOffset);
+
+    let submittedToday = 0;
+    let submittedWeek = 0;
+    let submittedMonth = 0;
+
+    for (const t of scopedTickets) {
+      if (t.status !== "synced") continue;
+      const submittedAt = new Date(t.updatedAt);
+      if (submittedAt >= startOfDay) submittedToday += 1;
+      if (submittedAt >= startOfWeek) submittedWeek += 1;
+      if (submittedAt >= startOfMonth) submittedMonth += 1;
     }
-    return tickets
-      .filter(t => sameDay(t.assignedAt))
-      .slice()
-      .sort((a, b) => b.assignedAt.localeCompare(a.assignedAt))
-  }, [tickets])
 
-  const pendingTickets = dailyTickets.filter(t => t.status === 'pending' || t.status === 'queued' || t.status === 'in_progress')
-  const syncedTickets = dailyTickets.filter(t => t.status === 'synced')
-  const pendingVisible = pendingOpen ? pendingTickets : pendingTickets.slice(0, 2)
-  const syncedVisible = syncedOpen ? syncedTickets : syncedTickets.slice(0, 2)
-  const formsVisible = formsOpen ? forms : forms.slice(0, 15)
+    return { submittedToday, submittedWeek, submittedMonth };
+  }, [scopedTickets]);
+
+  const formsVisible = useMemo(() => availableForms.slice(0, 6), [availableForms]);
+
+  const recentTickets = useMemo(
+    () =>
+      scopedTickets
+        .slice()
+        .sort((a, b) => b.assignedAt.localeCompare(a.assignedAt))
+        .slice(0, 4),
+    [scopedTickets]
+  );
 
   return (
     <div className="pb-10">
       <SectionHeader
         title="Dashboard"
-        subtitle="Immediate visibility into forms, field activity, and sync health."
         right={
           <>
-            <Button
-              variant="secondary"
-              disabled={!canEdit}
-              title={canEdit ? 'Create new form' : 'Admins only'}
-              onClick={async () => {
-                if (!canEdit) return
-                try {
-                  const id = await createForm('New Form')
-                  nav(`/builder/${id}`)
-                } catch (err: any) {
-                  pushToast({ title: 'Create failed', message: err?.message || 'Unable to create form', variant: 'danger' })
-                }
-              }}
-            >
-              <Plus size={16} /> Create New Form
-            </Button>
-            <Button variant="secondary" onClick={() => nav('/field')}>
+            {canEdit && (
+              <Button
+                onClick={() => {
+                  setNewFormName("");
+                  setNewFormOpen(true);
+                }}>
+                <Plus size={16} /> Create New Form
+              </Button>
+            )}
+            <Button variant="secondary" onClick={() => nav("/field")}> 
               Open Field App <ArrowRight size={16} />
             </Button>
           </>
         }
       />
 
-      <div className="px-4 mt-4 sm:px-6 sm:mt-6 grid grid-cols-1 md:grid-cols-4 gap-3">
-        <StatCard label="Pending" value={stats.pending} tone={stats.pending ? 'warning' : 'neutral'} />
-        <StatCard label="In progress" value={stats.inProgress} tone="neutral" />
-        <StatCard label="Failed" value={stats.failed} tone={stats.failed ? 'danger' : 'neutral'} />
-        <StatCard label="Synced today" value={stats.syncedToday} tone={stats.syncedToday ? 'success' : 'neutral'} />
-      </div>
-
-      <div className="px-4 mt-3 sm:px-6 sm:mt-4">
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <CardTitle>Sync Status Overview</CardTitle>
-                <CardSub>Queue health and last successful sync.</CardSub>
-              </div>
-              <Button variant="secondary" onClick={() => nav('/queue')}>Open Sync Queue</Button>
-            </div>
-          </CardHeader>
-          <CardBody className="pt-1">
-            <div className="flex flex-wrap gap-2 items-center">
-              <Badge tone={stats.pending ? 'warning' : 'neutral'}>{stats.pending} Pending</Badge>
-              <Badge tone="neutral">{stats.inProgress} In progress</Badge>
-              <Badge tone={stats.failed ? 'danger' : 'neutral'}>{stats.failed} Failed</Badge>
-              <span className="text-sm text-neutral-500 dark:text-neutral-400">
-                {lastSync ? `Last success ${timeHHMM(lastSync)}` : 'No successful sync yet'}
-              </span>
-            </div>
-          </CardBody>
-        </Card>
-      </div>
-
-      <div className="px-4 mt-4 sm:px-6 sm:mt-6 grid grid-cols-1 xl:grid-cols-2 gap-4">
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <CardTitle>Daily Pending Tickets</CardTitle>
-                <CardSub>{pendingTickets.length} pending today</CardSub>
-              </div>
-              <button
-                className="rf-focus rounded-xl p-2 hover:bg-neutral-100 dark:hover:bg-neutral-900"
-                onClick={() => setPendingOpen((v) => !v)}
-                aria-expanded={pendingOpen}
-                title={pendingOpen ? 'Collapse list' : 'Expand list'}
-              >
-                <ChevronDown size={18} className={cn('transition', pendingOpen && 'rotate-180')} />
-              </button>
-            </div>
-          </CardHeader>
-          <CardBody className="pt-1">
-            {pendingTickets.length === 0 ? (
-              <div className="text-sm text-neutral-500 dark:text-neutral-400">No pending tickets for today.</div>
-            ) : (
-              <div className="flex flex-col gap-2">
-                {pendingVisible.map((t) => (
-                  <Link key={t.id} to={`/field/ticket/${t.id}`} className="rf-focus rounded-2xl border border-neutral-200 dark:border-neutral-800 p-3 hover:bg-neutral-50 dark:hover:bg-neutral-900">
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="min-w-0">
-                        <div className="font-medium truncate">{t.id} — {t.title}</div>
-                        <div className="text-xs text-neutral-500 dark:text-neutral-400 truncate">
-                          Assigned: {t.assignedTo} · {dateTimeShort(t.assignedAt)}
-                        </div>
-                      </div>
-                      <Badge tone={ticketTone(t.status)}>{t.status}</Badge>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            )}
-          </CardBody>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <CardTitle>Synced Tickets</CardTitle>
-                <CardSub>{syncedTickets.length} synced today</CardSub>
-              </div>
-              <button
-                className="rf-focus rounded-xl p-2 hover:bg-neutral-100 dark:hover:bg-neutral-900"
-                onClick={() => setSyncedOpen((v) => !v)}
-                aria-expanded={syncedOpen}
-                title={syncedOpen ? 'Collapse list' : 'Expand list'}
-              >
-                <ChevronDown size={18} className={cn('transition', syncedOpen && 'rotate-180')} />
-              </button>
-            </div>
-          </CardHeader>
-          <CardBody className="pt-1">
-            {syncedTickets.length === 0 ? (
-              <div className="text-sm text-neutral-500 dark:text-neutral-400">No synced tickets yet today.</div>
-            ) : (
-              <div className="flex flex-col gap-2">
-                {syncedVisible.map((t) => (
-                  <Link key={t.id} to={`/field/ticket/${t.id}`} className="rf-focus rounded-2xl border border-neutral-200 dark:border-neutral-800 p-3 hover:bg-neutral-50 dark:hover:bg-neutral-900">
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="min-w-0">
-                        <div className="font-medium truncate">{t.id} — {t.title}</div>
-                        <div className="text-xs text-neutral-500 dark:text-neutral-400 truncate">
-                          Assigned: {t.assignedTo} · {dateTimeShort(t.assignedAt)}
-                        </div>
-                      </div>
-                      <Badge tone="success">synced</Badge>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            )}
-          </CardBody>
-        </Card>
-      </div>
-
       <div className="px-4 mt-4 sm:px-6 sm:mt-6">
         <Card>
           <CardHeader>
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <CardTitle>Forms Overview</CardTitle>
-                <CardSub>Versioned templates with per-form state.</CardSub>
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  className="rf-focus rounded-xl p-2 hover:bg-neutral-100 dark:hover:bg-neutral-900"
-                  onClick={() => setFormsOpen((v) => !v)}
-                  aria-expanded={formsOpen}
-                  title={formsOpen ? 'Collapse list' : 'Expand list'}
-                >
-                  <ChevronDown size={18} className={cn('transition', formsOpen && 'rotate-180')} />
-                </button>
-                <Button variant="secondary" onClick={() => nav('/forms')}>Manage</Button>
-              </div>
-            </div>
+            <CardTitle>At a Glance</CardTitle>
+            <CardSub>
+              {lastSync ? `Last sync ${dateTimeShort(lastSync)}` : "Online"}
+            </CardSub>
           </CardHeader>
-          <CardBody>
-            <div className="overflow-auto rf-scrollbar">
-              <table className="w-full text-sm">
-                <thead className="text-xs text-neutral-500 dark:text-neutral-400">
-                  <tr className="text-left">
-                    <th className="py-2">Form</th>
-                    <th className="py-2 hidden sm:table-cell">Version</th>
-                    <th className="py-2 hidden sm:table-cell">Status</th>
-                    <th className="py-2 hidden sm:table-cell">Fields</th>
-                    <th className="py-2 text-right hidden sm:table-cell">Open</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {formsVisible.map((f) => {
-                    const v = f.versions.find(v => v.status === 'active') ?? f.versions[0]
-                    return (
-                      <tr key={f.id} className="border-t border-neutral-200 dark:border-neutral-800">
-                        <td className="py-2">
-                          <div className="font-medium">{f.name}</div>
-                          <div className="text-xs text-neutral-500 dark:text-neutral-400">{f.subtitle}</div>
-                          <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-neutral-500 dark:text-neutral-400 sm:hidden">
-                            <span>{v.version}</span>
-                            <span>·</span>
-                            <span>{v.fieldCount} fields</span>
-                          </div>
-                          <div className="mt-2 sm:hidden">
-                            <Badge tone={v.status === 'active' ? 'success' : v.status === 'draft' ? 'warning' : 'neutral'}>
-                              {v.status}
-                            </Badge>
-                          </div>
-                          <div className="mt-2 sm:hidden">
-                            {canEdit ? (
-                              <Link className="rf-focus inline-flex items-center gap-2 rounded-xl px-2 py-1 hover:bg-neutral-100 dark:hover:bg-neutral-900" to={`/builder/${f.id}`}>
-                                Open <ArrowRight size={14} />
-                              </Link>
-                            ) : (
-                              <span className="text-xs text-neutral-500 dark:text-neutral-400">Admin only</span>
-                            )}
-                          </div>
-                        </td>
-                        <td className="py-2 hidden sm:table-cell">{v.version}</td>
-                        <td className="py-2 hidden sm:table-cell">
-                          <Badge tone={v.status === 'active' ? 'success' : v.status === 'draft' ? 'warning' : 'neutral'}>
-                            {v.status}
-                          </Badge>
-                        </td>
-                        <td className="py-2 hidden sm:table-cell">{v.fieldCount}</td>
-                        <td className="py-2 text-right hidden sm:table-cell">
-                          {canEdit ? (
-                            <Link className="rf-focus inline-flex items-center gap-2 rounded-xl px-2 py-1 hover:bg-neutral-100 dark:hover:bg-neutral-900" to={`/builder/${f.id}`}>
-                              Open <ArrowRight size={14} />
-                            </Link>
-                          ) : (
-                            <span className="text-xs text-neutral-500 dark:text-neutral-400">Admin only</span>
-                          )}
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
+          <CardBody className="pt-2">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+              <SummaryStat label="Submitted today" value={summary.submittedToday} />
+              <SummaryStat label="Submitted this week" value={summary.submittedWeek} />
+              <SummaryStat label="Submitted this month" value={summary.submittedMonth} />
             </div>
           </CardBody>
         </Card>
       </div>
 
-    </div>
-  )
-}
+      <div className="px-4 mt-4 sm:px-6 sm:mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <Card>
+          <CardHeader className="pb-3 sm:pb-4">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <CardTitle>Forms</CardTitle>
+              </div>
+              <Button variant="secondary" onClick={() => nav("/builder")}>Open Builder</Button>
+            </div>
+          </CardHeader>
+          <CardBody>
+            {formsVisible.length === 0 ? (
+              <div className="text-sm text-neutral-500">No forms available.</div>
+            ) : (
+              <div className="flex flex-col gap-2">
+                {formsVisible.map((form) => {
+                  const version =
+                    form.versions.find((v) => v.status === "active") ??
+                    form.versions[0];
+                  return (
+                    <Link
+                      key={form.id}
+                      to={`/builder/${form.id}`}
+                      className="rf-focus flex items-center justify-between gap-3 rounded-2xl border border-[var(--rf-border-soft)] bg-[var(--rf-surface)] px-3 py-3 hover:bg-[var(--rf-orange-50)]"
+                    >
+                      <div className="min-w-0">
+                        <div className="font-medium truncate">{form.name}</div>
+                        <div className="text-xs text-neutral-500 truncate">
+                          {form.subtitle ?? "Template"} · {version.version}
+                        </div>
+                      </div>
+                      <Badge
+                        tone={
+                          version.status === "active"
+                            ? "success"
+                            : version.status === "draft"
+                            ? "warning"
+                            : "neutral"
+                        }
+                      >
+                        {version.status}
+                      </Badge>
+                    </Link>
+                  );
+                })}
+              </div>
+            )}
+          </CardBody>
+        </Card>
 
-function StatCard({ label, value, tone }: { label: string; value: number; tone: 'neutral' | 'success' | 'warning' | 'danger' }) {
-  return (
-    <Card>
-      <CardBody className="py-5">
-        <div className="text-xs text-neutral-500 dark:text-neutral-400">{label}</div>
-        <div className="mt-1 flex items-end justify-between">
-          <div className="text-3xl font-semibold">{value}</div>
-          <Badge tone={tone}>{tone}</Badge>
+        <Card>
+          <CardHeader className="pb-3 sm:pb-4">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <CardTitle>Recent Tickets</CardTitle>
+              </div>
+              <Button variant="secondary" onClick={() => nav("/field")}>View Field App</Button>
+            </div>
+          </CardHeader>
+          <CardBody>
+            {recentTickets.length === 0 ? (
+              <div className="text-sm text-neutral-500">No tickets yet.</div>
+            ) : (
+              <div className="flex flex-col gap-2">
+                {recentTickets.map((ticket) => (
+                  <Link
+                    key={ticket.id}
+                    to={`/field/ticket/${ticket.id}`}
+                    className="rf-focus flex items-center justify-between gap-3 rounded-2xl border border-[var(--rf-border-soft)] bg-[var(--rf-surface)] px-3 py-3 hover:bg-[var(--rf-orange-50)]"
+                  >
+                    <div className="min-w-0">
+                      <div className="font-medium truncate">
+                        {ticket.id} · {ticket.title}
+                      </div>
+                      <div className="text-xs text-neutral-500 truncate">
+                        {ticket.assignedTo} · {dateTimeShort(ticket.assignedAt)}
+                      </div>
+                    </div>
+                    <Badge tone={ticketTone(ticket.status)}>{ticket.status}</Badge>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </CardBody>
+        </Card>
+      </div>
+
+      <Modal
+        open={newFormOpen}
+        onClose={() => setNewFormOpen(false)}
+        title="Create new form"
+      >
+        <div className="space-y-3">
+          <div className="text-sm text-neutral-500">
+            Enter a name for the template. Leave it blank and we will assign a short
+            unique name automatically.
+          </div>
+          <Input
+            placeholder="Form name"
+            value={newFormName}
+            onChange={(e) => setNewFormName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                void handleCreateForm();
+              }
+            }}
+          />
+          <div className="flex justify-end gap-2">
+            <Button variant="secondary" onClick={() => setNewFormOpen(false)}>
+              Cancel
+            </Button>
+            <Button disabled={creatingForm} onClick={handleCreateForm}>
+              Create
+            </Button>
+          </div>
         </div>
-      </CardBody>
-    </Card>
-  )
+      </Modal>
+    </div>
+  );
 }
 
-function ticketTone(status: TicketStatus): 'neutral' | 'success' | 'warning' | 'danger' {
-  if (status === 'synced') return 'success'
-  if (status === 'error') return 'danger'
-  if (status === 'queued' || status === 'pending') return 'warning'
-  return 'neutral'
+function SummaryStat({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-2xl border border-[var(--rf-border-soft)] bg-[var(--rf-orange-50)] px-4 py-3">
+      <div className="text-xs text-[var(--rf-text-accent)] opacity-70">{label}</div>
+      <div className="mt-1 text-2xl font-semibold">{value}</div>
+    </div>
+  );
+}
+
+function ticketTone(
+  status: TicketStatus
+): "neutral" | "success" | "warning" | "danger" {
+  if (status === "synced") return "success";
+  if (status === "error") return "danger";
+  if (status === "queued" || status === "pending") return "warning";
+  return "neutral";
 }

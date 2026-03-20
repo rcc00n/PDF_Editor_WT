@@ -7,8 +7,7 @@ export default function Select(props: SelectHTMLAttributes<HTMLSelectElement>) {
     <select
       {...rest}
       className={cn(
-        'rf-focus h-10 w-full rounded-2xl border border-neutral-200 bg-white px-3 text-sm',
-        'dark:border-neutral-800 dark:bg-neutral-950',
+        'rf-focus h-11 w-full rounded-2xl border border-[var(--rf-border)] bg-[var(--rf-surface)] px-4 text-sm',
         className
       )}
     />
