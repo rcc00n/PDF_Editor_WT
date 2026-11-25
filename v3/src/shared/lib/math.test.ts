@@ -23,5 +23,8 @@ describe('round', () => {
   it('rounds to the specified precision', () => {
     expect(round(3.14159, 2)).toBe(3.14)
     expect(round(1.005, 2)).toBe(1.01)
+    expect(round(2.675, 2)).toBe(2.68)
+    expect(round(-1.005, 2)).toBe(-1)
+    expect(round(1.25e-7, 8)).toBe(1.3e-7)
   })
 })

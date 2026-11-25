@@ -1,4 +1,6 @@
-const DB_NAME = 'rf_offline_cache'
+import { DEMO_MODE } from '@/shared/api/config'
+
+const DB_NAME = DEMO_MODE ? 'rf_demo_offline_cache' : 'rf_offline_cache'
 const STORE_NAME = 'pdfs'
 const DB_VERSION = 1
 

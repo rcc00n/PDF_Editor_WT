@@ -2,11 +2,17 @@ import os
 from pathlib import Path
 from datetime import timedelta
 import dj_database_url
+from django.core.exceptions import ImproperlyConfigured
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'insecure-change-me')
 DEBUG = os.getenv('DJANGO_DEBUG', '').lower() in {'1', 'true', 'yes'}
+SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', '').strip()
+if not DEBUG and (len(SECRET_KEY) < 50 or SECRET_KEY.startswith('insecure-')):
+    raise ImproperlyConfigured('Production requires an explicit DJANGO_SECRET_KEY of at least 50 characters.')
+if not SECRET_KEY:
+    SECRET_KEY = 'insecure-local-development-only-never-use-in-production'
+
 
 allowed_hosts = [h.strip() for h in os.getenv('DJANGO_ALLOWED_HOSTS', '').split(',') if h.strip()]
 ALLOWED_HOSTS = allowed_hosts or (['*'] if DEBUG else [])

@@ -4,7 +4,7 @@ import type { Activity, AccessGroup, Employee, FormTemplate, FormVersion, Id, Qu
 import { nowIso, uid, nextTicketId } from '@/shared/lib/ids'
 import { clamp } from '@/shared/lib/math'
 import { buildPdfCacheKey, deleteCachedPdf, setCachedPdf } from '@/shared/lib/pdfCache'
-import { API_ENABLED } from '@/shared/api/config'
+import { API_ENABLED, DEMO_MODE } from '@/shared/api/config'
 import { apiFetch, apiJson, clearStoredTokens, getStoredAccessToken, getStoredRefreshToken, storeTokens } from '@/shared/api/client'
 
 export type Theme = 'default' | 'slate' | 'ocean' | 'meadow'
@@ -1026,7 +1026,7 @@ export const useAppStore = create<State>()(
       }
     }),
     {
-      name: 'rf_store_v1',
+      name: DEMO_MODE ? 'rf_demo_store_v1' : 'rf_store_v1',
       storage: createJSONStorage(() => safeStorage),
       partialize: (s) => ({
         theme: s.theme,
