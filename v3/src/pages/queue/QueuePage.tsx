@@ -1,3 +1,4 @@
+import { DEMO_MODE } from '@/shared/api/config'
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import SectionHeader from "@/shared/ui/SectionHeader";
@@ -216,7 +217,7 @@ export default function QueuePage() {
                 Last success: {lastSuccess ? timeHHMM(lastSuccess) : "—"}
               </div>
               <div className="mt-2 text-xs text-neutral-500 dark:text-neutral-400">
-                Auto-sync enabled (demo).
+                {DEMO_MODE ? "Local simulation: no server receives these records." : "Queued submissions sync to the configured API."}
               </div>
             </CardBody>
           </Card>

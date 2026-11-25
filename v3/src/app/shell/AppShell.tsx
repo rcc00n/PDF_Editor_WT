@@ -1,3 +1,4 @@
+import { DEMO_MODE } from '@/shared/api/config'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useState } from 'react'
 import { LayoutGrid, PencilRuler, Smartphone, ClipboardCheck, Shield, User, ChevronDown, LogOut } from 'lucide-react'
@@ -108,7 +109,7 @@ export default function AppShell() {
                   {titleForPath(location.pathname)}
                 </div>
                 <div className="text-xs text-[var(--rf-text-accent)] opacity-80 truncate">
-                  {online ? (lastSyncSuccess ? `Last sync ${formatTime(lastSyncSuccess)}` : 'Online') : 'Offline'}
+                  {DEMO_MODE ? 'Local demo · simulated sync' : online ? (lastSyncSuccess ? `Last sync ${formatTime(lastSyncSuccess)}` : 'Online') : 'Offline'}
                 </div>
               </div>
             </div>

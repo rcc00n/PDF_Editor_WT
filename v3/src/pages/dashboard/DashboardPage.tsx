@@ -1,3 +1,4 @@
+import { DEMO_MODE } from '@/shared/api/config'
 import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
@@ -181,7 +182,7 @@ export default function DashboardPage() {
           <CardHeader>
             <CardTitle>At a Glance</CardTitle>
             <CardSub>
-              {lastSync ? `Last sync ${dateTimeShort(lastSync)}` : "Online"}
+              {DEMO_MODE ? "Local demo · simulated sync" : lastSync ? `Last sync ${dateTimeShort(lastSync)}` : "Online"}
             </CardSub>
           </CardHeader>
           <CardBody className="pt-2">

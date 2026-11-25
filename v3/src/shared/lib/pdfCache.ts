@@ -1,4 +1,7 @@
-const DB_NAME = 'rf_offline_cache'
+import { APP_MODE } from '@/shared/api/config'
+import { pdfStorageKey } from '@/shared/api/mode'
+
+const DB_NAME = pdfStorageKey(APP_MODE)
 const STORE_NAME = 'pdfs'
 const DB_VERSION = 1
 

@@ -4,7 +4,7 @@ import { signatureRoleLabel } from '@/shared/lib/signatureRoles'
 
 const DEFAULT_FONT_SIZE = 12
 
-export async function exportTicketPdf(ticket: Ticket, form: FormTemplate, version: FormVersion) {
+export async function buildTicketPdf(ticket: Ticket, form: FormTemplate, version: FormVersion) {
   const doc = new jsPDF({ unit: 'pt', format: 'a4' })
   let y = 56
 
@@ -75,6 +75,11 @@ export async function exportTicketPdf(ticket: Ticket, form: FormTemplate, versio
     }
   }
 
+  return doc
+}
+
+export async function exportTicketPdf(ticket: Ticket, form: FormTemplate, version: FormVersion) {
+  const doc = await buildTicketPdf(ticket, form, version)
   doc.save(`${ticket.id}.pdf`)
 }
 

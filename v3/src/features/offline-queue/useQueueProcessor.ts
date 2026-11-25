@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { useAppStore } from '@/shared/state/useAppStore'
-import { API_ENABLED } from '@/shared/api/config'
+import { API_ENABLED, DEMO_MODE } from '@/shared/api/config'
 import { apiJson } from '@/shared/api/client'
 
 export function useQueueProcessor() {
@@ -13,7 +13,7 @@ export function useQueueProcessor() {
   const busy = useRef(false)
 
   useEffect(() => {
-    if (!online) return
+    if (!online || (!API_ENABLED && !DEMO_MODE)) return
 
     const id = window.setInterval(async () => {
       if (busy.current) return
@@ -64,15 +64,8 @@ export function useQueueProcessor() {
           return
         }
 
-        await sleep(700 + Math.random() * 800)
-
-        const fail = Math.random() < 0.17
-        if (fail) {
-          const err = Math.random() < 0.5 ? 'Network timeout' : 'Server rejected payload'
-          markQueueItem(next.id, 'failed', err)
-          updateTicket(next.ticketId, { status: 'error', lastError: err })
-          return
-        }
+        // Explicit local demo only: deterministic progress, no server acceptance.
+        await sleep(350)
 
         markQueueItem(next.id, 'synced')
         markSynced(next.ticketId)

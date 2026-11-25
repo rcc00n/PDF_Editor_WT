@@ -15,7 +15,7 @@ import { useAppStore } from './shared/state/useAppStore'
 import ToastHost from './shared/ui/ToastHost'
 import { useQueueProcessor } from './features/offline-queue/useQueueProcessor'
 import { seedIfEmpty } from './shared/state/seed'
-import { API_ENABLED } from './shared/api/config'
+import { API_ENABLED, APP_MODE, DEMO_MODE } from './shared/api/config'
 
 export default function App() {
   const boot = useAppStore(s => s.boot)
@@ -28,7 +28,8 @@ export default function App() {
   useQueueProcessor()
 
   useEffect(() => {
-    if (!API_ENABLED) seedIfEmpty()
+    if (APP_MODE === 'unconfigured') return
+    if (DEMO_MODE) seedIfEmpty()
     boot()
     void primePdfCache()
     if (API_ENABLED) void initAuth()
@@ -44,6 +45,12 @@ export default function App() {
       window.removeEventListener('offline', off)
     }
   }, [setSystemOnline])
+
+  if (APP_MODE === 'unconfigured') {
+    return <main className="p-8"><h1>Application configuration required</h1>
+      <p>Set VITE_API_BASE_URL for a connected workspace, or VITE_DEMO_MODE=true for the local simulation. Do not set both.</p>
+    </main>
+  }
 
   if (API_ENABLED && authStatus === 'unknown') {
     return (
