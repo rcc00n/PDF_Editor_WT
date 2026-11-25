@@ -23,8 +23,11 @@ No API base URL may be configured at the same time as demo mode.
 Try the existing workflow: inspect a form in Builder, open a field ticket, enter
 values/signatures, queue the submission, then inspect it in Review. Use synthetic
 PDFs and data. Demo records and PDF cache have separate browser storage namespaces
-from connected mode. Previous local-demo state is not automatically migrated into
-the new namespace or sent to an API.
+from connected mode. Older builds mixed demo and API state under `rf_store_v1` / `rf_offline_cache`.
+Those stores remain untouched and are never automatically loaded into the new API
+queue. **Before upgrading an existing installation, inspect/export any unsent work
+from the old build.** Server records remain authoritative; this review branch does
+not migrate ambiguous local drafts. Fresh local reviewers need no migration.
 
 ## Architecture and evidence
 

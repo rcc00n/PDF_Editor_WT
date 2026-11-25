@@ -13,6 +13,11 @@ explicit. It is not a deployment-readiness certification.
   round trips after these changes. Installation requires access to the official
   SheetJS CDN as well as npm; no tarball is bundled in this source repository.
   [SheetJS distribution guidance](https://docs.sheetjs.com/docs/getting-started/installation/nodejs/).
+- **Browser-state migration:** old builds shared `rf_store_v1` and
+  `rf_offline_cache` between demo and connected mode. They are preserved but not
+  automatically loaded into either new mode. The owner must inspect/export any
+  unsent work in the old build before an existing installation is upgraded; do not
+  clear browser storage first. This source pass does not perform that migration.
 - **Delivery:** a connected queue has real API requests; the demo only simulates
   progress. End-to-end crash recovery, idempotent resubmission and multi-device
   conflicts are not established by these tests.
